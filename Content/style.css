@@ -1,0 +1,182 @@
+* {
+	font-family: Tahoma, Geneva, sans-serif;
+	font-size:0.985em;
+}
+table, td
+{
+	border-color: #006;
+	border-style: solid;
+}
+
+table
+{
+	margin-top: 5px;
+	border-width: 0 0 1px 1px;
+	border-spacing: 0;
+	border-collapse: collapse;
+}
+td
+{
+	margin: 0;
+	padding: 1px;
+	border-width: 1px 1px 0 0;
+}
+
+td.legend
+{
+	 text-align: center;
+}
+
+
+
+*.inlineRight
+{
+	 display: inline-block;
+/*	 float: right;
+	 display: inline-block;*/
+}
+*.inlineLeft
+{
+	 display: inline-block;
+/*	 float: left;
+	 display: inline;*/
+}
+
+*.uncoloured
+{
+	background-color: #ffffff
+}
+td.padded
+{
+	padding: 3px;
+}
+
+li  /* Space out list items */
+{
+	margin: 0 0 3px 0;
+}
+
+div
+{
+
+	border-color:#555577;
+}
+
+div.statusdiv
+{
+	margin: 0 auto;
+	width: 120px;
+	display: inline-block;
+	vertical-align:top;
+}
+div.maindiv
+{
+	margin: 0 auto;
+	width: 882px;
+	display: inline-block;
+	overflow:hidden;
+}
+
+div.subdiv
+{
+	border:2px solid;
+	/*border-radius:25px;*/
+}
+div.statediv
+{
+	border:2px solid;
+	/*border-radius:25px;*/
+	padding:10px
+}
+div.contentdiv
+{
+	padding-top:    0px;
+	padding-right:  5px;
+	padding-bottom: 20px;
+	padding-left:   5px;
+}
+
+div.legend
+{
+	margin: 0 auto;
+	padding-top:    5px;
+	padding-right:  5px;
+	padding-bottom: 0px;
+	padding-left:   5px;
+}
+
+div.mtMainId
+{
+	background-color:#FFF79A;
+}
+div.daId
+{
+	background-color:#BBBBFF;
+}
+div.faId
+{
+	background-color:#BBFFBB;
+}
+div.hfId
+{
+	background-color:#EE99EE;
+}
+div.pxId
+{
+	background-color:#FFBBBB;
+}
+div.buMonId
+{
+	background-color:#BBFFBB;
+}
+div.navId
+{
+	background-color:#EEEEEE;
+}
+
+h3
+{
+	margin: 5 auto;
+	text-align: center;
+}
+
+ul
+{
+	list-style-type: square;
+	margin-left: 5px;
+	margin-top: 0px;
+	margin-right: 0px;
+	padding-left: 10px;
+	padding-top: 5px;
+	padding-right: 0px;
+}
+
+
+tr:nth-child(even)
+{
+	background: #f0f0ff
+}
+tr:nth-child(odd)
+{
+	background: #FFF
+}
+input[type="text"]
+{
+	background: transparent;
+	border: 1px solid;
+	/*outline: none;*/
+}
+
+form {
+margin-bottom: 0em;
+}
+
+.tooltip {
+	position:absolute;
+	border:1px solid #333;
+	background-color:#161616;
+	border-radius:5px;
+	padding:10px;
+	color:#fff;
+	font-size:10px Arial;
+}
