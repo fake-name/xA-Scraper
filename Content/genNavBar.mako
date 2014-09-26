@@ -83,8 +83,16 @@ def compactDateStr(dateStr):
 	runTime = dict(runTime)
 
 	for key in ["da", "fa", "hf", "px"]:
-		nextRuns[key] = compactDateStr(format_timedelta(float(nextRuns[key])-time.time(), locale='en_US'))
-		runState[key] = "Yes" if runState[key] == "1" else "No"
+		if key in nextRuns:
+			nextRuns[key] = compactDateStr(format_timedelta(float(nextRuns[key])-time.time(), locale='en_US'))
+		else:
+			nextRuns[key] = "N.A."
+
+		if key in runState:
+			runState[key] = "Yes" if runState[key] == "1" else "No"
+		else:
+			runState[key] = "N.A."
+
 		if key in lastRun:
 			# print("Last run = ", lastRun[key])
 			lastRun[key] = compactDateStr(format_timedelta(float(lastRun[key])-time.time(), locale='en_US'))

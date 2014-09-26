@@ -162,7 +162,7 @@ class PluginBase(metaclass=abc.ABCMeta):
 												artistName text NOT NULL,
 												uploadEh integer default 0,
 												UNIQUE(siteName, artistName) ON CONFLICT REPLACE)''' % settings["dbConf"]["namesDb"])
-			self.conn.execute('''CREATE INDEX IF NOT EXISTS %s ON %s (siteName, artistName)'''       % ("%s_index" % settings["dbConf"]["namesDb"]))
+			self.conn.execute('''CREATE INDEX IF NOT EXISTS %s ON %s (siteName, artistName)'''       % ("%s_index" % settings["dbConf"]["namesDb"], settings["dbConf"]["namesDb"]))
 			self.conn.commit()
 			self.log.info("Scanned Artist Name database created")
 

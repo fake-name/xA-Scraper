@@ -28,6 +28,14 @@ import cherrypy
 import statusDbManager
 
 
+JOBS = [
+	(das.GetDA, settings["da"]["runInterval"], "da"),
+	(fas.GetFA, settings["fa"]["runInterval"], "fa"),
+	(hfs.GetHF, settings["hf"]["runInterval"], "hf"),
+	(pxs.GetPX, settings["px"]["runInterval"], "px")
+]
+
+
 def runServer():
 
 	cherrypy.tree.graft(wsgi_server.app, "/")
@@ -88,24 +96,30 @@ def serverProcess(managedNamespace):
 
 def scheduleJobs(sched, managedNamespace):
 
-	jobs = [
-		(das.GetDA.runScraper, settings["da"]["runInterval"], "da"),
-		(fas.GetFA.runScraper, settings["fa"]["runInterval"], "fa"),
-		(hfs.GetHF.runScraper, settings["hf"]["runInterval"], "hf"),
-		(pxs.GetPX.runScraper, settings["px"]["runInterval"], "px")
-	]
 
-	for callee, interval, name in jobs:
+	for scraperClass, interval, name in JOBS:
 
-		# print(callee, interval)
-		sched.add_interval_job(callee, seconds=interval, start_date='2014-1-4 4:15:00', name=name, args=(managedNamespace,))
+		# print(scraperClass, interval)
+		sched.add_interval_job(scraperClass.runScraper, seconds=interval, start_date='2014-1-4 4:15:00', name=name, args=(managedNamespace,))
 	# sched.add_interval_job(printWat, seconds=10, start_date='2014-1-1 01:00')
+
+
+def checkInitDbs():
+
+
+
+	for scraperClass, interval, name in JOBS:
+		print("Setup for ", scraperClass)
+		tmp = scraperClass()
+		tmp.checkInitPrimaryDb()
 
 
 def go(managedNamespace):
 	statusMgr = statusDbManager.StatusResource()
 	managedNamespace.run = True
 	managedNamespace.serverRun = True
+
+	checkInitDbs()
 
 	server_process = multiprocessing.Process(target=serverProcess, args=(managedNamespace,))
 
