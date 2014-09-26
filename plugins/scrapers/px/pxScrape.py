@@ -301,7 +301,10 @@ class GetPX(plugins.scrapers.ScraperBase.ScraperBase):
 		countSpan = mainDiv.find("span", class_="count-badge")
 		if not countSpan:
 			raise LookupError("Could not retreive artist item quantity!")
-		return int(countSpan.text.split()[0])
+
+		text = countSpan.text.split()[0]
+		text = ''.join([char for char in text if char in '0123456789'])
+		return int(text)
 
 
 	def _getItemsOnPage(self, inSoup):
