@@ -123,7 +123,7 @@ class PageResource(object):
 			# Conditionally parse and render mako files.
 			if reqPath.endswith(".mako"):
 				pgTemplate = self.lookupEngine.get_template(reqPath)
-				pageContent = pgTemplate.render_unicode(request=request, sqlCon=self.conn)
+				pageContent = pgTemplate.render_unicode(request=request, sqlCon=self.conn, api=self.apiInterface)
 				return Response(body=pageContent)
 			else:
 				absolute_path = os.path.join(self.base_directory, reqPath)
@@ -145,6 +145,7 @@ class PageResource(object):
 	def checkAuth(self, request):
 		userid = pys.authenticated_userid(request)
 		if userid is None:
+			self.log.warn("No userID found. Redirecting to login")
 			return HTTPFound(location=request.route_url('login'))
 
 	def getImagePathFromID(self, imageID):
@@ -244,10 +245,10 @@ class PageResource(object):
 				return Response(body=pageContent, headers=headers)
 
 			else:
-				self.log.info("Invalid user. Deleting cookie.")
+				self.log.warn("Invalid user. Deleting cookie.")
 				headers = pys.forget(request)
 		else:
-			self.log.info("No user specified - Deleting cookie.")
+			self.log.warn("No user specified - Deleting cookie.")
 			headers = pys.forget(request)
 
 		return HTTPFound(location=request.route_url('login'))

@@ -146,7 +146,7 @@ class ScraperBase(PluginBase, metaclass=abc.ABCMeta):
 		dirPath = self.getDownloadPath(self.dlBasePath, artist)
 		if not os.path.exists(dirPath):
 			try:
-				os.mkdir(dirPath)
+				os.makedirs(dirPath)
 			except:
 				self.log.error("Cannot Make working directory %s/. Do you have write Permissions?", dirPath)
 				raise

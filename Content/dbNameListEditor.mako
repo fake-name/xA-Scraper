@@ -118,9 +118,9 @@ logger =  logging.getLogger("Main.WebSrv")
 	</form>
 	<table border="1px" style="width:800px;">
 		<tr>
-				<th class="uncoloured padded" width="100%">Artist Name</th>
-				<th class="uncoloured padded" width="40">Auto-Upload</th>
-				<th class="uncoloured padded" width="30">Del</th>
+				<th class="uncoloured padded" width="670px">Artist Name</th>
+				<th class="uncoloured padded" width="100px">Auto-Upload</th>
+				<th class="uncoloured padded" width="30px">Del</th>
 		</tr>
 
 		% for uId, artistName, uploadEh in nameTupList:
@@ -154,16 +154,6 @@ logger =  logging.getLogger("Main.WebSrv")
 
 <%
 
-# ------------------------------------------------------------------------
-# This is the top of the main
-# page generation section.
-# Execution begins here
-# ------------------------------------------------------------------------
-
-
-
-cur = sqlCon.cursor()
-
 
 def getNameDict():
 
@@ -179,13 +169,35 @@ def getNameDict():
 
 	return items
 
+
+def processGetArgs(args):
+	print("Args", args)
+
+	for key, value in args.items():
+		print("	", key, value)
+
+%>
+
+<%
+
+
+
+if request.params:
+	api.handleApiCall(request)
+
+
+cur = sqlCon.cursor()
+
+
+
 siteNameDict = getNameDict()
 
+sites = [settings[key]['shortName'] for key in settings['artSites']]
 
-sites = list(siteNameDict.keys())
-sites.sort()
+for site in sites:
+	if not site in siteNameDict:
+		siteNameDict[site] = []
 
-# print(request.GET)
 
 %>
 

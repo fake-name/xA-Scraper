@@ -68,6 +68,37 @@ class ApiInterface(object):
 
 		return Response(body=json.dumps({"Status": "Success", "Message": "Directory Renamed"}))
 
+	def nameAdd(self, request):
+
+		requiredKeys = ['target', 'add', 'site', 'artistName']
+		for item in requiredKeys:
+			if not item in request.params:
+				return Response(body=json.dumps({"Status": "Failed", "Message": "Missing required parameters."}))
+
+		site = request.params['site']
+		if not site in settings["artSites"]:
+			return Response(body=json.dumps({"Status": "Failed", "Message": "Invalid source site."}))
+
+		add = request.params['add']
+		if not add == "True":
+			return Response(body=json.dumps({"Status": "Failed", "Message": "Add is false?"}))
+
+		name = request.params['artistName']
+		if not name:
+			return Response(body=json.dumps({"Status": "Failed", "Message": "Name is empty."}))
+
+
+		cur = self.conn.cursor()
+
+		ret = cur.execute("SELECT * FROM %s WHERE siteName=? AND artistName=?;" % settings["dbConf"]["namesDb"], (site, name))
+		have = ret.fetchall()
+		if have:
+			return Response(body=json.dumps({"Status": "Failed", "Message": "Name is already in database!"}))
+
+
+		cur.execute("INSERT INTO %s (siteName, artistName) VALUES (?, ?);" % settings["dbConf"]["namesDb"], (site, name))
+		self.conn.commit()
+
 
 	def handleApiCall(self, request):
 
@@ -80,5 +111,10 @@ class ApiInterface(object):
 		elif "change-artist-name" in request.params:
 			print("Updating artist's name!")
 			return self.updateName(request)
+		elif 'target' in request.params:
+			print("Adding artist!")
+			return self.nameAdd(request)
+
 		else:
+			print("Unknown API call!")
 			return Response(body="wat?")
