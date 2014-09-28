@@ -7,19 +7,19 @@ import bs4
 import urllib.request
 import urllib.parse
 import time
+import webFunctions as wg
 from settings import settings
 
-import plugins.PluginBase
+import plugins.uploaders.UploadBase
 
-
-class UploadEh(plugins.PluginBase.PluginBase):
+class UploadEh(plugins.uploaders.UploadBase.UploadBase):
 
 	settingsDictKey = "eh"
-	pluginName = "DaGet"
+	pluginName = "Eh.Ul"
 
 	ovwMode = "Check Files"
 
-	numThreads = 8
+	numThreads = 1
 
 
 
@@ -76,25 +76,14 @@ class UploadEh(plugins.PluginBase.PluginBase):
 
 
 
-	# ---------------------------------------------------------------------------------------------------------------------------------------------------------
-	# DB Convenience stuff
-	# ---------------------------------------------------------------------------------------------------------------------------------------------------------
-
-
-	def getByRowId(self, rowId):
-		cur = self.conn.cursor()
-
-		ret = cur.execute("""SELECT siteName, artistName FROM %s WHERE id=?;""" % settings["dbConf"]["namesDb"], (rowId, ))
-		rets = ret.fetchone()
-		return rets
-
-
 	def getToProcess(self):
 		cur = self.conn.cursor()
 
 		ret = cur.execute("""SELECT id FROM %s WHERE uploadEh=1;""" % settings["dbConf"]["namesDb"])
 		rets = ret.fetchall()
 		return rets
+
+
 
 
 
@@ -146,19 +135,23 @@ class UploadEh(plugins.PluginBase.PluginBase):
 
 		formDict = {}
 
-		title       = "%s - Art Works" % aName.title()
+		title       = "%s - Collected Works" % aName.title()
 		description = """Assorted art from varied sources for artist: %s.
 
 		Auto-Gallery System 0.0001a (really, really alpha release)
-		This is an automatically maintained gallery. Please direct any issues/complaints/complements to xadownloader@gmail.com.
+		This is an automatically maintained gallery. Please direct any issues/complaints/complements to fake0name@tfwno.gf.
 
 		By SHA-1 duplicate checking, this gallery should contain %s new items, %s duplicates, and is therefore
-		a super-set of any previously uploaded galleries. These values only reflect the initial upload state, though.
+		a super-set of any previously uploaded galleries. These values only reflect the initial upload state, though, and will miss items
+		that have been recompressed/resaved.
 
 		If there is an artist on DeviantArt, HentaiFoundry, FurAffinity or Pixiv you would
 		like a mirror of, feel free to ask. I currently have automated systems in place to
 		periodically update my local mirror of all four of these sites, and adding
 		additional targets to scrape is a trivial matter.
+
+		Updates are limited to at-max once every two weeks, as the rules require. If you see updates more often then that, plese
+		report the issue, and I'll see about fixing it as soon as possible.
 		""" % (aName.title(), uniques, totalItems-uniques)
 
 		formDict["gname"]         = title
@@ -170,30 +163,76 @@ class UploadEh(plugins.PluginBase.PluginBase):
 		formDict["tos"]           = "on"
 		formDict["creategallery"] = "Create+and+Continue"
 
-		print(formDict)
+		# print(formDict)
 
 		pagetext = self.wg.getpage('http://ul.exhentai.org/manage.php?act=new', postData = formDict)
 
+		soup = bs4.BeautifulSoup(pagetext)
+		forward = soup.find('p', id='continue')
+		forward.a['href']
 
-		print("Need to create gallery for ", aName)
+		itemUrl = forward.a['href']
+		urlQuery = urllib.parse.urlparse(itemUrl)[4]
+		newGid = urllib.parse.parse_qs(urlQuery)["gid"].pop()
+		newGid = int(newGid)
+
+		print("Created gallery for ", aName)
+		return newGid
+
+	def uploadFile(self, gid, filePath):
+
+		gurl = 'http://ul.e-hentai.org/manage.php?act=add&gid=%s' % gid
+
+		with open(filePath, "rb") as fp:
+			fcont = fp.read()
+		fName = os.path.split(filePath)[-1]
+		form = wg.MultiPartForm()
+		form.add_field("MAX_FILE_SIZE", '52428800')
+		form.add_field("ulact", 'ulmore')
+		form.add_file("file01", fName, fcont)
+
+		self.wg.getpage(gurl, binaryForm=form)
+
 
 	def updateGallery(self, rowId, images):
-		print("Implement me!")
+		lastUl, ulQuantity, galleryId = self.getUploadState(rowId)
 
-	def uploadToGallery(self, haveItems, rowId):
+		if lastUl > time.time() - 60*60*24*14:
+			self.log.info("Item updated within the last two weeks. Skipping")
+
+		for image in images:
+			if self.haveUploaded(image):
+				continue
+
+			self.uploadFile(galleryId, image)
+			self.addUploaded(rowId, image)
+
+		self.setUpdateTimer(rowId, time.time())
+
+
+
+		# print("rowId", rowId, "images", images)
+
+	def checkGallery(self, haveItems, rowId):
 
 		images = self.getImagesForId(rowId)
-		numUnique = self.checkIfShouldUpload(images)
 
 
 		siteName, aName = self.getByRowId(rowId)
 		if not aName in [name for name, gId in haveItems]:
-			self.createGallery(aName, numUnique, len(images))
-		else:
-			self.updateGallery(rowId, images)
-			print("Have gallery for", aName)
 
-		self.uploadFromRowId(rowId, siteName, aName)
+			numUnique = self.checkIfShouldUpload(images)
+			if numUnique > 3:
+				newGid = self.createGallery(aName, numUnique, len(images))
+				self.addNewUploadGallery(rowId, newGid)
+				self.updateGallery(rowId, images)
+			else:
+				self.log.warn("Do not have sufficent unique items to warrant upload for artist %s!" % aName)
+
+		else:
+			print("Have gallery for", aName, "Updating")
+			self.updateGallery(rowId, images)
+
 
 
 	# ---------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -209,21 +248,23 @@ class UploadEh(plugins.PluginBase.PluginBase):
 	def checkIfShouldUpload(self, fileList):
 		uniques = 0
 		nonuniq = 0
+		toScan = len(fileList)
 		for fileN in fileList:
 
 			fHash = self.getHashOfFile(fileN)
 			if not self.checkIfHashExists(fHash):
 				uniques += 1
-				print("Unique item", uniques, nonuniq, fileN)
+				self.log.info("Unique item '%s', '%s', '%s'", uniques, nonuniq, fileN)
 			else:
 				nonuniq += 1
-				print("Non-unique item", uniques, nonuniq, fileN)
-			time.sleep(2.5)
-		return uniques
+				self.log.info("Non-unique item '%s', '%s', '%s'", uniques, nonuniq, fileN)
 
-	def checkRecentlyUpdatedAlready(self, rowId):
-		print("Implement me!")
-		return False
+			toScan -= 1
+			self.log.info("Remaining to check - %s", toScan)
+			time.sleep(2)
+
+
+		return uniques
 
 	def processTodo(self, listIn):
 
@@ -231,12 +272,11 @@ class UploadEh(plugins.PluginBase.PluginBase):
 		for itemName, itemGid in existingGalleries:
 			self.log.info("Have gallery %s, %s", itemName, itemGid)
 		for rowId, in listIn:
-			alreadyUpdated = self.checkRecentlyUpdatedAlready(rowId)
 
-			if not alreadyUpdated:
-				self.uploadToGallery(existingGalleries, rowId)
-			else:
-				self.log.info("Skipping uploading %s", rowId)
+			self.checkGallery(existingGalleries, rowId)
+			# if not alreadyUpdated:
+			# else:
+			# 	self.log.info("Skipping uploading %s", rowId)
 
 
 

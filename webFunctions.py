@@ -28,6 +28,79 @@ import io
 from threading import Lock
 cookieWriteLock = Lock()
 
+#!/usr/bin/env python3
+import itertools
+import mimetypes
+import email.generator
+"""
+Doug Hellmann's urllib2, translated to python3.
+"""
+class MultiPartForm():
+	"""Accumulate the data to be used when posting a form."""
+
+	def __init__(self):
+		self.form_fields = []
+		self.files = []
+		self.boundary = email.generator._make_boundary()
+		return
+
+	def get_content_type(self):
+		return 'multipart/form-data; boundary=%s' % self.boundary
+
+	def add_field(self, name, value):
+		"""Add a simple field to the form data."""
+		self.form_fields.append((name, value))
+		return
+
+	def add_file(self, fieldname, filename, fContents, mimetype=None):
+		"""Add a file to be uploaded."""
+		if mimetype is None:
+			mimetype = mimetypes.guess_type(filename)[0] or 'application/octet-stream'
+		self.files.append((fieldname, filename, mimetype, fContents))
+		return
+
+	def make_result(self):
+		"""Return bytes representing the form data, including attached files."""
+		# Build a list of lists, each containing "lines" of the
+		# request.  Each part is separated by a boundary string.
+		# Once the list is built, return a string where each
+		# line is separated by '\r\n'.
+		parts = []
+		part_boundary = '--' + self.boundary
+
+		# Add the form fields
+		parts.extend(
+			[ bytes(part_boundary, 'utf-8'),
+			  bytes('Content-Disposition: form-data; name="%s"' % name, 'utf-8'),
+			  b'',
+			  bytes(value, 'utf-8'),
+			]
+			for name, value in self.form_fields
+			)
+
+		# Add the files to upload
+		parts.extend(
+			[ bytes(part_boundary, 'utf-8'),
+			  bytes('Content-Disposition: file; name="%s"; filename="%s"' % (field_name, filename), 'utf-8'),
+			  bytes('Content-Type: %s' % content_type, 'utf-8'),
+			  b'',
+			  body,
+			]
+			for field_name, filename, content_type, body in self.files
+			)
+
+		# Flatten the list and add closing boundary marker,
+		# then return CR+LF separated data
+		flattened = list(itertools.chain(*parts))
+		flattened.append(bytes('--' + self.boundary + '--', 'utf-8'))
+		flattened.append(b'')
+		return b'\r\n'.join(flattened)
+
+
+
+
+
+
 class WebGetRobust:
 	COOKIEFILE = 'cookies.lwp'				# the path and filename to save your cookies in
 	cj = None
@@ -135,7 +208,7 @@ class WebGetRobust:
 
 		# postData expects a dict
 		# addlHeaders also expects a dict
-	def getpage(self, pgreq, addlHeaders = None, returnMultiple = False, callBack=None, postData=None, soup=False):
+	def getpage(self, pgreq, addlHeaders=None, returnMultiple=False, callBack=None, postData=None, soup=False, binaryForm=None):
 
 		# pgreq = fixurl(pgreq)
 		# print pgreq
@@ -152,7 +225,15 @@ class WebGetRobust:
 
 		try:
 			# TODO: make this more sensible
-			if addlHeaders != None and  postData != None:
+			if binaryForm:
+				log.info("Binary/multipart form submission!")
+				pgreq = urllib.request.Request(pgreq)
+				formContents = binaryForm.make_result()
+				pgreq.data = formContents
+				pgreq.add_header('Content-type', binaryForm.get_content_type())
+				pgreq.add_header('Content-length', len(formContents))
+
+			elif addlHeaders != None and  postData != None:
 				log.info("Making a post-request with additional headers!")
 				pgreq = urllib.request.Request(pgreq, headers=addlHeaders, data=urllib.parse.urlencode(postData).encode("utf-8"))
 			elif addlHeaders != None:
