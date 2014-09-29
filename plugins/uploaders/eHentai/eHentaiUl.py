@@ -211,6 +211,7 @@ class UploadEh(plugins.uploaders.UploadBase.UploadBase):
 
 			self.uploadFile(galleryId, image)
 			self.addUploaded(rowId, image)
+			remaining -= remaining
 			self.log.info("Remaining to upload - %s of %s", remaining, len(images))
 
 		self.setUpdateTimer(rowId, time.time())
@@ -267,7 +268,7 @@ class UploadEh(plugins.uploaders.UploadBase.UploadBase):
 				self.log.info("Non-unique item '%s', '%s', '%s'", uniques, nonuniq, fileN)
 
 			toScan -= 1
-			self.log.info("Remaining to check - %s", toScan)
+			self.log.info("Remaining to check - %s of %s", toScan, len(fileList))
 			time.sleep(2)
 
 
