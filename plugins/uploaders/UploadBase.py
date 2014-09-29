@@ -101,7 +101,7 @@ class UploadBase(plugins.PluginBase.PluginBase):
 			raise ValueError("Wat? Gallery appears to exist already? Please delete colliding library.")
 
 		ret = items.pop()[0]
-		print("Ret", ret, bool(ret))
+		# print("Ret", ret, bool(ret))
 		return bool(ret)
 
 	def addUploaded(self, artistId, imagePath):

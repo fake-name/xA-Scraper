@@ -319,7 +319,7 @@ class WebGetRobust:
 				if pghandle != None:
 					try:
 
-						log.info("Request for URL: %s succeeded at %s On Attempt %s. Recieving...", pgreq.get_full_url(), time.ctime(time.time()), loopctr)
+						log.info("Request for URL: %s succeeded at %s On Attempt %s. Recieving.", pgreq.get_full_url(), time.ctime(time.time()), loopctr)
 						if callBack:
 							pgctnt = self.chunkRead(pghandle, 2 ** 17, reportHook = callBack)
 						else:

@@ -183,6 +183,8 @@ class PluginBase(metaclass=abc.ABCMeta):
 		ret = []
 		for fileN in files:
 			ret.append(os.path.join(filesPath, fileN))
+
+		ret.sort()
 		return ret
 
 	def getImagesForId(self, rowId):

@@ -10,6 +10,8 @@ import time
 import webFunctions as wg
 from settings import settings
 
+from natsort import natsorted
+
 import plugins.uploaders.UploadBase
 
 class UploadEh(plugins.uploaders.UploadBase.UploadBase):
@@ -109,7 +111,7 @@ class UploadEh(plugins.uploaders.UploadBase.UploadBase):
 
 		for item in items:
 			itemTd = item.find("td", class_="gtc1")
-			aName = itemTd.get_text().split("-")[0]
+			aName = itemTd.get_text().split(" - ")[0]
 			aName = aName.rstrip().lstrip().lower()
 
 			itemUrl = itemTd.a["href"]
@@ -141,6 +143,9 @@ class UploadEh(plugins.uploaders.UploadBase.UploadBase):
 		Auto-Gallery System 0.0001a (really, really alpha release)
 		This is an automatically maintained gallery. Please direct any issues/complaints/complements to fake0name@tfwno.gf.
 
+		Items are sorted alphabetically. Sorry, not much I can do about any ordering issues, if there is a problem,
+		take it up with the artist (and their poor filenaming practices).
+
 		By SHA-1 duplicate checking, this gallery should contain %s new items, %s duplicates, and is therefore
 		a super-set of any previously uploaded galleries. These values only reflect the initial upload state, though, and will miss items
 		that have been recompressed/resaved.
@@ -169,7 +174,6 @@ class UploadEh(plugins.uploaders.UploadBase.UploadBase):
 
 		soup = bs4.BeautifulSoup(pagetext)
 		forward = soup.find('p', id='continue')
-		forward.a['href']
 
 		itemUrl = forward.a['href']
 		urlQuery = urllib.parse.urlparse(itemUrl)[4]
@@ -200,12 +204,14 @@ class UploadEh(plugins.uploaders.UploadBase.UploadBase):
 		if lastUl > time.time() - 60*60*24*14:
 			self.log.info("Item updated within the last two weeks. Skipping")
 
+		remaining = len(images)
 		for image in images:
 			if self.haveUploaded(image):
 				continue
 
 			self.uploadFile(galleryId, image)
 			self.addUploaded(rowId, image)
+			self.log.info("Remaining to upload - %s of %s", remaining, len(images))
 
 		self.setUpdateTimer(rowId, time.time())
 
@@ -217,6 +223,7 @@ class UploadEh(plugins.uploaders.UploadBase.UploadBase):
 
 		images = self.getImagesForId(rowId)
 
+		images = natsorted(images)
 
 		siteName, aName = self.getByRowId(rowId)
 		if not aName in [name for name, gId in haveItems]:
