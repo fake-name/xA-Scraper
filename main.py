@@ -10,7 +10,7 @@ import multiprocessing.managers
 import threading
 import logSetup
 
-from apscheduler.scheduler import Scheduler
+from apscheduler.schedulers.background import BackgroundScheduler
 # from apscheduler.jobstores.sqlalchemy_store import SQLAlchemyJobStore
 
 from settings import settings
@@ -99,8 +99,8 @@ def scheduleJobs(sched, managedNamespace):
 
 	for scraperClass, interval, name in JOBS:
 
-		# print(scraperClass, interval)
-		sched.add_interval_job(scraperClass.runScraper, seconds=interval, start_date='2014-1-4 4:15:00', name=name, args=(managedNamespace,))
+		print(scraperClass, interval)
+		sched.add_job(scraperClass.runScraper, trigger='interval', seconds=interval, start_date='2014-1-4 4:15:00', name=name, args=(managedNamespace,))
 	# sched.add_interval_job(printWat, seconds=10, start_date='2014-1-1 01:00')
 
 
@@ -123,7 +123,7 @@ def go(managedNamespace):
 
 	server_process = multiprocessing.Process(target=serverProcess, args=(managedNamespace,))
 
-	sched = Scheduler()
+	sched = BackgroundScheduler()
 
 	scheduleJobs(sched, managedNamespace)
 	server_process.start()
