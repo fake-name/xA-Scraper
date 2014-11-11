@@ -59,6 +59,13 @@ class UploadBase(plugins.PluginBase.PluginBase):
 		rets = ret.fetchone()
 		return rets
 
+	def getByGalleryId(self, gId):
+		cur = self.conn.cursor()
+
+		ret = cur.execute("""SELECT mainId, uploadTime, uploadedItems, galleryId FROM %s WHERE galleryId=?;""" % settings["dbConf"]["uploadGalleries"], (gId, ))
+		rets = ret.fetchone()
+		return rets
+
 
 	def getToProcess(self):
 		cur = self.conn.cursor()
@@ -87,7 +94,6 @@ class UploadBase(plugins.PluginBase.PluginBase):
 			print("Returned ", items)
 			raise ValueError("Wat? Gallery appears to exist already? Please delete colliding library.")
 
-
 		return items.pop()
 
 
@@ -110,10 +116,25 @@ class UploadBase(plugins.PluginBase.PluginBase):
 		self.conn.commit()
 
 
+	def getUploaded(self, artistId):
+		cur = self.conn.cursor()
+		ret = cur.execute("SELECT artistId, imagePath FROM %s WHERE artistId=?;"  % (settings["dbConf"]["uploadedImages"]), (artistId, ))
+		items = ret.fetchall()
+		self.conn.commit()
+		return items
+
+
 
 	def setUpdateTimer(self, artistId, updateTime):
 		cur = self.conn.cursor()
 		cur.execute("UPDATE %s SET uploadTime=? WHERE mainId=?;"  % (settings["dbConf"]["uploadGalleries"]), (updateTime, artistId))
+		self.conn.commit()
+
+
+	def updateGalleryId(self, mainId, galleryId):
+		cur = self.conn.cursor()
+		cur.execute("UPDATE %s SET galleryId=? WHERE mainId=?;"  % (settings["dbConf"]["uploadGalleries"]), (galleryId, mainId))
+
 		self.conn.commit()
 
 

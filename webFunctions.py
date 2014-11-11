@@ -374,7 +374,7 @@ class WebGetRobust:
 									# bytes string is using, and we need the regex to get that encoding
 									coding = re.search(b"charset=[\'\"]?([a-zA-Z0-9\-]*)[\'\"]?", pgctnt, flags=re.IGNORECASE)
 
-									cType = ""
+									cType = b""
 									if coding:
 										cType = coding.group(1)
 
