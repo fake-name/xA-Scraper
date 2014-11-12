@@ -100,7 +100,7 @@ def scheduleJobs(sched, managedNamespace):
 	for scraperClass, interval, name in JOBS:
 
 		print(scraperClass, interval)
-		sched.add_job(scraperClass.runScraper, trigger='interval', seconds=interval, start_date='2014-1-4 4:15:00', name=name, args=(managedNamespace,))
+		sched.add_job(scraperClass.runScraper, trigger='interval', seconds=interval, start_date='2014-1-4 0:00:00', name=name, args=(managedNamespace,))
 	# sched.add_interval_job(printWat, seconds=10, start_date='2014-1-1 01:00')
 
 

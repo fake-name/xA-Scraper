@@ -16,6 +16,9 @@ from settings import settings
 import statusDbManager
 from plugins.PluginBase import PluginBase
 
+import plugins.uploaders.eHentai.eHentaiUl
+
+
 class ScraperBase(PluginBase, metaclass=abc.ABCMeta):
 
 	# Abstract class (must be subclassed)
@@ -246,8 +249,8 @@ class ScraperBase(PluginBase, metaclass=abc.ABCMeta):
 			self.log.info("Successfully retreived content for artist %s", artist)
 			return False
 		except:
-			self.log.error("Exception when retreiving artist %s" % artist)
-			self.log.error("%s" % traceback.format_exc())
+			self.log.error("Exception when retreiving artist %s", artist)
+			self.log.error("%s", traceback.format_exc())
 			return True
 
 
@@ -289,9 +292,18 @@ class ScraperBase(PluginBase, metaclass=abc.ABCMeta):
 				errored  |= future.result()
 				# self.log.info("Return = %s, aName = %s, errored = %s" % (res, aName, errored))
 
+		if errored:
+			self.log.warn("Had errors!")
+
+		ul = plugins.uploaders.eHentai.eHentaiUl.UploadEh()
+		# ul.syncGalleryIds()
+		ul.go(ctrlNamespace=ctrlNamespace, ulFilter=[self.settingsDictKey])
+
 		self.statusMgr.updateRunningStatus(self.settingsDictKey, False)
 		runTime = time.time()-startTime
 		self.statusMgr.updateLastRunDuration(self.settingsDictKey, runTime)
+
+
 
 	@classmethod
 	def runScraper(cls, managedNamespace):

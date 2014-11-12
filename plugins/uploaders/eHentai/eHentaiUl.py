@@ -309,7 +309,12 @@ class UploadEh(plugins.uploaders.UploadBase.UploadBase):
 
 	def checkGallery(self, haveItems, rowId):
 
-		images = self.getImagesForId(rowId)
+		try:
+			images = self.getImagesForId(rowId)
+		except ValueError:
+			self.log.error("Failure getting downloads for artist '%s'!", self.getByRowId(rowId))
+			self.log.error("Artist has not been downloaded, or cannot find download path!")
+			return
 
 		images = natsorted(images)
 
@@ -329,8 +334,8 @@ class UploadEh(plugins.uploaders.UploadBase.UploadBase):
 
 			lastUl = self.getUploadState(rowId)[0]
 			ulQuantity = len(self.getUploaded(rowId))
-			if lastUl > time.time() - 60*60*24*14:
-				self.log.info("Item updated within the last two weeks. Skipping")
+			if lastUl > time.time() - 60*60*24*21:
+				self.log.info("Item updated within the last three weeks. Skipping")
 				return
 			if len(images) < ulQuantity+3:
 				self.log.info("Do not have enough new content to warrant updating (%s new item(s)). Skipping.", len(images) - ulQuantity)
@@ -404,13 +409,18 @@ class UploadEh(plugins.uploaders.UploadBase.UploadBase):
 
 
 
-	def processTodo(self, listIn):
+	def processTodo(self, listIn, ulFilter):
 
 		existingGalleries = self.getExtantGalleries()
-		print("Existing galleries", existingGalleries)
+		# print("Existing galleries", existingGalleries)
 		for itemName, itemGid in existingGalleries:
 			self.log.info("Have gallery %s, %s", itemName, itemGid)
 		for rowId, in listIn:
+
+			artistInfo = self.getByRowId(rowId)
+			if ulFilter and artistInfo[0] not in ulFilter:
+				self.log.info("Skipping download for %s due to upload filter.", artistInfo)
+
 			self.checkGallery(existingGalleries, rowId)
 
 
@@ -421,7 +431,7 @@ class UploadEh(plugins.uploaders.UploadBase.UploadBase):
 	# ---------------------------------------------------------------------------------------------------------------------------------------------------------
 
 
-	def go(self, toDoList=None, ctrlNamespace=None):
+	def go(self, ulFilter=['da'], toDoList=None, ctrlNamespace=None):
 		if ctrlNamespace == None:
 			raise ValueError("You need to specify a namespace!")
 		self.manager = ctrlNamespace
@@ -455,7 +465,7 @@ class UploadEh(plugins.uploaders.UploadBase.UploadBase):
 			toDoList = self.getToProcess()
 
 
-		self.processTodo(toDoList)
+		self.processTodo(toDoList, ulFilter)
 
 
 		self.statusMgr.updateRunningStatus(self.settingsDictKey, False)

@@ -176,7 +176,7 @@ class PluginBase(metaclass=abc.ABCMeta):
 
 	def getFilesForId(self, rowId):
 		siteName, aName = self.getByRowId(rowId)
-		filesPath = self.getDownloadPath(settings[siteName]["dlDirName"], aName)
+		filesPath = self.getDownloadPath(settings[siteName]["dlDirName"], aName.lower())
 		if not os.path.isdir(filesPath):
 			raise ValueError("FilePath is invalid! %s" % filesPath)
 		files = os.listdir(filesPath)
