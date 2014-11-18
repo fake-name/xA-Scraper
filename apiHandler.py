@@ -25,19 +25,18 @@ class ApiInterface(object):
 
 		cur = self.conn.cursor()
 
-		ret = cur.execute('SELECT id, siteName, artistName, uploadEh FROM %s WHERE id=?;' % settings["dbConf"]["namesDb"], (request.params["id"], ))
+		ret = cur.execute('SELECT id, siteName, artistName FROM %s WHERE id=?;' % settings["dbConf"]["namesDb"], (request.params["id"], ))
 
 		rets = ret.fetchone()
 		if not len(rets):
 			return Response(body=json.dumps({"Status": "Error", "Message": "No artist for specified ID!"}))
 
-		rowId, siteName, artistName, uploadEh = rets
+		rowId, siteName, artistName = rets
 
-		if artistName == request.params["aName"] and uploadEh == (request.params["auto-upload"].lower() == "true"):
+		if artistName == request.params["aName"]:
 			return Response(body=json.dumps({"Status": "Error", "Message": "No changes made?"}))
 
-		cur.execute("UPDATE %s SET artistName=?, uploadEh=? WHERE id=?" % settings["dbConf"]["namesDb"], (request.params["aName"],
-																										(request.params["auto-upload"].lower() == "true"),
+		cur.execute("UPDATE %s SET artistName=?, WHERE id=?" % settings["dbConf"]["namesDb"], (request.params["aName"],
 																										request.params["id"]))
 		self.conn.commit()
 

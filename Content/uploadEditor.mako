@@ -67,11 +67,9 @@
 				});
 				if (!$.isEmptyObject(ret))
 				{
-					ret["change-artist-name"] = true;
+					ret["change-upload-status"] = true;
 					$.ajax("api", {"data": ret, success: ajaxSuccess})
 				}
-
-
 
 			}
 		};
@@ -97,44 +95,64 @@ from settings import settings
 logger =  logging.getLogger("Main.WebSrv")
 
 
-
 %>
 
 
 
 
 
-<%def name="genNameListManagementTable(siteShortName, nameTupList)">
-	<h2>${settings[siteShortName]["dlDirName"]}</h2>
-	<form>
-		Add new artist:
-		<input type="hidden" name="target" value="addName">
-		<input type="hidden" name="add", value="True">
-		<input type="hidden" name="site", value="${siteShortName}">
-		<div style="display: inline-block;">
-			<td><input type="text" name="artistName", value="" size=50></td>
-		</div>
-		<input type="submit" value="Add">
-	</form>
+<%def name="genUploadManagementTable(scrapeList, nameLUT)">
+
+	<%
+
+	cols = list(settings["ulConf"].keys())
+	cols.sort()
+
+	%>
 	<table border="1px" style="width:800px;">
 		<tr>
-				<th class="uncoloured padded" width="670px">Artist Name</th>
+				<th class="uncoloured padded" width="70px">RowId</th>
+				<th class="uncoloured padded" width="70px">GalId</th>
+				% for col in cols:
+					<th class="uncoloured padded" width="200px">${settings["ulConf"][col]}</th>
+				% endfor
 				<th class="uncoloured padded" width="30px">Del</th>
 		</tr>
 
-		% for uId, artistName in nameTupList:
-			<tr id='rowid_${uId}'>
+		% for rowId, rowData in scrapeList.items():
+			<%
+
+			print(rowId, rowData)
+			galId, aIds = rowData
+
+			print(nameLUT)
+
+			aIds = dict(zip(cols, aIds))
+			%>
+			<tr id='rowid_${rowId}'>
 
 				<td>
-					<span id="view"> ${artistName} </span>
-					<span id="edit" style="display:none">
-						<input type="text" name="aName" style="box-sizing: border-box; width: 100%; -moz-box-sizing: border-box; -webkit-box-sizing: border-box;" value="${artistName}">
-
-					</span>
+					${rowId}
+				</td>
+				<td>
+					${galId}
 				</td>
 
+				% for srcKey in cols:
+					<%
+					keyVal = '' if aIds[srcKey] == None else nameLUT[aIds[srcKey]]
+					%>
+					<td>
+						<span id="view"> ${keyVal} </span>
+						<span id="edit" style="display:none">
+							<input type="text" name="${settings["ulConf"][srcKey]}" style="box-sizing: border-box; width: 100%; -moz-box-sizing: border-box; -webkit-box-sizing: border-box;" value="keyVal">
+
+						</span>
+					</td>
+				% endfor
+
 				<td>
-					&nbsp;<a href="#" id='buttonid_${uId}' onclick="ToggleEdit('${uId}');return false;">Edit</a>&nbsp;
+					&nbsp;<a href="#" id='buttonid_${rowId}' onclick="ToggleEdit('${rowId}');return false;">Edit</a>&nbsp;
 				</td>
 			</tr>
 		% endfor
@@ -148,17 +166,39 @@ logger =  logging.getLogger("Main.WebSrv")
 
 def getNameDict():
 
-	ret = cur.execute('SELECT id, siteName, artistName FROM %s;' % settings["dbConf"]["namesDb"])
+	cols = list(settings["ulConf"].keys())
+	cols.sort()
+	cols = [key+'id' for key in cols]
+	cols = ", ".join(cols)
+
+	ret = cur.execute('SELECT id, galleryId, {cols} FROM {table};'.format(table=settings["dbConf"]["uploadGalleries"], cols=cols))
 	rets = ret.fetchall()
 
-	items = {}
-	for uId, site, name in rets:
-		if not site in items:
-			items[site] = [(uId, name)]
-		else:
-			items[site].append((uId, name))
+	ids = []
+	for keyset in rets:
+		for key in keyset[2:]:
+			if key != None:
+				ids.append(key)
 
-	return items
+	items = {}
+	for row in rets:
+		site = row[0]
+		item = (row[1], row[2:])
+		if not site in items:
+			items[site] = item
+		else:
+			raise ValueError("Duplicate primary keys? Watttttttttttttttttt")
+
+	# print("Items", items)
+
+	opts = ["id={id}".format(id=val) for val in ids]
+	opts = " OR ".join(opts)
+
+	ret = cur.execute('SELECT id, artistName FROM {table} WHERE {condition};'.format(table=settings["dbConf"]["namesDb"], condition=opts))
+	rets = ret.fetchall()
+	nameLUT = dict(rets)
+
+	return items, nameLUT
 
 
 def processGetArgs(args):
@@ -181,13 +221,7 @@ cur = sqlCon.cursor()
 
 
 
-siteNameDict = getNameDict()
-
-sites = [settings[key]['shortName'] for key in settings['artSites']]
-
-for site in sites:
-	if not site in siteNameDict:
-		siteNameDict[site] = []
+scrapeList, nameLUT = getNameDict()
 
 
 %>
@@ -205,18 +239,20 @@ for site in sites:
 
 				<div>
 
+					${genUploadManagementTable(scrapeList, nameLUT)}
+
 				</div>
 				<hr>
 			</div>
 		</div>
 
-		% for site in sites:
-			<div class="subdiv ${site}Id">
-				<div class="contentdiv">
-					${genNameListManagementTable(site, siteNameDict[site])}
-				</div>
-			</div>
-		% endfor
+		## % for site in sites:
+		## 	<div class="subdiv ${site}Id">
+		## 		<div class="contentdiv">
+		## 			${genUploadManagementTable(scrapeList, nameLUT))}
+		## 		</div>
+		## 	</div>
+		## % endfor
 
 	</div>
 <div>

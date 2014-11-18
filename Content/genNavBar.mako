@@ -170,6 +170,7 @@ def compactDateStr(dateStr):
 				<li><a href="/source/bysite/px">PX Artists</a>
 				<hr>
 				<li><a href="/dbNameListEditor">Monitored Names</a>
+				<li><a href="/uploadEditor">Upload Settings</a>
 <!-- 				<hr>
 				<li><a href="dbFix">DB Tweaker</a> -->
 			</ul>

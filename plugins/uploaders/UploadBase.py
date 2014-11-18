@@ -17,14 +17,35 @@ class UploadBase(plugins.PluginBase.PluginBase):
 
 		if not rets or not settings["dbConf"]["uploadGalleries"] in tables:   # If the DB doesn't exist, set it up.
 			self.log.info("Need to setup initial suceeded page database....")
-			self.conn.execute('''CREATE TABLE %s (id INTEGER PRIMARY KEY,
-												mainId INTEGER,
-												uploadTime real NOT NULL,
-												uploadedItems INTEGER,
-												galleryId INTEGER,
-												FOREIGN KEY(mainId) REFERENCES %s(id),
-												UNIQUE(mainId) ON CONFLICT ABORT,
-												UNIQUE(galleryId) ON CONFLICT ABORT)''' % (settings["dbConf"]["uploadGalleries"], settings["dbConf"]["namesDb"]))
+			self.conn.execute('''
+			CREATE TABLE {tableName} (
+			    id            INTEGER PRIMARY KEY,
+			    uploadTime    REAL    NOT NULL,
+			    uploadedItems INTEGER,
+			    galleryId     INTEGER,
+			    daid          INTEGER UNIQUE REFERENCES {refName} ( id ),
+			    faid          INTEGER UNIQUE REFERENCES {refName} ( id ),
+			    hfid          INTEGER UNIQUE REFERENCES {refName} ( id ),
+			    pxid          INTEGER UNIQUE REFERENCES {refName} ( id ),
+			    UNIQUE ( galleryId )  ON CONFLICT ABORT
+			);
+			'''.format(tableName=settings["dbConf"]["uploadGalleries"], refName=settings["dbConf"]["namesDb"]))
+
+
+			# CREATE TABLE {tableName} (
+			#     id            INTEGER PRIMARY KEY,
+			#     uploadTime    REAL    NOT NULL,
+			#     uploadedItems INTEGER,
+			#     galleryId     INTEGER,
+			#     sourceId      TEXT,
+			#     daid          INTEGER UNIQUE REFERENCES {refName} ( id ),
+			#     faid          INTEGER UNIQUE REFERENCES {refName} ( id ),
+			#     hfid          INTEGER UNIQUE REFERENCES {refName} ( id ),
+			#     pxid          INTEGER UNIQUE REFERENCES {refName} ( id ),
+			#     UNIQUE ( galleryId )  ON CONFLICT ABORT
+			# );
+
+
 
 			self.conn.execute('''CREATE INDEX IF NOT EXISTS %s ON %s (uploadTime)'''              % ("%s_time_index"          % settings["dbConf"]["uploadGalleries"], settings["dbConf"]["uploadGalleries"]))
 			self.conn.execute('''CREATE INDEX IF NOT EXISTS %s ON %s (mainId)'''                  % ("%s_id_index"            % settings["dbConf"]["uploadGalleries"], settings["dbConf"]["uploadGalleries"]))
@@ -50,7 +71,6 @@ class UploadBase(plugins.PluginBase.PluginBase):
 	# ---------------------------------------------------------------------------------------------------------------------------------------------------------
 	# DB Convenience stuff
 	# ---------------------------------------------------------------------------------------------------------------------------------------------------------
-
 
 	def getByRowId(self, rowId):
 		cur = self.conn.cursor()
@@ -133,7 +153,7 @@ class UploadBase(plugins.PluginBase.PluginBase):
 
 	def updateGalleryId(self, mainId, galleryId):
 		cur = self.conn.cursor()
-		cur.execute("UPDATE %s SET galleryId=? WHERE mainId=?;"  % (settings["dbConf"]["uploadGalleries"]), (galleryId, mainId))
+		cur.execute("UPDATE %s SET galleryId=? WHERE id=?;"  % (settings["dbConf"]["uploadGalleries"]), (galleryId, mainId))
 
 		self.conn.commit()
 

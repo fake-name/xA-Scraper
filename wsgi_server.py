@@ -145,7 +145,7 @@ class PageResource(object):
 	def checkAuth(self, request):
 		userid = pys.authenticated_userid(request)
 		if userid is None:
-			self.log.warn("No userID found. Redirecting to login")
+			self.log.warn("No userID found for request to '%s'. Redirecting to login." % request.path)
 			return HTTPFound(location=request.route_url('login'))
 
 	def getImagePathFromID(self, imageID):

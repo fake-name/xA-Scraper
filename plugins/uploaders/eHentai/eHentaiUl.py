@@ -99,12 +99,47 @@ class UploadEh(plugins.uploaders.UploadBase.UploadBase):
 	# ---------------------------------------------------------------------------------------------------------------------------------------------------------
 
 
+
+
+
 	def getToProcess(self):
+
 		cur = self.conn.cursor()
 
-		ret = cur.execute("""SELECT id FROM %s WHERE uploadEh=1;""" % settings["dbConf"]["namesDb"])
+		cols = list(settings["ulConf"].keys())
+		cols.sort()
+		cols = [key+'id' for key in cols]
+		cols = ", ".join(cols)
+
+		ret = cur.execute('SELECT id, uploadTime, uploadedItems, galleryId, {cols} FROM {table};'.format(table=settings["dbConf"]["uploadGalleries"], cols=cols))
 		rets = ret.fetchall()
-		return rets
+
+		ids = []
+		for keyset in rets:
+			for key in keyset[4:]:
+				if key != None:
+					ids.append(key)
+
+		items = {}
+		for row in rets:
+			site = row[0]
+			item = row[1:]
+			if not site in items:
+				items[site] = item
+			else:
+				raise ValueError("Duplicate primary keys? Watttttttttttttttttt")
+
+		# print("Items", items)
+
+		opts = ["id={id}".format(id=val) for val in ids]
+		opts = " OR ".join(opts)
+
+		ret = cur.execute('SELECT id, artistName FROM {table} WHERE {condition};'.format(table=settings["dbConf"]["namesDb"], condition=opts))
+		rets = ret.fetchall()
+		nameLUT = dict(rets)
+
+		return items, nameLUT
+
 
 
 	def uploadFromRowId(self, rowId, siteName, aName):
@@ -133,7 +168,7 @@ class UploadEh(plugins.uploaders.UploadBase.UploadBase):
 			urlQuery = urllib.parse.urlparse(itemUrl)[4]
 			itemGid = urllib.parse.parse_qs(urlQuery)["gid"].pop()
 
-			ret.append((aName, itemGid))
+			ret.append((aName, int(itemGid)))
 
 		return ret
 
@@ -289,9 +324,6 @@ class UploadEh(plugins.uploaders.UploadBase.UploadBase):
 	def updateGallery(self, rowId, images):
 		lastUl, ulQuantity, galleryId = self.getUploadState(rowId)
 
-		if lastUl > time.time() - 60*60*24*14:
-			self.log.info("Item updated within the last two weeks. Skipping")
-
 
 		remaining = len(images)
 		for image in images:
@@ -307,7 +339,7 @@ class UploadEh(plugins.uploaders.UploadBase.UploadBase):
 
 		# print("rowId", rowId, "images", images)
 
-	def checkGallery(self, haveItems, rowId):
+	def checkGallery(self, haveItems, rowId, lastUl):
 
 		try:
 			images = self.getImagesForId(rowId)
@@ -332,11 +364,7 @@ class UploadEh(plugins.uploaders.UploadBase.UploadBase):
 
 		else:
 
-			lastUl = self.getUploadState(rowId)[0]
 			ulQuantity = len(self.getUploaded(rowId))
-			if lastUl > time.time() - 60*60*24*21:
-				self.log.info("Item updated within the last three weeks. Skipping")
-				return
 			if len(images) < ulQuantity+3:
 				self.log.info("Do not have enough new content to warrant updating (%s new item(s)). Skipping.", len(images) - ulQuantity)
 				return
@@ -358,26 +386,23 @@ class UploadEh(plugins.uploaders.UploadBase.UploadBase):
 	def syncGalleryIds(self):
 
 		existG = self.getExtantGalleries()
-		toUl = self.getToProcess()
-		toUl = [(self.getByRowId(rowId[0])[1], rowId[0]) for rowId in toUl]
-		# for user, gid in existG:
-
 		existG = dict(existG)
-		toUl = dict(toUl)
-		keys = list(toUl.keys())
-		keys.sort()
-		for key in keys:
-			if key in existG:
-				isId = self.getUploadState(toUl[key])[-1]
-				shouldBe = existG[key]
-				shouldBe = int(shouldBe)
-				if shouldBe != isId:
-					self.log.warn("Invalid galleryId for artist '%s'! Is %s, should be %s", key, isId, shouldBe)
-					self.updateGalleryId(toUl[key], shouldBe)
+
+		toUl, nameLUT = self.getToProcess()
+
+		for dbId, row in toUl.items():
+			ulTime, uploadedItems, isId = row[:3]
+
+			names = [nameLUT[idNo] for idNo in row[3:] if idNo != None]
+
+			for name in existG:
+				if name in names:
+
+					if isId != existG[name]:
+						print("Bad GalleryId!", isId, existG[name])
+						self.updateGalleryId(dbId, existG[name])
 
 
-
-		# self.updateGalleryId(rowId, newGid)
 
 	def checkIfHashExists(self, hashS):
 		pagetext = self.wg.getpage('http://exhentai.org/?f_shash=%s' % hashS)
@@ -412,16 +437,28 @@ class UploadEh(plugins.uploaders.UploadBase.UploadBase):
 	def processTodo(self, listIn, ulFilter):
 
 		existingGalleries = self.getExtantGalleries()
+
 		# print("Existing galleries", existingGalleries)
 		for itemName, itemGid in existingGalleries:
 			self.log.info("Have gallery %s, %s", itemName, itemGid)
-		for rowId, in listIn:
 
-			artistInfo = self.getByRowId(rowId)
-			if ulFilter and artistInfo[0] not in ulFilter:
-				self.log.info("Skipping download for %s due to upload filter.", artistInfo)
+		print(listIn)
+		listIn, nameLUT = listIn
+		for rowId, data in listIn.items():
 
-			self.checkGallery(existingGalleries, rowId)
+			lastUl = data[0]
+			if lastUl > time.time() - 60*60*24*14:
+				self.log.info("Item '%s' (artist '%s') updated within the last two weeks. Skipping", rowId, nameLUT[rowId])
+				continue
+
+			for rowId in [item for item in data[-4:] if item != None]:
+
+				artistInfo = self.getByRowId(rowId)
+				if ulFilter and artistInfo[0] not in ulFilter:
+					self.log.info("Skipping download for %s due to upload filter.", artistInfo)
+
+
+				self.checkGallery(existingGalleries, rowId, lastUl)
 
 
 
@@ -458,7 +495,7 @@ class UploadEh(plugins.uploaders.UploadBase.UploadBase):
 			self.wg.cj.clear("e-hentai.org")
 			raise ValueError("Logged in, but cannot access ex?")
 
-		self.syncGalleryIds()
+		# self.syncGalleryIds()
 
 
 		if not toDoList:

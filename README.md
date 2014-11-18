@@ -8,7 +8,10 @@ This is a automated tool for scraping content from a number of art sites:
 - HentaFoundry
 - Pixiv
 
+To Add:
 
+ - Inkbunny?
+ - Weasyl?
 
 It also has grown a lot of other functions over time. It has a fairly complex,
 interactive web-interface for browsing the local gallery mirrors, and a tool
@@ -39,7 +42,7 @@ These are a few DeviantArt Artists culled from the Reddit [ImaginaryLandscapes](
 
 The web-interface has a lot of fancy mouseover preview stuff. Since this is primarily intended to run off a local network, bandwidth concerns are not too relevant, and I went a bit nuts with jQuery.
 
-![Basic Popups](https://raw.githubusercontent.com/fake-name/xA-Scraper/gh-pages/Mouse1.gif)  
+![Basic Popups](https://raw.githubusercontent.com/fake-name/xA-Scraper/gh-pages/Mouse1.gif)
 
 
 There is also a somewhat experimental "gallery slice" viewing system, where horizontal mouse movement seeks through a spaced sub-set of each artist's images. The artist is determined by the row, and each horizontal 10 pixels is a different image.
