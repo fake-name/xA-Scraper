@@ -99,6 +99,20 @@ class ApiInterface(object):
 		self.conn.commit()
 
 
+	def errResponse(self, errorMessage=None):
+		ret = {}
+		ret['Status'] = 'Failed'
+		if not errorMessage:
+			ret['Message'] = 'Error in API Call!'
+		else:
+			ret['Message']  = 'Error in API Call! \n'
+			ret['Message'] += 'Error message: \n'
+			ret['Message'] += errorMessage
+
+
+		return Response(body=json.dumps(ret))
+
+
 	def handleApiCall(self, request):
 
 		print("API Call!", request.params)
@@ -116,4 +130,4 @@ class ApiInterface(object):
 
 		else:
 			print("Unknown API call!")
-			return Response(body="wat?")
+			return self.errResponse("Unknown command: '%s'" % request.params)

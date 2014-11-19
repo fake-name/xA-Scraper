@@ -20,13 +20,13 @@
 			console.log(ctnt);
 			var text = reqData;
 			text = text.replace(/ +/g,' ').replace(/(\r\n|\n|\r)/gm,"");
-			if (ctnt["Status"] == "Error")
+			if (ctnt["Status"] == "Success")
 			{
-				window.alert("Error!\n"+ctnt["Message"])
+				window.alert("Succeeded!\n"+ctnt["Message"])
 			}
 			else
 			{
-				window.alert("Succeeded!\n"+ctnt["Message"])
+				window.alert("Error!\n"+ctnt["Message"])
 				// location.reload();
 
 			}
@@ -52,17 +52,13 @@
 
 				$('#rowid_'+rowId+' #edit').map(function()
 				{
-					var inputF = $(this).find('input:first');
+					var inputF = $(this).find('select:first');
 
 					ret["id"] = rowId;
-					if (inputF.is(":checkbox"))
-					{
-						ret[""+inputF.attr('name')] = inputF.prop('checked');
-					}
-					else
-					{
-						ret[""+inputF.attr('name')] = inputF.val();
-					}
+
+
+					ret[""+inputF.attr('name')] = inputF.val();
+
 
 				});
 				if (!$.isEmptyObject(ret))
@@ -74,9 +70,18 @@
 			}
 		};
 
+		function newRow()
+		{
+			console.log("New Row");
+			var ret = ({});
+			ret["add-new-row"] = true;
+			$.ajax("api", {"data": ret, success: ajaxSuccess})
+		}
 
 	</script>
 </head>
+
+## <input type="text" name="${settings["ulConf"][srcKey]}" style="box-sizing: border-box; width: 100%; -moz-box-sizing: border-box; -webkit-box-sizing: border-box;" value="keyVal">
 
 <%startTime = time.time()%>
 
@@ -100,6 +105,37 @@ logger =  logging.getLogger("Main.WebSrv")
 
 
 
+<%def name="getNameFromId(inId)">
+	<%
+
+	cur = sqlCon.cursor()
+	ret = cur.execute('SELECT siteName, artistName FROM {table} WHERE id=?;'.format(table=settings["dbConf"]["namesDb"]), (inId, ))
+	rets = ret.fetchall()
+	if rets:
+		return rets.pop()
+	else:
+		return None, None
+	%>
+</%def>
+
+
+<%def name="getDropbox(srcId, selectId=None)">
+	<%
+
+	cur = sqlCon.cursor()
+	ret = cur.execute('SELECT id, artistName FROM {table} WHERE siteName=?;'.format(table=settings["dbConf"]["namesDb"]), (srcId, ))
+	rets = ret.fetchall()
+
+	%>
+	<select name="aname_${srcId}">
+		<option value="" ${'selected="selected"' if not selectId else ''}>--</option>
+		% for aId, name in rets:
+			<option value="${aId}" ${'selected="selected"' if selectId == aId else ''} >${name.title()}</option>
+		% endfor
+	</select>
+</%def>
+
+
 
 <%def name="genUploadManagementTable(scrapeList, nameLUT)">
 
@@ -107,6 +143,12 @@ logger =  logging.getLogger("Main.WebSrv")
 
 	cols = list(settings["ulConf"].keys())
 	cols.sort()
+
+	# Pixiv column is currently somewhat useless, as it's
+	# populated by the pixiv favorites, and not stored
+	# in the DB.
+	cols.remove("px")
+
 
 	%>
 	<table border="1px" style="width:800px;">
@@ -140,12 +182,16 @@ logger =  logging.getLogger("Main.WebSrv")
 
 				% for srcKey in cols:
 					<%
-					keyVal = '' if aIds[srcKey] == None else nameLUT[aIds[srcKey]]
+					src, name = getNameFromId(aIds[srcKey])
+					keyVal = '' if aIds[srcKey] == None else name
+					if src and src != srcKey:
+						print("Wat?")
+
 					%>
 					<td>
 						<span id="view"> ${keyVal} </span>
 						<span id="edit" style="display:none">
-							<input type="text" name="${settings["ulConf"][srcKey]}" style="box-sizing: border-box; width: 100%; -moz-box-sizing: border-box; -webkit-box-sizing: border-box;" value="keyVal">
+							${getDropbox(srcKey, aIds[srcKey])}
 
 						</span>
 					</td>
@@ -166,6 +212,7 @@ logger =  logging.getLogger("Main.WebSrv")
 
 def getNameDict():
 
+	cur = sqlCon.cursor()
 	cols = list(settings["ulConf"].keys())
 	cols.sort()
 	cols = [key+'id' for key in cols]
@@ -217,7 +264,6 @@ if request.params:
 	api.handleApiCall(request)
 
 
-cur = sqlCon.cursor()
 
 
 
@@ -242,7 +288,7 @@ scrapeList, nameLUT = getNameDict()
 					${genUploadManagementTable(scrapeList, nameLUT)}
 
 				</div>
-				<hr>
+				<button onclick="newRow()">Add Row</button>
 			</div>
 		</div>
 

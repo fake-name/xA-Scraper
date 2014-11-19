@@ -339,32 +339,32 @@ class UploadEh(plugins.uploaders.UploadBase.UploadBase):
 
 		# print("rowId", rowId, "images", images)
 
-	def checkGallery(self, haveItems, rowId, lastUl):
+	def checkGallery(self, haveItems, artistRowId, ulTableRowId):
 
 		try:
-			images = self.getImagesForId(rowId)
+			images = self.getImagesForId(artistRowId)
 		except ValueError:
-			self.log.error("Failure getting downloads for artist '%s'!", self.getByRowId(rowId))
+			self.log.error("Failure getting downloads for artist '%s'!", self.getByRowId(artistRowId))
 			self.log.error("Artist has not been downloaded, or cannot find download path!")
 			return
 
 		images = natsorted(images)
 
-		siteName, aName = self.getByRowId(rowId)
+		siteName, aName = self.getByRowId(artistRowId)
 
-		if not aName in [name for name, gId in haveItems]:
-
+		if not aName.lower() in [name for name, gId in haveItems]:
 			numUnique = self.checkIfShouldUpload(images)
+			# numUnique = 50
 			if numUnique > 3:
 				newGid = self.createGallery(aName, numUnique, len(images))
-				self.addNewUploadGallery(rowId, newGid)
-				self.updateGallery(rowId, images)
+				self.insertGalleryId(ulTableRowId, newGid)
+				self.updateGallery(ulTableRowId, images)
 			else:
 				self.log.warn("Do not have sufficent unique items to warrant upload for artist %s!" % aName)
 
 		else:
 
-			ulQuantity = len(self.getUploaded(rowId))
+			ulQuantity = len(self.getUploaded(artistRowId))
 			if len(images) < ulQuantity+3:
 				self.log.info("Do not have enough new content to warrant updating (%s new item(s)). Skipping.", len(images) - ulQuantity)
 				return
@@ -372,10 +372,10 @@ class UploadEh(plugins.uploaders.UploadBase.UploadBase):
 			newImages = len(images) - ulQuantity
 
 			self.log.info("Need to update gallery for '%s' (%s new item(s)).", aName, newImages)
-			self.unlockGallery(rowId)
-			self.updateGallery(rowId, images)
-			self.addUpdateNote(rowId, newImages)
-			self.setUpdateTimer(rowId, time.time())
+			self.unlockGallery(ulTableRowId)
+			self.updateGallery(ulTableRowId, images)
+			self.addUpdateNote(ulTableRowId, newImages)
+			self.setUpdateTimer(ulTableRowId, time.time())
 
 
 
@@ -444,21 +444,22 @@ class UploadEh(plugins.uploaders.UploadBase.UploadBase):
 
 		print(listIn)
 		listIn, nameLUT = listIn
-		for rowId, data in listIn.items():
+		for ulTableRowId, data in listIn.items():
 
 			lastUl = data[0]
 			if lastUl > time.time() - 60*60*24*14:
-				self.log.info("Item '%s' (artist '%s') updated within the last two weeks. Skipping", rowId, nameLUT[rowId])
-				continue
+				if data[3] != None:
+					self.log.info("Item '%s' (artist '%s') updated within the last two weeks. Skipping", ulTableRowId, nameLUT[data[3]])
+					continue
 
-			for rowId in [item for item in data[-4:] if item != None]:
+			for artistRowId in [item for item in data[-4:] if item != None]:
 
-				artistInfo = self.getByRowId(rowId)
+				artistInfo = self.getByRowId(artistRowId)
 				if ulFilter and artistInfo[0] not in ulFilter:
 					self.log.info("Skipping download for %s due to upload filter.", artistInfo)
 
 
-				self.checkGallery(existingGalleries, rowId, lastUl)
+				self.checkGallery(existingGalleries, artistRowId, ulTableRowId)
 
 
 
@@ -468,7 +469,7 @@ class UploadEh(plugins.uploaders.UploadBase.UploadBase):
 	# ---------------------------------------------------------------------------------------------------------------------------------------------------------
 
 
-	def go(self, ulFilter=['da'], toDoList=None, ctrlNamespace=None):
+	def go(self, ulFilter=[], toDoList=None, ctrlNamespace=None):
 		if ctrlNamespace == None:
 			raise ValueError("You need to specify a namespace!")
 		self.manager = ctrlNamespace

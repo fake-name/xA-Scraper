@@ -45,8 +45,6 @@ class UploadBase(plugins.PluginBase.PluginBase):
 			#     UNIQUE ( galleryId )  ON CONFLICT ABORT
 			# );
 
-
-
 			self.conn.execute('''CREATE INDEX IF NOT EXISTS %s ON %s (uploadTime)'''              % ("%s_time_index"          % settings["dbConf"]["uploadGalleries"], settings["dbConf"]["uploadGalleries"]))
 			self.conn.execute('''CREATE INDEX IF NOT EXISTS %s ON %s (mainId)'''                  % ("%s_id_index"            % settings["dbConf"]["uploadGalleries"], settings["dbConf"]["uploadGalleries"]))
 			self.conn.commit()
@@ -96,11 +94,11 @@ class UploadBase(plugins.PluginBase.PluginBase):
 
 
 
-	def addNewUploadGallery(self, mainId, galleryId):
+	def insertGalleryId(self, mainId, galleryId):
 		cur = self.conn.cursor()
 
 		# uploadTime of 0 causes it to be updated immediately.
-		cur.execute("INSERT INTO %s (mainId, uploadTime, uploadedItems, galleryId) VALUES (?, ?, ?, ?)"  % (settings["dbConf"]["uploadGalleries"]), (mainId, 0, 0, galleryId))
+		cur.execute("UPDATE %s SET galleryId=? WHERE id=?"  % (settings["dbConf"]["uploadGalleries"]), (galleryId, mainId))
 		self.conn.commit()
 
 
@@ -108,11 +106,14 @@ class UploadBase(plugins.PluginBase.PluginBase):
 	def getUploadState(self, mainId):
 		cur = self.conn.cursor()
 
-		ret = cur.execute("SELECT uploadTime, uploadedItems, galleryId FROM %s WHERE mainId=?;" % (settings["dbConf"]["uploadGalleries"]), (mainId,))
+		ret = cur.execute("SELECT uploadTime, uploadedItems, galleryId FROM %s WHERE id=?;" % (settings["dbConf"]["uploadGalleries"]), (mainId,))
 		items = ret.fetchall()
-		if len(items) != 1:
+		print(mainId, items)
+		if len(items) > 1:
 			print("Returned ", items)
 			raise ValueError("Wat? Gallery appears to exist already? Please delete colliding library.")
+		if len(items) == 0:
+			raise ValueError("Wat? Gallery not found, and it should exist at this point!")
 
 		return items.pop()
 
@@ -147,7 +148,7 @@ class UploadBase(plugins.PluginBase.PluginBase):
 
 	def setUpdateTimer(self, artistId, updateTime):
 		cur = self.conn.cursor()
-		cur.execute("UPDATE %s SET uploadTime=? WHERE mainId=?;"  % (settings["dbConf"]["uploadGalleries"]), (updateTime, artistId))
+		cur.execute("UPDATE %s SET uploadTime=? WHERE id=?;"  % (settings["dbConf"]["uploadGalleries"]), (updateTime, artistId))
 		self.conn.commit()
 
 
