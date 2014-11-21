@@ -27,6 +27,8 @@ class UploadBase(plugins.PluginBase.PluginBase):
 			    faid          INTEGER UNIQUE REFERENCES {refName} ( id ),
 			    hfid          INTEGER UNIQUE REFERENCES {refName} ( id ),
 			    pxid          INTEGER UNIQUE REFERENCES {refName} ( id ),
+			    ibid          INTEGER UNIQUE REFERENCES {refName} ( id ),
+			    wyid          INTEGER UNIQUE REFERENCES {refName} ( id ),
 			    UNIQUE ( galleryId )  ON CONFLICT ABORT
 			);
 			'''.format(tableName=settings["dbConf"]["uploadGalleries"], refName=settings["dbConf"]["namesDb"]))

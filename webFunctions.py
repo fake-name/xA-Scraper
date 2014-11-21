@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 import sys
-import types
+import codecs
 
 import urllib.request, urllib.parse, urllib.error
 import os.path
@@ -11,94 +11,24 @@ import http.cookiejar
 import traceback
 
 import logging
-
-import random
 import zlib
-
 import bs4
-
+import userAgents
 import re
-
-#pylint: disable-msg=E1101, C0325, R0201
-# A urllib2 wrapper that provides error handling and logging, as well as cookie management. It's a bit crude, but it works.
-
 import gzip
 import io
+
+#pylint: disable-msg=E1101, C0325, R0201, W0702, W0703
+
+# A urllib2 wrapper that provides error handling and logging, as well as cookie management. It's a bit crude, but it works.
+# Also supports transport compresion.
+# OOOOLLLLLLDDDDD, has lots of creaky internals. Needs some cleanup desperately, but lots of crap depends on almost everything.
+# Arrrgh.
 
 from threading import Lock
 cookieWriteLock = Lock()
 
-#!/usr/bin/env python3
-import itertools
-import mimetypes
-import email.generator
-"""
-Doug Hellmann's urllib2, translated to python3.
-"""
-class MultiPartForm():
-	"""Accumulate the data to be used when posting a form."""
-
-	def __init__(self):
-		self.form_fields = []
-		self.files = []
-		self.boundary = email.generator._make_boundary()
-		return
-
-	def get_content_type(self):
-		return 'multipart/form-data; boundary=%s' % self.boundary
-
-	def add_field(self, name, value):
-		"""Add a simple field to the form data."""
-		self.form_fields.append((name, value))
-		return
-
-	def add_file(self, fieldname, filename, fContents, mimetype=None):
-		"""Add a file to be uploaded."""
-		if mimetype is None:
-			mimetype = mimetypes.guess_type(filename)[0] or 'application/octet-stream'
-		self.files.append((fieldname, filename, mimetype, fContents))
-		return
-
-	def make_result(self):
-		"""Return bytes representing the form data, including attached files."""
-		# Build a list of lists, each containing "lines" of the
-		# request.  Each part is separated by a boundary string.
-		# Once the list is built, return a string where each
-		# line is separated by '\r\n'.
-		parts = []
-		part_boundary = '--' + self.boundary
-
-		# Add the form fields
-		parts.extend(
-			[ bytes(part_boundary, 'utf-8'),
-			  bytes('Content-Disposition: form-data; name="%s"' % name, 'utf-8'),
-			  b'',
-			  bytes(value, 'utf-8'),
-			]
-			for name, value in self.form_fields
-			)
-
-		# Add the files to upload
-		parts.extend(
-			[ bytes(part_boundary, 'utf-8'),
-			  bytes('Content-Disposition: file; name="%s"; filename="%s"' % (field_name, filename), 'utf-8'),
-			  bytes('Content-Type: %s' % content_type, 'utf-8'),
-			  b'',
-			  body,
-			]
-			for field_name, filename, content_type, body in self.files
-			)
-
-		# Flatten the list and add closing boundary marker,
-		# then return CR+LF separated data
-		flattened = list(itertools.chain(*parts))
-		flattened.append(bytes('--' + self.boundary + '--', 'utf-8'))
-		flattened.append(b'')
-		return b'\r\n'.join(flattened)
-
-
-
-
+import iri2uri
 
 
 class WebGetRobust:
@@ -107,45 +37,41 @@ class WebGetRobust:
 	cookielib = None
 	opener = None
 
-	log = logging.getLogger("Main.Web")
-	# Due to general internet people douchebaggyness, I've basically said to hell with it and decided to spoof a whole assortment of browsers
-	# It should keep people from blocking this scraper *too* easily
-	opera = [	('User-Agent'		,	'Mozilla/5.0 (Windows NT 6.1; en; rv:2.0) Gecko/20100101 Firefox/4.0 Opera 11.61'),
-				('Accept-Language'	,	'en-US,en;q=0.9'),
-				('Accept-Encoding'	,	'gzip'),
-				('Accept'			,	'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.81')
-		]
-	firefox = [	('User-Agent'		,	'Mozilla/5.0 (Windows NT 6.1; WOW64; rv:8.0.1) Gecko/20100101 Firefox/8.0.1'),
-				('Accept-Language'	,	'en-us,en;q=0.5'),
-				('Accept'			,	'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'),
-				('Accept-Encoding'	,	'gzip'),
-				('Accept-Charset'	,	'ISO-8859-1,utf-8;q=0.7,*;q=0.7')
-		]
-	chrome = [	('User-Agent'		,	'Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/535.2 (KHTML, like Gecko) Chrome/15.0.874.121 Safari/535.2'),
-				('Accept-Language'	,	'en-US,en;q=0.8'),
-				('Accept'			,	'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'),
-				('Accept-Encoding'	,	'gzip,deflate,sdch'),
-				('Accept-Charset'	,	'ISO-8859-1,utf-8;q=0.7,*;q=0.3')
-		]
-	IE = [		('User-Agent'		,	'Mozilla/5.0 (compatible; MSIE 9.0; Windows NT 6.1; Win64; x64; Trident/5.0)'),
-				('Accept-Language'	,	'en-US'),
-				('Accept'			,	'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'),
-				('Accept-Encoding'	,	'gzip')
-		]
+	errorOutCount = 2
+	retryDelay = 1.5
 
-	errorOutCount = 3
-	browsers = [opera, chrome, firefox, IE]
 
 	data = None
 
-	def __init__(self, test=False):
+	# if test=true, no resources are actually fetched (for testing)
+	# creds is a list of 3-tuples that gets inserted into the password manager.
+	# it is structured [(top_level_url1, username1, password1), (top_level_url2, username2, password2)]
+	def __init__(self, test=False, creds=None, logPath="Main.Web"):
+		self.log = logging.getLogger(logPath)
+		print("Webget init! Logpath = ", logPath)
+		if test:
+			self.log.warning("-----------------------------------------------------------------------------------------------")
+			self.log.warning("WARNING: WebGet in testing mode!")
+			self.log.warning("-----------------------------------------------------------------------------------------------")
 
-		self.browserHeaders = random.choice(self.browsers)
+		# Due to general internet people douchebaggyness, I've basically said to hell with it and decided to spoof a whole assortment of browsers
+		# It should keep people from blocking this scraper *too* easily
+		self.browserHeaders = userAgents.getUserAgent()
 
-		self.testMode = test					# if we don't want to actually contact the remote server, you pass a string containing
+		self.testMode = test		# if we don't want to actually contact the remote server, you pass a string containing
 									# pagecontent for testing purposes as test. It will get returned for any calls of getpage()
 
 		self.data = urllib.parse.urlencode(self.browserHeaders)
+
+
+		if creds:
+			self.log.info("Have credentials, installing password manager into urllib handler.")
+			passManager = urllib.request.HTTPPasswordMgrWithDefaultRealm()
+			for url, username, password in creds:
+				passManager.add_password(None, url, username, password)
+			self.credHandler = urllib.request.HTTPBasicAuthHandler(passManager)
+		else:
+			self.credHandler = None
 
 		self.loadCookies()
 
@@ -164,8 +90,11 @@ class WebGetRobust:
 			if http.cookiejar is not None:
 				self.log.info("Installing CookieJar")
 				self.log.debug(self.cj)
-
-				self.opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(self.cj))
+				cookieHandler = urllib.request.HTTPCookieProcessor(self.cj)
+				if self.credHandler:
+					self.opener = urllib.request.build_opener(cookieHandler, self.credHandler)
+				else:
+					self.opener = urllib.request.build_opener(cookieHandler)
 				#self.opener.addheaders = [('User-Agent', 'Mozilla/4.0 (compatible; MSIE 5.5; Windows NT)')]
 				self.opener.addheaders = self.browserHeaders
 				#urllib2.install_opener(self.opener)
@@ -206,112 +135,145 @@ class WebGetRobust:
 
 		return pgContent
 
+
+
+	def getSoup(self, *args, **kwargs):
+		if 'returnMultiple' in kwargs and kwargs['returnMultiple']:
+			raise ValueError("getSoup cannot be called with 'returnMultiple' being true")
+
+		if 'soup' in kwargs and kwargs['soup']:
+			raise ValueError("getSoup contradicts the 'soup' directive!")
+
+		page = self.getpage(*args, **kwargs)
+		if isinstance(page, bytes):
+			raise ValueError("Received content not decoded! Cannot parse!")
+
+		soup = bs4.BeautifulSoup(page)
+		return soup
+
+
+	def getFileAndName(self, *args, **kwargs):
+		if 'returnMultiple' in kwargs:
+			raise ValueError("getFileAndName cannot be called with 'returnMultiple'")
+
+		if 'soup' in kwargs and kwargs['soup']:
+			raise ValueError("getFileAndName contradicts the 'soup' directive!")
+
+		kwargs["returnMultiple"] = True
+
+		pgctnt, pghandle = self.getpage(*args, **kwargs)
+		hName = pghandle.info()['Content-Disposition'].split('filename=')[1]
+
+
+		return pgctnt, hName
+
+
+		# HUGE GOD-FUNCTION.
+		# OH GOD FIXME.
+
 		# postData expects a dict
 		# addlHeaders also expects a dict
-	def getpage(self, pgreq, addlHeaders=None, returnMultiple=False, callBack=None, postData=None, soup=False, binaryForm=None):
+	def getpage(self, pgreq, addlHeaders = None, returnMultiple = False, callBack=None, postData=None, soup=False):
 
 		# pgreq = fixurl(pgreq)
-		# print pgreq
-		# print type(pgreq)
+
+		if soup:
+			self.log.warn("'soup' kwarg is depreciated. Please use the `getSoup()` call instead.")
+
+
 
 		originalString = pgreq
 
-		log = self.log
 
-		pgctnt = "Failed"
+		pgctnt = None
 		pghandle = None
 
-		loopctr = 0
+		retryCount = 0
+
+		# Encode Unicode URL's properly
+		pgreq = iri2uri.iri2uri(pgreq)
 
 		try:
 			# TODO: make this more sensible
-			if binaryForm:
-				log.info("Binary/multipart form submission!")
-				pgreq = urllib.request.Request(pgreq)
-				formContents = binaryForm.make_result()
-				pgreq.data = formContents
-				pgreq.add_header('Content-type', binaryForm.get_content_type())
-				pgreq.add_header('Content-length', len(formContents))
-
-			elif addlHeaders != None and  postData != None:
-				log.info("Making a post-request with additional headers!")
+			if addlHeaders != None and  postData != None:
+				self.log.info("Making a post-request with additional headers!")
 				pgreq = urllib.request.Request(pgreq, headers=addlHeaders, data=urllib.parse.urlencode(postData).encode("utf-8"))
 			elif addlHeaders != None:
 				pgreq = urllib.request.Request(pgreq, headers=addlHeaders)
 			elif postData != None:
-				log.info("Making a post request!")
+				self.log.info("Making a post request!")
 				pgreq = urllib.request.Request(pgreq, data=urllib.parse.urlencode(postData).encode("utf-8"))
-
 			else:
 				pgreq = urllib.request.Request(pgreq)
+
 		except:
-			log.critical("Invalid header or url")
+			self.log.critical("Invalid header or url")
 			raise
 
 		errored = False
 		lastErr = ""
 
-		delay = 1.5
+
 		if not self.testMode:
 			while 1:
 
-				loopctr = loopctr + 1
+				retryCount = retryCount + 1
 
-
-
-				if loopctr > self.errorOutCount:
-					log.error("Failed to retrieve Website : %s at %s All Attempts Exhausted", pgreq.get_full_url(), time.ctime(time.time()))
-					pgctnt = "Failed"
+				if retryCount > self.errorOutCount:
+					self.log.error("Failed to retrieve Website : %s at %s All Attempts Exhausted", pgreq.get_full_url(), time.ctime(time.time()))
+					pgctnt = None
 					try:
-						print("Critical Failure to retrieve page! %s at %s, attempt %s" % (pgreq.get_full_url(), time.ctime(time.time()), loopctr))
-						print("Error:", lastErr)
-						print("Exiting")
+						self.log.critical(("Critical Failure to retrieve page! %s at %s, attempt %s" % (pgreq.get_full_url(), time.ctime(time.time()), retryCount)))
+						self.log.critical(("Error:", lastErr))
+						self.log.critical("Exiting")
 					except:
-						print("And the URL could not be printed due to an encoding error")
+						self.log.critical("And the URL could not be printed due to an encoding error")
 					break
 
-				#print "execution", loopctr
+				#print "execution", retryCount
 				try:
-
-					# print("request type = ", type(pgreq))
 					pghandle = self.opener.open(pgreq)					# Get Webpage
 
 				except urllib.error.HTTPError as e:								# Lotta logging
-					log.warning("Error opening page: %s at %s On Attempt %s.", pgreq.get_full_url(), time.ctime(time.time()), loopctr)
-					log.warning("Error Code: %s", e)
+					self.log.warning("Error opening page: %s at %s On Attempt %s.", pgreq.get_full_url(), time.ctime(time.time()), retryCount)
+					self.log.warning("Error Code: %s", e)
 
 					#traceback.print_exc()
 					lastErr = e
 					try:
-						log.warning("Error opening page: %s at %s On Attempt %s.", pgreq.get_full_url(), time.ctime(time.time()), loopctr)
-						log.warning("Error: %s, Original URL: %s", e, originalString)
+
+						self.log.warning("Original URL: %s", originalString)
 						errored = True
 					except:
-						log.warning("And the URL could not be printed due to an encoding error")
+						self.log.warning("And the URL could not be printed due to an encoding error")
 
 					if e.code == 404:
 						#print "Unrecoverable - Page not found. Breaking"
-						log.critical("Unrecoverable - Page not found. Breaking")
+						self.log.critical("Unrecoverable - Page not found. Breaking")
 						break
 
-					time.sleep(delay)
+					time.sleep(self.retryDelay)
 
+				except UnicodeEncodeError:
+					self.log.critical("Unrecoverable Unicode issue retreiving page - %s", originalString)
+					break
 
 				except Exception:
 					errored = True
 					#traceback.print_exc()
 					lastErr = sys.exc_info()
-					log.warning("Retreival failed. Traceback:")
-					log.warning(lastErr)
+					self.log.warning("Retreival failed. Traceback:")
+					self.log.warning(lastErr)
+					self.log.warning(traceback.format_exc())
 
-					log.warning("Error Retrieving Page! - Trying again - Waiting 2.5 seconds")
+					self.log.warning("Error Retrieving Page! - Trying again - Waiting 2.5 seconds")
 
 					try:
-						print("Error on page - %s" % originalString)
+						self.log.critical("Error on page - %s", originalString)
 					except:
-						print("And the URL could not be printed due to an encoding error")
+						self.log.critical("And the URL could not be printed due to an encoding error")
 
-					time.sleep(delay)
+					time.sleep(self.retryDelay)
 
 
 					continue
@@ -319,14 +281,14 @@ class WebGetRobust:
 				if pghandle != None:
 					try:
 
-						log.info("Request for URL: %s succeeded at %s On Attempt %s. Recieving.", pgreq.get_full_url(), time.ctime(time.time()), loopctr)
+						self.log.info("Request for URL: %s succeeded at %s On Attempt %s. Recieving...", pgreq.get_full_url(), time.ctime(time.time()), retryCount)
 						if callBack:
 							pgctnt = self.chunkRead(pghandle, 2 ** 17, reportHook = callBack)
 						else:
 							pgctnt = pghandle.read()
 						if pgctnt != None:
 
-							log.info("URL fully retrieved.")
+							self.log.info("URL fully retrieved.")
 
 							preDecompSize = len(pgctnt)/1000.0
 
@@ -351,79 +313,99 @@ class WebGetRobust:
 								compType = "none"
 
 							decompSize = len(pgctnt)/1000.0
-
+							# self.log.info("Page content type = %s", type(pgctnt))
 							cType = pghandle.headers.get("Content-Type")
-							self.log.info("Compression type = %s. Content Size compressed = %0.3fK. Decompressed = %0.3fK. File type: %s.", compType, preDecompSize, decompSize, cType)
+							if compType == 'none':
+								self.log.info("Compression type = %s. Content Size = %0.3fK. File type: %s.", compType, decompSize, cType)
+							else:
+								self.log.info("Compression type = %s. Content Size compressed = %0.3fK. Decompressed = %0.3fK. File type: %s.", compType, preDecompSize, decompSize, cType)
 
-							if "text/html" in cType:				# If this is a html/text page, we want to decode it using the local encoding
+							if cType:
+								if "text/html" in cType or \
+									'text/javascript' in cType or    \
+									'application/atom+xml' in cType:				# If this is a html/text page, we want to decode it using the local encoding
 
-								if (";" in cType) and ("=" in cType): 		# the server is reporting an encoding. Now we use it to decode the
-
-									dummy_docType, charset = cType.split(";")
-									charset = charset.split("=")[-1]
-
-
-								else:		# The server is not reporting an encoding in the headers.
-
-									# this *should* probably be done using a parser.
-									# However, it seems to be grossly overkill to shove the whole page (which can be quite large) through a parser just to pull out a tag that
-									# should be right near the page beginning anyways.
-									# As such, it's a regular expression for the moment
-
-									# Regex is of bytes type, since we can't convert a string to unicode until we know the encoding the
-									# bytes string is using, and we need the regex to get that encoding
-									coding = re.search(b"charset=[\'\"]?([a-zA-Z0-9\-]*)[\'\"]?", pgctnt, flags=re.IGNORECASE)
-
-									cType = b""
-									if coding:
-										cType = coding.group(1)
-
-									if (b";" in cType) and (b"=" in cType): 		# the server is reporting an encoding. Now we use it to decode the
+									if (";" in cType) and ("=" in cType): 		# the server is reporting an encoding. Now we use it to decode the
 
 										dummy_docType, charset = cType.split(";")
 										charset = charset.split("=")[-1]
 
-									else:
-										charset = "iso-8859-1"
 
-								try:
-									pgctnt = str(pgctnt, charset)
+									else:		# The server is not reporting an encoding in the headers.
 
-								except UnicodeDecodeError:
-									self.log.error("Encoding Error! Stripping invalid chars.")
-									pgctnt = pgctnt.decode('utf-8', errors='ignore')
+										# this *should* probably be done using a parser.
+										# However, it seems to be grossly overkill to shove the whole page (which can be quite large) through a parser just to pull out a tag that
+										# should be right near the page beginning anyways.
+										# As such, it's a regular expression for the moment
 
-								if soup:
-									pgctnt = bs4.BeautifulSoup(pgctnt)
-							elif "text/plain" in cType or "text/xml" in cType:
-								pgctnt = bs4.UnicodeDammit(pgctnt).unicode_markup
+										# Regex is of bytes type, since we can't convert a string to unicode until we know the encoding the
+										# bytes string is using, and we need the regex to get that encoding
+										coding = re.search(rb"charset=[\'\"]?([a-zA-Z0-9\-]*)[\'\"]?", pgctnt, flags=re.IGNORECASE)
 
-							elif "text" in cType:
-								self.log.critical("Unknown content type!")
-								self.log.critical(cType)
+										cType = b""
+										charset = None
+										try:
+											if coding:
+												cType = coding.group(1)
+												codecs.lookup(cType.decode("ascii"))
+												charset = cType.decode("ascii")
 
-								print("Unknown content type!")
-								print(cType)
+										except LookupError:
+
+											# I'm actually not sure what I was thinking when I wrote this if statement. I don't think it'll ever trigger.
+											if (b";" in cType) and (b"=" in cType): 		# the server is reporting an encoding. Now we use it to decode the
+
+												dummy_docType, charset = cType.split(b";")
+												charset = charset.split(b"=")[-1]
+
+										if not charset:
+											self.log.warning("Could not find encoding information on page - Using default charset. Shit may break!")
+											charset = "iso-8859-1"
+
+									try:
+										pgctnt = str(pgctnt, charset)
+
+									except UnicodeDecodeError:
+										self.log.error("Encoding Error! Stripping invalid chars.")
+										pgctnt = pgctnt.decode('utf-8', errors='ignore')
+
+									if soup:
+										pgctnt = bs4.BeautifulSoup(pgctnt)
+								elif "text/plain" in cType or "text/xml" in cType:
+									pgctnt = bs4.UnicodeDammit(pgctnt).unicode_markup
+
+								# Assume JSON is utf-8. Probably a bad idea?
+								elif "application/json" in cType:
+									pgctnt = pgctnt.decode('utf-8')
+
+								elif "text" in cType:
+									self.log.critical("Unknown content type!")
+									self.log.critical(cType)
+
+							else:
+								self.log.critical("No content disposition header!")
+								self.log.critical("Cannot guess content type!")
+
 
 
 							break
 
 
 					except:
-						print("pghandle = ", pghandle)
+						print(("pghandle = ", pghandle))
 
+						self.log.error(sys.exc_info())
 						traceback.print_exc()
-						log.error(sys.exc_info())
-						log.error("Error Retrieving Page! - Transfer failed. Waiting %s seconds before retrying", delay)
+						self.log.error("Error Retrieving Page! - Transfer failed. Waiting %s seconds before retrying", self.retryDelay)
 
 						try:
-							print("Critical Failure to retrieve page! %s at %s" % (pgreq.get_full_url(), time.ctime(time.time())))
-							print("Exiting")
+							self.log.critical("Critical Failure to retrieve page! %s at %s", pgreq.get_full_url(), time.ctime(time.time()))
+							self.log.critical("Exiting")
 						except:
-							print("And the URL could not be printed due to an encoding error")
+							self.log.critical("And the URL could not be printed due to an encoding error")
 						print()
-						log.error(pghandle)
-						time.sleep(delay)
+						self.log.error(pghandle)
+						time.sleep(self.retryDelay)
 
 
 
@@ -431,7 +413,7 @@ class WebGetRobust:
 
 
 		if errored and pghandle != None:
-			print("Later attempt succeeded %s" % pgreq.get_full_url())
+			print(("Later attempt succeeded %s" % pgreq.get_full_url()))
 			#print len(pgctnt)
 		elif errored and pghandle == None:
 			raise urllib.error.URLError("Failed to retreive page!")
@@ -458,8 +440,9 @@ class WebGetRobust:
 		# temp file
 
 	def updateCookiesFromFile(self):
-		self.log.info("Synchronizing cookies with cookieFile.")
-		self.cj.load(self.COOKIEFILE)
+		if os.path.exists(self.COOKIEFILE):
+			self.log.info("Synchronizing cookies with cookieFile.")
+			self.cj.load(self.COOKIEFILE)
 		# Update cookies from cookiefile
 
 	def addCookie(self, inCookie):
@@ -491,15 +474,16 @@ class WebGetRobust:
 		self.cj.set_cookie(cookie)
 
 	def initLogging(self):
-			mainLogger = logging.getLogger("Main")			# Main logger
-			mainLogger.setLevel(logging.DEBUG)
+		print("WARNING - Webget logging re-initialized?")
+		mainLogger = logging.getLogger("Main")			# Main logger
+		mainLogger.setLevel(logging.DEBUG)
 
-			ch = logging.StreamHandler(sys.stdout)
-			formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-			ch.setFormatter(formatter)
-			mainLogger.addHandler(ch)
+		ch = logging.StreamHandler(sys.stdout)
+		formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+		ch.setFormatter(formatter)
+		mainLogger.addHandler(ch)
 
-	def saveCookies(self):
+	def saveCookies(self, halting=False):
 
 		cookieWriteLock.acquire()
 		# print("Have %d cookies before saving cookiejar" % len(self.cj))
@@ -524,19 +508,20 @@ class WebGetRobust:
 				self.log.info("Cookies Saved")
 			else:
 				self.log.info("No cookies to save?")
-		except:
-			print(traceback.format_exc())
+		except Exception as e:
+			print("Encountered an error on exit?")
+			print("Exception = %s" % e)
 		finally:
 			cookieWriteLock.release()
 
 		# print("Have %d cookies after saving cookiejar" % len(self.cj))
-
-		self.syncCookiesFromFile()
+		if not halting:
+			self.syncCookiesFromFile()
 		# print "Have %d cookies after reloading cookiejar" % len(self.cj)
 
 	def __del__(self):
 		# print "WGH Destructor called!"
-		self.saveCookies()
+		self.saveCookies(halting=True)
 
 
 def isList(obj):
@@ -575,9 +560,11 @@ if __name__ == "__main__":
 	print("Oh HAI")
 	wg = WebGetRobust()
 
-	content, handle = wg.getpage(u"http://www.lighttpd.net", returnMultiple = True)
-	print(handle.headers.get('Content-Encoding'))
-	content, handle = wg.getpage(u"http://www.example.org", returnMultiple = True)
-	print(handle.headers.get('Content-Encoding'))
-	content, handle = wg.getpage(u"https://www.google.com/images/srpr/logo11w.png", returnMultiple = True)
-	print(handle.headers.get('Content-Encoding'))
+	content, handle = wg.getpage("http://www.lighttpd.net", returnMultiple = True)
+	print((handle.headers.get('Content-Encoding')))
+	content, handle = wg.getpage("http://www.example.org", returnMultiple = True)
+	print((handle.headers.get('Content-Encoding')))
+	content, handle = wg.getpage("https://www.google.com/images/srpr/logo11w.png", returnMultiple = True)
+	print((handle.headers.get('Content-Encoding')))
+	content, handle = wg.getpage("http://www.doujin-moe.us/ajax/newest.php", returnMultiple = True)
+	print((handle.headers.get('Content-Encoding')))
