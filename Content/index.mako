@@ -9,12 +9,21 @@ import datetime
 <%
 startTime = time.time()
 
-contentSources = {}
-for key in settings["artSites"]:
-	contentSources[settings[key]["shortName"]] = settings[key]
-
-
 cur = sqlCon.cursor()
+
+
+urlLut = {}
+contentSources = {}
+for key in settings.keys():
+	if not isinstance(settings[key], dict):
+		continue
+
+	if 'user-url' in settings[key]:
+		urlLut[key] = settings[key]['user-url']
+
+		contentSources[key] = settings[key]
+
+
 %>
 
 <html>
@@ -45,40 +54,24 @@ cur = sqlCon.cursor()
 <div>
 	${sideBar.getSideBar(sqlCon)}
 	<div class="maindiv">
-		<div class="subdiv daId">
-			<div class="contentdiv">
-				${genSourceErrorTable(contentSources["da"]["dlDirName"], "da", lim=50)}
+		<%
+		keys = list(urlLut.keys())
+		keys.sort()
+		%>
+		% for key in keys:
+			<div class="subdiv ${key}Id">
+				<div class="contentdiv">
+					${genSourceTable(contentSources[key]["dlDirName"], key, lim=50)}
 
+				</div>
 			</div>
-		</div>
-		<div class="subdiv faId">
-			<div class="contentdiv">
-				${genSourceErrorTable(contentSources["fa"]["dlDirName"], "fa", lim=50)}
-
-
-			</div>
-		</div>
-
-		<div class="subdiv hfId">
-			<div class="contentdiv">
-				${genSourceErrorTable(contentSources["hf"]["dlDirName"], "hf", lim=50)}
-
-
-			</div>
-		</div>
-		<div class="subdiv pxId">
-			<div class="contentdiv">
-				${genSourceErrorTable(contentSources["px"]["dlDirName"], "px", lim=50)}
-
-
-			</div>
-		</div>
+		% endfor
 
 	</div>
 <div>
 
 
-<%def name="genSourceErrorTable(niceName, siteName, lim=100)">
+<%def name="genSourceTable(niceName, siteName, lim=100)">
 	<div>
 		<div style="margin-top: 10px;">
 			<h2>${niceName}</h2>
@@ -96,12 +89,13 @@ cur = sqlCon.cursor()
 				# artistName, pageUrl, retreivalTime
 				cur.execute('SELECT id, siteName, artistName, pageUrl, retreivalTime FROM retrieved_pages WHERE siteName=? ORDER BY retreivalTime DESC LIMIT ?;', (siteName, lim))
 				pageLinks = cur.fetchall()
-				urlLut = {
-					"da" : "http://%s.deviantart.com/",
-					"fa" : "http://www.furaffinity.net/user/%s/",
-					"hf" : "http://www.hentai-foundry.com/user/%s/profile",
-					"px" : "http://www.pixiv.net/member.php?id=%s"
-				}
+				print(urlLut)
+
+				# 	"da" : "http://%s.deviantart.com/",
+				# 	"fa" : "http://www.furaffinity.net/user/%s/",
+				# 	"hf" : "http://www.hentai-foundry.com/user/%s/profile",
+				# 	"px" : "http://www.pixiv.net/member.php?id=%s"
+				# }
 			%>
 
 

@@ -8,6 +8,8 @@ import datetime
 from babel.dates import format_timedelta
 import time
 
+from settings import settings
+
 def compactDateStr(dateStr):
 	dateStr = dateStr.replace("months", "mo")
 	dateStr = dateStr.replace("month", "mo")
@@ -28,43 +30,28 @@ def compactDateStr(dateStr):
 
 
 <%def name="getSideBar(sqlConnection)">
+
+
+
+
 	<%
+
+
+	contentSources = {}
+	for key in settings.keys():
+		if not isinstance(settings[key], dict):
+			continue
+
+		if 'user-url' in settings[key]:
+			print('key', key)
+			contentSources[key] = settings[key]
+
+	keys = list(contentSources.keys())
+	keys.sort()
 
 	# Counting stuff
 
-
 	cur = sqlConnection.cursor()
-
-
-	cur.execute('SELECT COUNT(*) FROM errored_pages WHERE siteName="fa";')
-	faErrs = cur.fetchone()[0]
-
-	cur.execute('SELECT COUNT(*) FROM retrieved_pages WHERE siteName="fa";')
-	faSucceed = cur.fetchone()[0]
-
-	# ----------------------------
-
-	cur.execute('SELECT COUNT(*) FROM errored_pages WHERE siteName="da";')
-	daErrs = cur.fetchone()[0]
-
-	cur.execute('SELECT COUNT(*) FROM retrieved_pages WHERE siteName="da";')
-	daSucceed = cur.fetchone()[0]
-
-	# ----------------------------
-
-	cur.execute('SELECT COUNT(*) FROM errored_pages WHERE siteName="hf";')
-	hfErrs = cur.fetchone()[0]
-
-	cur.execute('SELECT COUNT(*) FROM retrieved_pages WHERE siteName="hf";')
-	hfSucceed = cur.fetchone()[0]
-
-	# ----------------------------
-
-	cur.execute('SELECT COUNT(*) FROM errored_pages WHERE siteName="px";')
-	pxErrs = cur.fetchone()[0]
-
-	cur.execute('SELECT COUNT(*) FROM retrieved_pages WHERE siteName="px";')
-	pxSucceed = cur.fetchone()[0]
 
 	cur.execute('SELECT siteName,statusText FROM statusDb WHERE sectionName="nextRun";')
 	nextRuns = cur.fetchall()
@@ -82,7 +69,7 @@ def compactDateStr(dateStr):
 	runTime = cur.fetchall()
 	runTime = dict(runTime)
 
-	for key in ["da", "fa", "hf", "px"]:
+	for key in keys:
 		if key in nextRuns:
 			nextRuns[key] = compactDateStr(format_timedelta(float(nextRuns[key])-time.time(), locale='en_US'))
 		else:
@@ -102,79 +89,63 @@ def compactDateStr(dateStr):
 			runTime[key] = compactDateStr(format_timedelta(float(runTime[key]), locale='en_US'))
 		else:
 			runTime[key] = "N.A."
+
+
 	%>
 	<div class="statusdiv">
 
-		<div class="statediv">
-			<strong>Status:</strong>
-		</div>
-		<br>
-		<div class="statediv daId">
-			<strong>DA:</strong><br />
-			Have: ${daSucceed}<br />
-			Errs: ${daErrs}
-			<hr>
-			NextRun: ${nextRuns["da"]}<br />
-			Running: ${runState["da"]}<br />
-			RunTime: ${runTime["da"]}<br />
-			LastRun: ${lastRun["da"]}<br />
-
-
-		</div>
-		<div class="statediv faId">
-			<strong>FA:</strong><br />
-			Have: ${faSucceed}<br />
-			Errs: ${faErrs}
-			<hr>
-			NextRun: ${nextRuns["fa"]}<br />
-			Running: ${runState["fa"]}<br />
-			RunTime: ${runTime["fa"]}<br />
-			LastRun: ${lastRun["fa"]}<br />
-		</div>
-		<div class="statediv hfId">
-			<strong>HF:</strong><br />
-			Have: ${hfSucceed}<br />
-			Errs: ${hfErrs}
-			<hr>
-			NextRun: ${nextRuns["hf"]}<br />
-			Running: ${runState["hf"]}<br />
-			RunTime: ${runTime["hf"]}<br />
-			LastRun: ${lastRun["hf"]}<br />
-
-		</div>
-		<div class="statediv pxId">
-			<strong>PX:</strong><br />
-			Have: ${pxSucceed}<br />
-			Errs: ${pxErrs}
-			<hr>
-			NextRun: ${nextRuns["px"]}<br />
-			Running: ${runState["px"]}<br />
-			RunTime: ${runTime["px"]}<br />
-			LastRun: ${lastRun["px"]}<br />
-		</div>
-		<br>
 		<div class="statediv navId">
 			<strong>Navigation:</strong><br />
 			<ul>
 				<li><a href="/">Index</a>
 				<hr>
 				<li><a href="errLists">Error Lists</a>
-				<li><a href="errLists?db=da">DA Errors</a>
-				<li><a href="errLists?db=fa">FA Errors</a>
-				<li><a href="errLists?db=hf">HF Errors</a>
-				<li><a href="errLists?db=px">PX Errors</a>
+
+				% for key in keys:
+					<li><a href="errLists?db=${key}">${key.upper()} Errors</a>
+				% endfor
 				<hr>
-				<li><a href="/source/bysite/da">DA Artists</a>
-				<li><a href="/source/bysite/fa">FA Artists</a>
-				<li><a href="/source/bysite/hf">HF Artists</a>
-				<li><a href="/source/bysite/px">PX Artists</a>
+				% for key in keys:
+					<li><a href="/source/bysite/${key}">${key.upper()} Artists</a>
+				% endfor
 				<hr>
 				<li><a href="/dbNameListEditor">Monitored Names</a>
 				<li><a href="/uploadEditor">Upload Settings</a>
-<!-- 				<hr>
-				<li><a href="dbFix">DB Tweaker</a> -->
 			</ul>
 		</div>
+		<div class="statediv">
+			<strong>Status:</strong>
+		</div>
+		<br>
+
+		% for key in keys:
+			<%
+
+			cur.execute('SELECT COUNT(*) FROM errored_pages WHERE siteName=?;', (key, ))
+			errs = cur.fetchone()[0]
+
+			cur.execute('SELECT COUNT(*) FROM retrieved_pages WHERE siteName=?;', (key, ))
+			succeed = cur.fetchone()[0]
+
+			%>
+
+
+			<div class="statediv ${key}Id">
+				<strong>${key.upper()}:</strong><br />
+				Have: ${succeed}<br />
+				Errs: ${errs}
+				<hr>
+				NextRun: ${nextRuns[key]}<br />
+				Running: ${runState[key]}<br />
+				RunTime: ${runTime[key]}<br />
+				LastRun: ${lastRun[key]}<br />
+
+			</div>
+		% endfor
+
+
+
 	</div>
+
 
 </%def>

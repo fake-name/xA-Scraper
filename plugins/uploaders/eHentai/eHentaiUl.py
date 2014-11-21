@@ -354,7 +354,7 @@ class UploadEh(plugins.uploaders.UploadBase.UploadBase):
 
 		if not aName.lower() in [name for name, gId in haveItems]:
 			numUnique = self.checkIfShouldUpload(images)
-			# numUnique = 50
+
 			if numUnique > 3:
 				newGid = self.createGallery(aName, numUnique, len(images))
 				self.insertGalleryId(ulTableRowId, newGid)

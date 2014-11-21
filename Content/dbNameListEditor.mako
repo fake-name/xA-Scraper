@@ -185,6 +185,16 @@ siteNameDict = getNameDict()
 
 sites = [settings[key]['shortName'] for key in settings['artSites']]
 
+
+sites = []
+for key in settings.keys():
+	if not isinstance(settings[key], dict):
+		continue
+
+	if 'user-url' in settings[key]:
+		sites.append(key)
+sites.sort()
+
 for site in sites:
 	if not site in siteNameDict:
 		siteNameDict[site] = []
