@@ -60,6 +60,8 @@ contentSources = {}
 for key in settings["artSites"]:
 	contentSources[settings[key]["shortName"]] = settings[key]
 
+print(contentSources)
+
 %>
 
 <body>

@@ -136,7 +136,7 @@ class GetHF(plugins.scrapers.ScraperBase.ScraperBase):
 			redirLinkFound = False
 
 			self.log.info("Image is on a sub-Page; Fetching sub page")
-			pgSoup = self.wg.getpage(tempLink, soup=True)					# Get Webpage
+			pgSoup = self.wg.getSoup(tempLink)					# Get Webpage
 
 			if pgSoup != "Failed":
 
@@ -179,7 +179,7 @@ class GetHF(plugins.scrapers.ScraperBase.ScraperBase):
 	def _getArtPage(self, dlPathBase, artPageUrl, artistName):
 
 
-		pgSoup = self.wg.getpage(artPageUrl, soup=True)					# Get Webpage
+		pgSoup = self.wg.getSoup(artPageUrl)					# Get Webpage
 
 		if pgSoup == "Failed":
 			self.log.error("cannot get page")
@@ -279,7 +279,7 @@ class GetHF(plugins.scrapers.ScraperBase.ScraperBase):
 
 	def _getTotalArtCount(self, artist):
 		basePage = "http://www.hentai-foundry.com/user/%s/profile" % artist
-		page = self.wg.getpage(basePage, soup=True)
+		page = self.wg.getSoup(basePage)
 
 		tds = page.find("b", text="# Pictures")
 
@@ -330,7 +330,7 @@ class GetHF(plugins.scrapers.ScraperBase.ScraperBase):
 				pageNumber += 1
 
 				self.log.info("Getting = " + turl)
-				pageSoup = self.wg.getpage(turl, soup=True)
+				pageSoup = self.wg.getSoup(turl)
 				if pageSoup == False:
 					self.log.error("Cannot get Page")
 					return "Failed"

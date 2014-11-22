@@ -41,7 +41,9 @@ cur = sqlCon.cursor()
 
 <%
 
-	shortnames = contentSources.keys()
+shortnames = contentSources.keys()
+print(shortnames)
+print(siteSource)
 %>
 
 

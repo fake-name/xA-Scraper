@@ -102,7 +102,7 @@ def compactDateStr(dateStr):
 				<li><a href="errLists">Error Lists</a>
 
 				% for key in keys:
-					<li><a href="errLists?db=${key}">${key.upper()} Errors</a>
+					<li><a href="/errLists?db=${key}">${key.upper()} Errors</a>
 				% endfor
 				<hr>
 				% for key in keys:

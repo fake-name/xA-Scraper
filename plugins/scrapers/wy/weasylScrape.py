@@ -22,7 +22,7 @@ class GetWy(plugins.scrapers.ScraperBase.ScraperBase):
 
 	ovwMode = "Check Files"
 
-	numThreads = 5
+	numThreads = 1
 
 
 
@@ -31,13 +31,14 @@ class GetWy(plugins.scrapers.ScraperBase.ScraperBase):
 	# # ---------------------------------------------------------------------------------------------------------------------------------------------------------
 
 	def checkCookie(self):
-		self.log.info("Wy Checking cookies")
-		cookie = re.search(r"<Cookie WZL=[\w%]*? for www\.weasyl\.com/>", "%s" % self.wg.cj)
 
-		if cookie:
-			return True, "Have Wy Cookies:\n	%s" % (cookie.group(0))
 
-		return False, "Do not have Wy login Cookies"
+		pagetext = self.wg.getpage('https://www.weasyl.com/')
+		if settings["wy"]["username"] in pagetext:
+			return True, "Have Wy Cookie."
+		else:
+			return False, "Do not have Wy login Cookies"
+
 
 	def getToken(self):
 			self.log.info("Getting Entrance Cookie")
@@ -59,18 +60,24 @@ class GetWy(plugins.scrapers.ScraperBase.ScraperBase):
 			#print soup
 			if accessToken:
 				self.log.info("Got Entrance token, logging in")
-
+				print("accessToken", accessToken)
 
 				logondict = {"token"        : accessToken,
-							"username"      : settings["hf"]["username"],
-							"password"      : settings["hf"]["password"],
-							"Referer"       : "https://www.weasyl.com/signin"}
+							"username"      : settings["wy"]["username"],
+							"password"      : settings["wy"]["password"],
+							"Referer"       : "https://www.weasyl.com/"}
 
-				pagetext = self.wg.getpage('https://www.weasyl.com/signin', postData = logondict)
-				if not "The login information you entered was not correct." in pagetext:
+				extraHeaders = {
+							"Referer"       : "https://www.weasyl.com/signin",
+				}
+
+				pagetext = self.wg.getpage('https://www.weasyl.com/signin', postData=logondict, addlHeaders=extraHeaders)
+				if settings["wy"]["username"] in pagetext:
+
 					self.wg.saveCookies()
 					return True, "Logged In"
 				else:
+					self.log.error("Login failed!")
 					return False, "Failed to log in"
 			return "No hidden input - entry step-through failed"
 
@@ -87,260 +94,187 @@ class GetWy(plugins.scrapers.ScraperBase.ScraperBase):
 	# # Individual page scraping
 	# # ---------------------------------------------------------------------------------------------------------------------------------------------------------
 
-	def _getContentUrlFromPage(self, soupIn):
-		pass
+	def _getContentUrlFromPage(self, soup):
 
-	# 	# TODO: Proper page parsing, rather then regexes
-
-
-	# 	contentDiv = soupIn.find('div', attrs={"class" : "box", "id" : "yw0"})			# Image should be in the first <div>
-	# 	boxDiv = contentDiv.findNext("div", attrs={"class" : "boxbody"})
-	# 	imgLink = boxDiv.findNext("img")
+		dlBar = soup.find('ul', id='detail-actions')
 
 
-	# 	if imgLink:
-	# 		try:
-	# 			if imgLink["src"].find("pictures") + 1:			# Content is hosted on the  pictures.hentai-fountry.net subdomain. Therefore, we want the
-	# 				imageURL = imgLink["src"]
-	# 				self.log.info("%s%s" % ("Found Image URL : ", imageURL))
-	# 				return imageURL
-	# 		except:
-	# 			self.log.error("Error:", soupIn)
-	# 			self.log.error(traceback.format_exc())
+		dummy, dlLink, dummy = dlBar.find_all('li')
+		if 'Download' in dlLink.get_text():
+			itemUrl = urllib.parse.urljoin(self.urlBase, dlLink.a['href'])
 
+			return itemUrl
 
-	# 	flashContent = boxDiv.findNext("div", attrs={"id" : "flash"})
-	# 	if flashContent:
-	# 		imageURL = flashContent.findNext("embed")["src"]
-	# 		self.log.info("%s%s" % ("Found Flash URL : ", imageURL))
-	# 		return imageURL
+		raise ValueError("Wat?")
 
+	def _extractTitleDescription(self, soup):
+		title = soup.find('h2', id='detail-bar-title')
+		title = title.get_text().strip()
 
+		descContainer = soup.find('div', id='detail-description')
+		desc = descContainer.find('div', class_='formatted-content')
+		desc = desc.get_text().strip()
 
-
-	# 	subPageLink = boxDiv.findNext("a")
-
-	# 	if subPageLink:
-
-	# 		tempLink = urllib.parse.urljoin("http://www.hentai-foundry.com/", subPageLink["href"])
-
-	# 		redirLinkFound = False
-
-	# 		self.log.info("Image is on a sub-Page; Fetching sub page")
-	# 		pgSoup = self.wg.getpage(tempLink, soup=True)					# Get Webpage
-
-	# 		if pgSoup != "Failed":
-
-	# 			imgLink = pgSoup.find('div', attrs={"class" : "box"}).findNext("div", attrs={"class" : "boxbody"}).findNext("img")
-
-	# 			if imgLink:
-	# 				if imgLink["src"].find("pictures") + 1:			# Content is hosted on the  pictures.hentai-fountry.net subdomain. Therefore, we want the
-
-
-	# 					imageURL = imgLink["src"]
-
-	# 					redirLinkFound = True
-	# 					self.log.info("%s%s" % ("Found Image URL : ", imageURL))
-
-	# 					return imageURL
-
-	# 		if not redirLinkFound:
-	# 			self.log.error("Failed to retreive image!")
-
-	# 	return False
-
-	def _extractTitleDescription(self, soupin):
-		pass
-
-	# 	infoContainer = soupin.find("div", class_="container", id="page")
-	# 	if infoContainer:
-	# 		itemTitle = infoContainer.find("span", class_="imageTitle")
-	# 		if itemTitle:
-	# 			itemTitle = itemTitle.get_text()
-	# 		captionContainer = infoContainer.find("div", id="yw1")
-	# 		if captionContainer:
-	# 			itemCaption = captionContainer.find("div", class_="boxbody")
-	# 			if itemCaption:
-	# 				itemCaption = str(itemCaption.extract())
-	# 	else:
-	# 		itemTitle = ""
-	# 		itemCaption = ""
-
-	# 	return itemTitle, itemCaption
+		return title, desc
 
 	def _getArtPage(self, dlPathBase, artPageUrl, artistName):
-		pass
+
+		soup = self.wg.getSoup(artPageUrl)
 
 
-	# 	pgSoup = self.wg.getpage(artPageUrl, soup=True)					# Get Webpage
+		imageURL = self._getContentUrlFromPage(soup)
+		itemTitle, itemCaption = self._extractTitleDescription(soup)
 
-	# 	if pgSoup == "Failed":
-	# 		self.log.error("cannot get page")
-	# 		return "Failed", ""
+		if not imageURL:
+			self.log.error("OH NOES!!! No image on page = " + artPageUrl)
+			raise ValueError("No image found!")
 
+		urlPath = urllib.parse.urlparse(imageURL).path
+		fName = urlPath.split("/")[-1]
 
-	# 	imageURL = self._getContentUrlFromPage(pgSoup)
-	# 	itemTitle, itemCaption = self._extractTitleDescription(pgSoup)
-
-	# 	if not imageURL:
-	# 		self.log.error("OH NOES!!! No image on page = " + artPageUrl)
-	# 		return "Failed", ""										# Return Fail
-
-
-
-	# 	if not "http" in imageURL:
-	# 		imageURL =  urllib.parse.urljoin("http://hentai-foundry.com", imageURL)
-
-	# 	fTypeRegx	= re.compile(r"http://.+?\.com.*/.*?\.")
-	# 	fNameRegex	= re.compile(r"http://.+/")
-	# 	ftype		= fTypeRegx.sub("" , imageURL)
-	# 	fname		= fNameRegex.sub("" , imageURL)
-
-	# 	if ftype == imageURL:								# If someone forgot the filename it may not be a .jpg, but it's likely any image viewer can figure out what it is.
-	# 		fname += ".jpg"
+		if not fName:
+			self.log.error("OH NOES!!! No filename for image on page = " + artPageUrl)
+			raise ValueError("No filename found!")
 
 
-	# 	contentDiv = pgSoup.find('div', attrs={"class" : "box", "id" : "yw0"})			# Image should be in the first <div>
+		filePath = os.path.join(dlPathBase, fName)
 
-	# 	imgTitleContainer = contentDiv.findNext("span", class_="imageTitle")
-	# 	imgTitle = None
+		self.log.info("			Filename			= %s", fName)
+		self.log.info("			Page Image Title	= %s", itemTitle)
+		self.log.info("			FileURL				= %s", imageURL)
+		self.log.info("			dlPath				= %s", filePath)
 
-	# 	if imgTitleContainer.contents:
-	# 		imgTitle = imgTitleContainer.contents[0]
-	# 	else:
-	# 		self.log.info("No Title for Image!")
+		if self._checkFileExists(filePath):
+			self.log.info("Exists, skipping...")
+			return "Exists", filePath, itemCaption, itemTitle
+		else:
+			imgdat = self.wg.getpage(imageURL, addlHeaders={'Referer':artPageUrl})
 
+			errs = 0
+			fp = None
 
-	# 	if imgTitle != None:
-	# 		fname = "%s.%s" % (re.sub(r'[^a-zA-Z0-9\-_.() ]', '', imgTitle), fname)
+			while not fp:
+				try:
+					# For text, the URL fetcher returns decoded strings, rather then bytes.
+					# Therefore, if the file is a string type, we encode it with utf-8
+					# so we can write it to a file.
+					if isinstance(imgdat, str):
+						imgdat = imgdat.encode(encoding='UTF-8')
 
-	# 	filePath = os.path.join(dlPathBase, fname)
-
-	# 	self.log.info("			Filename			= %s" % fname)
-	# 	self.log.info("			Page Image Title		= %s" % imgTitle)
-	# 	self.log.info("			FileURL				= %s" % imageURL)
-	# 	self.log.info("			FileType			= %s" % ftype)
-	# 	self.log.info("			dlPath				= %s" % filePath)
-
-	# 	if self._checkFileExists(filePath):
-	# 		self.log.info("Exists, skipping...")
-	# 		return "Exists", filePath, itemCaption, itemTitle
-	# 	else:
-	# 		imgdat = self.wg.getpage(imageURL)							# Request Image
-
-	# 		if imgdat == "Failed":
-	# 			self.log.error("cannot get image")
-	# 			return "Failed", ""
+					fp = open(filePath, "wb")								# Open file for saving image (Binary)
+					fp.write(imgdat)						# Write Image to File
+					fp.close()
+				except IOError:
+					try:
+						fp.close()
+					except:
+						pass
+					errs += 1
+					self.log.critical("Error attempting to save image file - %s", filePath)
+					if errs > 3:
+						self.log.critical("Could not open file for writing!")
+						return "Failed", ""
 
 
 
-	# 		errs = 0
-	# 		fp = None
-
-	# 		while not fp:
-	# 			try:
-	# 				# For text, the URL fetcher returns decoded strings, rather then bytes.
-	# 				# Therefore, if the file is a string type, we encode it with utf-8
-	# 				# so we can write it to a file.
-	# 				if isinstance(imgdat, str):
-	# 					imgdat = imgdat.encode(encoding='UTF-8')
-
-	# 				fp = open(filePath, "wb")								# Open file for saving image (Binary)
-	# 				fp.write(imgdat)						# Write Image to File
-	# 				fp.close()
-	# 			except IOError:
-	# 				try:
-	# 					fp.close()
-	# 				except:
-	# 					pass
-	# 				errs += 1
-	# 				self.log.critical("Error attempting to save image file - %s" % filePath)
-	# 				if errs > 3:
-	# 					self.log.critical("Could not open file for writing!")
-	# 					return "Failed", ""
-
-
-
-	# 		self.log.info("Successfully got: %s" % imageURL)
-	# 		return "Succeeded", filePath, itemCaption, itemTitle
+			self.log.info("Successfully got: %s" % imageURL)
+			return "Succeeded", filePath, itemCaption, itemTitle
 
 	# 	raise RuntimeError("How did this ever execute?")
 
-	# # ---------------------------------------------------------------------------------------------------------------------------------------------------------
-	# # Gallery Scraping
-	# # ---------------------------------------------------------------------------------------------------------------------------------------------------------
+	# ---------------------------------------------------------------------------------------------------------------------------------------------------------
+	# Gallery Scraping
+	# ---------------------------------------------------------------------------------------------------------------------------------------------------------
 
 	def _getTotalArtCount(self, artist):
-		pass
-	# 	basePage = "http://www.hentai-foundry.com/user/%s/profile" % artist
-	# 	page = self.wg.getpage(basePage, soup=True)
 
-	# 	tds = page.find("b", text="# Pictures")
+		basePage = "https://www.weasyl.com/~{user}".format(user=artist)
 
-	# 	stats = tds.parent.parent.find("td", text=re.compile(r"^\d+$"))
-	# 	if stats:
-	# 		return int(stats.text)
+		page = self.wg.getSoup(basePage)
+		stats = page.find('div', id='user-stats')
 
-	# 	raise LookupError("Could not retreive artist item quantity!")
+		item = stats.find("dd", text='Submissions')
+		if item:
+			# This feels a bit brittle, but I can't see how else to get the row
+			# I want.
+			items = item.previous_sibling.previous_sibling.get_text()
+			return int(items)
+
+		raise LookupError("Could not retreive artist item quantity!")
+
 
 
 	def _getItemsOnPage(self, inSoup):
-		pass
 
-	# 	links = set()
+		baseDiv = inSoup.find('div', class_='sectioned-main')
 
-	# 	imageLinks = inSoup.find_all('img', class_="thumb")
+		links = set()
+		itemUl = baseDiv.find("ul", recursive=False)
+		pages = itemUl.find_all("li", class_='grid-item')
+		for page in pages:
+			itemUrl = urllib.parse.urljoin(self.urlBase, page.a['href'])
+			links.add(itemUrl)
 
-	# 	for imageLink in imageLinks:
+		nextPage = False
+		buttonDiv = baseDiv.find("div", recursive=False)
+		for link in buttonDiv('a'):
+			if 'next' in link.get_text().lower():
+				nextPage = urllib.parse.urljoin(self.urlBase, link['href'])
 
-	# 		try:
-	# 			link = imageLink.find_parent()["href"]
-	# 			fullLink = urllib.parse.urljoin("http://www.hentai-foundry.com/", link)			 # Extract link
-	# 		except KeyError:										# badly formed link ? probably just a named anchor like '<a name="something">'
-	# 			continue
+		return links, nextPage
 
-	# 		links.add(fullLink)
+	def _getDirectories(self, baseUrl):
 
-	# 	return links
+		pageSoup = self.wg.getSoup(baseUrl)
+		dirDiv = pageSoup.find('div', class_='sectioned-sidebar')
+		if not dirDiv:
+			return []
+		assert dirDiv.h3.get_text() == 'Folders'
+
+		links = []
+
+		for link in dirDiv('a'):
+			item = urllib.parse.urljoin(self.urlBase, link['href'])
+			links.append(item)
+
+		return links
+
+
+
+	def _getItemsInDir(self, nextUrl):
+		ret = set()
+		while nextUrl:
+
+			if not flags.run:
+				break
+
+			self.log.info("Getting = '%s'", nextUrl)
+			pageSoup = self.wg.getSoup(nextUrl)
+			if pageSoup == False:
+				self.log.error("Cannot get Page")
+				return "Failed"
+
+			new, nextUrl = self._getItemsOnPage(pageSoup)
+			new = new - ret
+			self.log.info("Retrieved %s new items on page", len(new))
+			ret |= new
+		return ret
 
 
 	def _getGalleries(self, artist):
-		pass
 
+		artlinks = set()
+		artist = artist.strip()
 
-	# 	artlinks = set()
+		baseUrl = 'https://www.weasyl.com/submissions/{user}'.format(user=artist)
+		dirs = self._getDirectories(baseUrl)
+		dirs.append(baseUrl)
 
-	# 	artist = artist.strip()
+		for url in dirs:
+			artlinks |= self._getItemsInDir(url)
 
-	# 	subGalleries = ["http://www.hentai-foundry.com/pictures/user/%s/page/%s",
-	# 				"http://www.hentai-foundry.com/pictures/user/%s/scraps/page/%s"]
-
-	# 	for gallery in subGalleries:
-	# 		pageNumber = 1
-	# 		while 1:
-
-	# 			if not flags.run:
-	# 				break
-
-	# 			turl = gallery % (artist, pageNumber)
-	# 			pageNumber += 1
-
-	# 			self.log.info("Getting = " + turl)
-	# 			pageSoup = self.wg.getpage(turl, soup=True)
-	# 			if pageSoup == False:
-	# 				self.log.error("Cannot get Page")
-	# 				return "Failed"
-
-	# 			new = self._getItemsOnPage(pageSoup)
-	# 			new = new - artlinks
-	# 			self.log.info("Retrieved %s new items on page", len(new))
-	# 			artlinks |= new
-
-	# 			if not len(new):
-	# 				break
-
-	# 	self.log.info("Found %s links" % (len(artlinks)))
-	# 	return artlinks
+		self.log.info("Found %s links" % (len(artlinks)))
+		return artlinks
 
 
 

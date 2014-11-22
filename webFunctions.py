@@ -162,6 +162,7 @@ class WebGetRobust:
 		kwargs["returnMultiple"] = True
 
 		pgctnt, pghandle = self.getpage(*args, **kwargs)
+		print(pghandle.info())
 		hName = pghandle.info()['Content-Disposition'].split('filename=')[1]
 
 
@@ -194,17 +195,15 @@ class WebGetRobust:
 		pgreq = iri2uri.iri2uri(pgreq)
 
 		try:
-			# TODO: make this more sensible
-			if addlHeaders != None and  postData != None:
-				self.log.info("Making a post-request with additional headers!")
-				pgreq = urllib.request.Request(pgreq, headers=addlHeaders, data=urllib.parse.urlencode(postData).encode("utf-8"))
-			elif addlHeaders != None:
-				pgreq = urllib.request.Request(pgreq, headers=addlHeaders)
-			elif postData != None:
-				self.log.info("Making a post request!")
-				pgreq = urllib.request.Request(pgreq, data=urllib.parse.urlencode(postData).encode("utf-8"))
-			else:
-				pgreq = urllib.request.Request(pgreq)
+			params = {}
+			if postData != None:
+				self.log.info("Making a post-request!")
+				params['data'] = urllib.parse.urlencode(postData).encode("utf-8")
+			if addlHeaders != None:
+				self.log.info("Have additional GET parameters!")
+				params['headers'] = addlHeaders
+
+			pgreq = urllib.request.Request(pgreq, **params)
 
 		except:
 			self.log.critical("Invalid header or url")

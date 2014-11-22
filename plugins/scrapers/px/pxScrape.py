@@ -293,7 +293,7 @@ class GetPX(plugins.scrapers.ScraperBase.ScraperBase):
 
 	def _getTotalArtCount(self, artist):
 		basePage = "http://www.pixiv.net/member_illust.php?id=%s" % artist
-		page = self.wg.getpage(basePage, soup=True)
+		page = self.wg.getSoup(basePage)
 
 		mainDiv = page.find("div", class_="layout-a")
 		if not mainDiv:

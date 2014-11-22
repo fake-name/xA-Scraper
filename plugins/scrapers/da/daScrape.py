@@ -101,7 +101,7 @@ class GetDA(plugins.scrapers.ScraperBase.ScraperBase):
 				linkHandle = urllib.request.urlopen(urlAddr)
 				imgurl = linkHandle.geturl()
 				return imgurl
-		except:
+		except Exception:
 			return False
 
 	def _getContentDescriptionTitleFromSoup(self, inSoup):
@@ -124,7 +124,7 @@ class GetDA(plugins.scrapers.ScraperBase.ScraperBase):
 	def _getArtPage(self, dlPathBase, artPageUrl, artistName):
 		self.log.info("Getting page %s", artPageUrl)
 
-		pageSoup = self.wg.getpage(artPageUrl, soup=True)
+		pageSoup = self.wg.getSoup(artPageUrl)
 
 
 		imgurl = self._getContentUrlFromSoup(pageSoup)
@@ -175,18 +175,18 @@ class GetDA(plugins.scrapers.ScraperBase.ScraperBase):
 					except IOError:
 						try:
 							fp.close()
-						except:
+						except Exception:
 							pass
 						errs += 1
-						self.log.critical("Error attempting to save image file - %s" % filePath)
+						self.log.critical("Error attempting to save image file - %s", filePath)
 						if errs > 3:
 							self.log.critical("Could not open file for writing!")
 							return "Failed", ""
 														# Write Image to File
 
-					except:
+					except Exception:
 						self.log.error("Error saving image - what?")
-						self.log.error("Source URL: ", artPageUrl)
+						self.log.error("Source URL: '%s'", artPageUrl)
 						self.log.error(type(imgdat))
 
 						self.log.error(traceback.format_exc())
@@ -207,7 +207,7 @@ class GetDA(plugins.scrapers.ScraperBase.ScraperBase):
 
 	def _getTotalArtCount(self, artist):
 		basePage = "http://%s.deviantart.com/" % artist
-		page = self.wg.getpage(basePage, soup=True)
+		page = self.wg.getSoup(basePage)
 		div = page.find("div", class_="pbox pppbox")
 		if not div:
 			raise LookupError("Could not retreive artist item quantity!")
@@ -230,7 +230,7 @@ class GetDA(plugins.scrapers.ScraperBase.ScraperBase):
 			while 1:
 
 				pageUrl = gallery % (artist, loopCounter * 24)
-				pageSoup = self.wg.getpage(pageUrl, soup=True)
+				pageSoup = self.wg.getSoup(pageUrl)
 				new = self._getItemsOnPage(pageSoup)
 				if len(new) == 0 or flags.run == False:
 					self.log.info("No more images. At end of gallery.")

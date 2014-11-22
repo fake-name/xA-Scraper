@@ -216,7 +216,7 @@ class GetFA(plugins.scrapers.ScraperBase.ScraperBase):
 
 	def _getTotalArtCount(self, artist):
 		basePage = "http://www.furaffinity.net/user/%s/" % artist
-		page = self.wg.getpage(basePage, soup=True)
+		page = self.wg.getSoup(basePage)
 
 		tds = page.find("td", align="right", text="Statistics")
 
@@ -263,7 +263,7 @@ class GetFA(plugins.scrapers.ScraperBase.ScraperBase):
 
 				turl = galleryUrlBase % (artist, pageNo)
 				self.log.info("Getting = " + turl)
-				pageSoup = self.wg.getpage(turl, soup=True)							# Request Image
+				pageSoup = self.wg.getSoup(turl)							# Request Image
 				if pageSoup == "Failed":
 					self.log.error("Cannot get Page: %s" % turl)
 					break
