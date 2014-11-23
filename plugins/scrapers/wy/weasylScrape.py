@@ -113,8 +113,23 @@ class GetWy(plugins.scrapers.ScraperBase.ScraperBase):
 
 		descContainer = soup.find('div', id='detail-description')
 		desc = descContainer.find('div', class_='formatted-content')
-		desc = desc.get_text().strip()
 
+		tags = soup.find('div', id='di-tags')
+
+		# Horrible hack using ** to work around the fact that 'class' is a reserved keyword
+		tagDiv = soup.new_tag('div', **{'class' : 'tags'})
+
+		tagHeader = soup.new_tag('b')
+		tagHeader.append('Tags:')
+		tagDiv.append(tagHeader)
+
+		for tag in tags.div.find_all('a'):
+			new = soup.new_tag('div', **{'class' : 'tag'})
+			new.append(tag.get_text())
+			tagDiv.append(new)
+
+		desc.append(tagDiv)
+		desc = str(desc.prettify())
 		return title, desc
 
 	def _getArtPage(self, dlPathBase, artPageUrl, artistName):
@@ -206,18 +221,16 @@ class GetWy(plugins.scrapers.ScraperBase.ScraperBase):
 
 	def _getItemsOnPage(self, inSoup):
 
-		baseDiv = inSoup.find('div', class_='sectioned-main')
-
 		links = set()
-		itemUl = baseDiv.find("ul", recursive=False)
+		itemUl = inSoup.find("ul", class_='thumbnail-grid')
 		pages = itemUl.find_all("li", class_='grid-item')
 		for page in pages:
 			itemUrl = urllib.parse.urljoin(self.urlBase, page.a['href'])
 			links.add(itemUrl)
 
 		nextPage = False
-		buttonDiv = baseDiv.find("div", recursive=False)
-		for link in buttonDiv('a'):
+		buttons = inSoup.find_all("a", class_='button')
+		for link in buttons:
 			if 'next' in link.get_text().lower():
 				nextPage = urllib.parse.urljoin(self.urlBase, link['href'])
 
