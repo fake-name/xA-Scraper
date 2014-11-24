@@ -22,7 +22,7 @@ class GetIb(plugins.scrapers.ScraperBase.ScraperBase):
 
 	ovwMode = "Check Files"
 
-	numThreads = 1
+	numThreads = 4
 
 
 
@@ -97,7 +97,6 @@ class GetIb(plugins.scrapers.ScraperBase.ScraperBase):
 	# ---------------------------------------------------------------------------------------------------------------------------------------------------------
 
 	def _fetchImage(self, imageURL, dlPathBase, itemCaption, itemTitle, artPageUrl):
-
 		urlPath = urllib.parse.urlparse(imageURL).path
 		fName = urlPath.split("/")[-1]
 
@@ -154,20 +153,31 @@ class GetIb(plugins.scrapers.ScraperBase.ScraperBase):
 		if not soup:
 			soup = self.wg.getSoup(url)
 
-		resize   = soup.find('div', title='Click to show max preview size')
-		origSize = soup.find('div', class_='widget_imageFromSubmission')
+		resize       = soup.find('div', title='Click to show max preview size')
+		origSize     = soup.find('div', class_='widget_imageFromSubmission')
+		swfContainer = soup.find('embed', type='application/x-shockwave-flash')
 		if resize:
 			return resize.a['href']
 		elif origSize:
 			return origSize.img['src']
+		elif swfContainer:
+			return swfContainer['src']
 		else:
+			self.log.error("No content found on page!")
 			return None
 
 
 
 	def _extractTitle(self, soup):
 		div = soup.find('div', class_='content')
-		dummy_avatar, titleTd, dummy_smiley, dummy_donate = div.find_all('td')
+		tds = div.find_all('td')
+		if len(tds) == 4:
+			dummy_avatar, titleTd, dummy_smiley, dummy_donate = tds
+		elif len(tds) == 2:
+			dummy_avatar, titleTd = tds
+		else:
+			raise ValueError("Do not know how to unpack title!")
+
 
 		title, dummy_by = titleTd.find_all('div')
 		return title.get_text()
@@ -223,13 +233,17 @@ class GetIb(plugins.scrapers.ScraperBase.ScraperBase):
 		if len(mainDivs) == 2:
 			imgDiv, desc_div = mainDivs
 			imageURL    = [self._getContentUrlFromPage(imgDiv)]
-		elif len(mainDivs) == 3:
-			imgDiv, seqDiv, desc_div = mainDivs
+		elif len(mainDivs) == 3 or len(mainDivs) == 4:
+			if len(mainDivs) == 3:
+				imgDiv, seqDiv, desc_div = mainDivs
+			elif len(mainDivs) == 4:
+				dummy_header, imgDiv, seqDiv, desc_div = mainDivs
 
 			imageURL = set()
 			imageURL.add(self._getContentUrlFromPage(imgDiv))
 			for img in self._getSeqImageDivs(seqDiv):
 				imageURL.add(img)
+			self.log.info("Found %s item series on page!", len(imageURL))
 		else:
 			raise ValueError("Unknown number of mainDivs! %s" % len(mainDivs))
 
@@ -290,12 +304,15 @@ class GetIb(plugins.scrapers.ScraperBase.ScraperBase):
 
 		baseGal   = pageSoup.find('a', text='Gallery')
 		scrapsGal = pageSoup.find('a', text='Scraps')
+		csGal     = pageSoup.find('a', text='Character Sheets')
 
 		ret = []
 		if baseGal:
 			ret.append(urllib.parse.urljoin(baseUrl, baseGal['href']))
 		if scrapsGal:
 			ret.append(urllib.parse.urljoin(baseUrl, scrapsGal['href']))
+		if csGal:
+			ret.append(urllib.parse.urljoin(baseUrl, csGal['href']))
 		return ret
 
 	def _getItemsFromGallery(self, nextUrl):
