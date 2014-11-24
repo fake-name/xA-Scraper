@@ -20,7 +20,8 @@ import plugins.scrapers.da.daScrape as das
 import plugins.scrapers.fa.faScrape as fas
 import plugins.scrapers.hf.hfScrape as hfs
 import plugins.scrapers.px.pxScrape as pxs
-import plugins.scrapers.wy.weasylScrape as wys
+import plugins.scrapers.wy.wyScrape as wys
+import plugins.scrapers.ib.ibScrape as ibs
 
 import wsgi_server
 
@@ -34,6 +35,7 @@ JOBS = [
 	(fas.GetFA, settings["fa"]["runInterval"], "fa"),
 	(hfs.GetHF, settings["hf"]["runInterval"], "hf"),
 	(wys.GetWy, settings["wy"]["runInterval"], "wy"),
+	(ibs.GetIb, settings["ib"]["runInterval"], "ib"),
 	(pxs.GetPX, settings["px"]["runInterval"], "px")
 ]
 

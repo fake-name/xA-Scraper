@@ -105,7 +105,11 @@ logger =  logging.getLogger("Main.WebSrv")
 
 
 <%def name="genNameListManagementTable(siteShortName, nameTupList)">
-	<h2>${settings[siteShortName]["dlDirName"]}</h2>
+	<span>
+
+		<h2 style='display: inline-block' > ${settings[siteShortName]["dlDirName"]}</h2>
+	</span>
+
 	<form>
 		Add new artist:
 		<input type="hidden" name="target" value="addName">
@@ -116,30 +120,42 @@ logger =  logging.getLogger("Main.WebSrv")
 		</div>
 		<input type="submit" value="Add">
 	</form>
-	<table border="1px" style="width:800px;">
-		<tr>
-				<th class="uncoloured padded" width="670px">Artist Name</th>
-				<th class="uncoloured padded" width="30px">Del</th>
-		</tr>
-
-		% for uId, artistName in nameTupList:
-			<tr id='rowid_${uId}'>
-
-				<td>
-					<span id="view"> ${artistName} </span>
-					<span id="edit" style="display:none">
-						<input type="text" name="aName" style="box-sizing: border-box; width: 100%; -moz-box-sizing: border-box; -webkit-box-sizing: border-box;" value="${artistName}">
-
-					</span>
-				</td>
-
-				<td>
-					&nbsp;<a href="#" id='buttonid_${uId}' onclick="ToggleEdit('${uId}');return false;">Edit</a>&nbsp;
-				</td>
+	<button style='display: inline-block' class="btn_${siteShortName}">Show List</button>
+	<div class='toggle_${siteShortName}' style='display: none'>
+		<table border="1px" style="width:800px;">
+			<tr>
+					<th class="uncoloured padded" width="670px">Artist Name</th>
+					<th class="uncoloured padded" width="30px">Del</th>
 			</tr>
-		% endfor
 
-	</table>
+			% for uId, artistName in nameTupList:
+				<tr id='rowid_${uId}'>
+
+					<td>
+						<span id="view"> ${artistName} </span>
+						<span id="edit" style="display:none">
+							<input type="text" name="aName" style="box-sizing: border-box; width: 100%; -moz-box-sizing: border-box; -webkit-box-sizing: border-box;" value="${artistName}">
+
+						</span>
+					</td>
+
+					<td>
+						&nbsp;<a href="#" id='buttonid_${uId}' onclick="ToggleEdit('${uId}');return false;">Edit</a>&nbsp;
+					</td>
+				</tr>
+			% endfor
+
+		</table>
+	</div>
+
+	<script>
+	$(".btn_${siteShortName}").click(function() {
+
+		$(".toggle_${siteShortName}").toggle(200);
+
+	});​
+	</script>
+
 </%def>
 
 
