@@ -47,25 +47,71 @@ class ApiInterface(object):
 		print("Parameter update call!")
 		print(request.params)
 
-		# if not "new-rating" in request.params:
-		# 	return Response(body=json.dumps({"Status": "Failed", "Message": "No new rating specified in rating-change call!"}))
+		return Response(body=json.dumps({"Status": "Error", "Message": "Rating change not implemented!"}))
 
-		# mangaName = request.params["change-rating"]
-		# newRating = request.params["new-rating"]
 
-		# try:
-		# 	newRating = int(newRating)
-		# except ValueError:
-		# 	return Response(body=json.dumps({"Status": "Failed", "Message": "New rating was not a integer!"}))
+	# 'NestedMultiDict([('id', '9'), ('aname_da', ''), ('aname_fa', ''), ('aname_hf', ''), ('aname_ib', ''), ('aname_wy', ''), ('change-upload-status', 'true')])'
+	def changeUploadStatus(self, request):
 
-		# if not mangaName in nt.dirNameProxy:
-		# 	return Response(body=json.dumps({"Status": "Failed", "Message": "Specified Manga Name not in dir-dict."}))
+		print("Parameter update call!")
+		print(request.params)
 
-		# print("Calling ratingChange")
-		# nt.dirNameProxy.changeRating(mangaName, newRating)
-		# print("ratingChange Complete")
+		# Verify all the keys
 
-		return Response(body=json.dumps({"Status": "Success", "Message": "Directory Renamed"}))
+		requireKeys = ['id', 'change-upload-status']
+
+		for key in settings['artSites']:
+
+			# Skip pixiv.
+			if key == 'px':
+				continue
+
+			key = 'aname_{key}'.format(key=key)
+			requireKeys.append(key)
+
+
+
+		if not all([key in request.params for key in requireKeys]):
+			return self.errResponse("Missing required key in request params.")
+
+		setKeys = []
+		setParams = []
+		for key in settings['artSites']:
+			# Skip pixiv.
+			if key == 'px':
+				continue
+
+			lookupKey = 'aname_{key}'.format(key=key)
+			setKey = '{key}id=?'.format(key=key)
+			setKeys.append(setKey)
+			if request.params[lookupKey]:
+				setParams.append(request.params[lookupKey])
+			else:
+				setParams.append(None)
+
+
+		params = setParams + [request.params["id"]]
+
+		query = "UPDATE {table} SET {cols} WHERE id=?;".format(table=settings["dbConf"]["uploadGalleries"], cols=', '.join(setKeys))
+
+		print('query', query)
+		print('params', params)
+
+		cur = self.conn.cursor()
+		ret = cur.execute(query, params)
+		self.conn.commit()
+
+		return Response(body=json.dumps({"Status": "Success", "Message": "Updated artist state!", 'reload': True}))
+
+
+
+	def createEmptyRow(self, request):
+		cur = self.conn.cursor()
+		cur.execute("INSERT INTO {table} (uploadTime) VALUES (0);".format(table=settings["dbConf"]["uploadGalleries"]))
+		self.conn.commit()
+
+
+		return Response(body=json.dumps({"Status": "Success", "Message": "Inserted new artist!", 'reload': True}))
 
 	def nameAdd(self, request):
 
@@ -121,12 +167,21 @@ class ApiInterface(object):
 			print("Rating change!")
 			return self.changeRating(request)
 
+		elif "change-upload-status" in request.params:
+			print("Rating change!")
+			return self.changeUploadStatus(request)
+
 		elif "change-artist-name" in request.params:
 			print("Updating artist's name!")
 			return self.updateName(request)
+
 		elif 'target' in request.params:
 			print("Adding artist!")
 			return self.nameAdd(request)
+
+		elif 'add-new-row' in request.params:
+			print("Adding empty upload row!")
+			return self.createEmptyRow(request)
 
 		else:
 			print("Unknown API call!")

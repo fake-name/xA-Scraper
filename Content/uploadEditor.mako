@@ -23,11 +23,13 @@
 			if (ctnt["Status"] == "Success")
 			{
 				window.alert("Succeeded!\n"+ctnt["Message"])
+				if (ctnt['reload'] == true)
+					location.reload();
 			}
 			else
 			{
 				window.alert("Error!\n"+ctnt["Message"])
-				// location.reload();
+
 
 			}
 
@@ -35,6 +37,9 @@
 		};
 		function ToggleEdit(rowId)
 		{
+			console.log('Visibility:', $('#rowid_'+rowId+' #view').is(":visible"))
+			console.log('Object:', $('#rowid_'+rowId+' #view'))
+
 			if ($('#rowid_'+rowId+' #view').is(":visible"))
 			{
 				$('#rowid_'+rowId+' #view').each(function(){ $(this).hide(); })
@@ -166,8 +171,10 @@ logger =  logging.getLogger("Main.WebSrv")
 
 			print(rowId, rowData)
 			galId, aIds = rowData
+			print(cols)
+			print(aIds)
 
-			print(nameLUT)
+
 
 			aIds = dict(zip(cols, aIds))
 			%>
@@ -182,6 +189,8 @@ logger =  logging.getLogger("Main.WebSrv")
 
 				% for srcKey in cols:
 					<%
+					print(srcKey, aIds[srcKey])
+
 					src, name = getNameFromId(aIds[srcKey])
 					keyVal = '' if aIds[srcKey] == None else name
 					if src and src != srcKey:
@@ -189,8 +198,10 @@ logger =  logging.getLogger("Main.WebSrv")
 
 					%>
 					<td>
-						<span id="view"> ${keyVal} </span>
-						<span id="edit" style="display:none">
+						## 'display: block;' is a hack to force jquery's :visible to properly resove items as visible even though
+						## they have not content. Arrrgh.
+						<span id="view" style="display: block;"> ${keyVal} </span>
+						<span id="edit" style="display: none;">
 							${getDropbox(srcKey, aIds[srcKey])}
 
 						</span>
@@ -215,7 +226,7 @@ def getNameDict():
 	cur = sqlCon.cursor()
 	cols = list(settings["ulConf"].keys())
 	cols.sort()
-	cols = [key+'id' for key in cols]
+	cols = [key+'id' for key in cols if key != 'px']
 	cols = ", ".join(cols)
 
 	ret = cur.execute('SELECT id, galleryId, {cols} FROM {table};'.format(table=settings["dbConf"]["uploadGalleries"], cols=cols))
