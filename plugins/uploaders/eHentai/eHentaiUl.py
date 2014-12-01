@@ -339,43 +339,57 @@ class UploadEh(plugins.uploaders.UploadBase.UploadBase):
 
 		# print("rowId", rowId, "images", images)
 
-	def checkGallery(self, haveItems, artistRowId, ulTableRowId):
+	def checkGallery(self, haveItems, ulTableRowId):
 
-		try:
-			images = self.getImagesForId(artistRowId)
-		except ValueError:
-			self.log.error("Failure getting downloads for artist '%s'!", self.getByRowId(artistRowId))
-			self.log.error("Artist has not been downloaded, or cannot find download path!")
-			return
+		ret = self.getSiteIds(ulTableRowId)
+		# drop all keys which we're not uploading (v == None)
+		ret = dict(
+					[(k,v) for k,v in ret.items() if v ]
+					)
 
-		images = natsorted(images)
 
-		siteName, aName = self.getByRowId(artistRowId)
+		print("Row", ulTableRowId)
+		for key, value in ret.items():
+			print(self.getByRowId(value))
 
-		if not aName.lower() in [name for name, gId in haveItems]:
-			numUnique = self.checkIfShouldUpload(images)
 
-			if numUnique > 3:
-				newGid = self.createGallery(aName, numUnique, len(images))
-				self.insertGalleryId(ulTableRowId, newGid)
-				self.updateGallery(ulTableRowId, images)
-			else:
-				self.log.warn("Do not have sufficent unique items to warrant upload for artist %s!" % aName)
-
-		else:
-
-			ulQuantity = len(self.getUploaded(artistRowId))
-			if len(images) < ulQuantity+3:
-				self.log.info("Do not have enough new content to warrant updating (%s new item(s)). Skipping.", len(images) - ulQuantity)
+		for sourceSite, artistRowId in ret.items():
+			try:
+				images = self.getImagesForId(artistRowId)
+			except ValueError:
+				self.log.error("Failure getting downloads for artist '%s'!", self.getByRowId(artistRowId))
+				self.log.error("Artist has not been downloaded, or cannot find download path!")
 				return
 
-			newImages = len(images) - ulQuantity
+			images = natsorted(images)
 
-			self.log.info("Need to update gallery for '%s' (%s new item(s)).", aName, newImages)
-			self.unlockGallery(ulTableRowId)
-			self.updateGallery(ulTableRowId, images)
-			self.addUpdateNote(ulTableRowId, newImages)
-			self.setUpdateTimer(ulTableRowId, time.time())
+			siteName, aName = self.getByRowId(artistRowId)
+
+			if not aName.lower() in [name for name, gId in haveItems]:
+
+				numUnique = self.checkIfShouldUpload(images)
+
+				if numUnique > 3:
+					newGid = self.createGallery(aName, numUnique, len(images))
+					self.insertGalleryId(ulTableRowId, newGid)
+					self.updateGallery(ulTableRowId, images)
+				else:
+					self.log.warn("Do not have sufficent unique items to warrant upload for artist %s!" % aName)
+
+			else:
+
+				ulQuantity = len(self.getUploaded(artistRowId))
+				if len(images) < ulQuantity+3:
+					self.log.info("Do not have enough new content to warrant updating (%s new item(s)). Skipping.", len(images) - ulQuantity)
+					return
+
+				newImages = len(images) - ulQuantity
+
+				self.log.info("Need to update gallery for '%s' (%s new item(s)).", aName, newImages)
+				self.unlockGallery(ulTableRowId)
+				self.updateGallery(ulTableRowId, images)
+				self.addUpdateNote(ulTableRowId, newImages)
+				self.setUpdateTimer(ulTableRowId, time.time())
 
 
 
@@ -386,6 +400,7 @@ class UploadEh(plugins.uploaders.UploadBase.UploadBase):
 	def syncGalleryIds(self):
 
 		existG = self.getExtantGalleries()
+
 		existG = dict(existG)
 
 		toUl, nameLUT = self.getToProcess()
@@ -442,24 +457,20 @@ class UploadEh(plugins.uploaders.UploadBase.UploadBase):
 		for itemName, itemGid in existingGalleries:
 			self.log.info("Have gallery %s, %s", itemName, itemGid)
 
-		print(listIn)
-		listIn, nameLUT = listIn
-		for ulTableRowId, data in listIn.items():
 
+
+		listIn, nameLUT = listIn
+
+
+		for ulTableRowId, data in listIn.items():
 			lastUl = data[0]
-			if lastUl > time.time() - 60*60*24*14:
+			if lastUl > time.time() - 60*60*24*21:
 				if data[3] != None:
-					self.log.info("Item '%s' (artist '%s') updated within the last two weeks. Skipping", ulTableRowId, nameLUT[data[3]])
+					self.log.info("Item '%s' (artist '%s') updated within the last 3 weeks. Skipping", ulTableRowId, nameLUT[data[3]])
 					continue
 
-			for artistRowId in [item for item in data[-4:] if item != None]:
 
-				artistInfo = self.getByRowId(artistRowId)
-				if ulFilter and artistInfo[0] not in ulFilter:
-					self.log.info("Skipping download for %s due to upload filter.", artistInfo)
-
-
-				self.checkGallery(existingGalleries, artistRowId, ulTableRowId)
+			self.checkGallery(existingGalleries, ulTableRowId)
 
 
 

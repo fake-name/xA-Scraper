@@ -110,7 +110,7 @@ class UploadBase(plugins.PluginBase.PluginBase):
 
 		ret = cur.execute("SELECT uploadTime, uploadedItems, galleryId FROM %s WHERE id=?;" % (settings["dbConf"]["uploadGalleries"]), (mainId,))
 		items = ret.fetchall()
-		print(mainId, items)
+
 		if len(items) > 1:
 			print("Returned ", items)
 			raise ValueError("Wat? Gallery appears to exist already? Please delete colliding library.")
@@ -118,6 +118,25 @@ class UploadBase(plugins.PluginBase.PluginBase):
 			raise ValueError("Wat? Gallery not found, and it should exist at this point!")
 
 		return items.pop()
+
+	def getSiteIds(self, mainId):
+		cur = self.conn.cursor()
+
+		ret = cur.execute("SELECT daid, faid, hfid, pxid, ibid, wyid FROM %s WHERE id=?;" % (settings["dbConf"]["uploadGalleries"]), (mainId,))
+		items = ret.fetchall()
+
+		if len(items) > 1:
+			print("Returned ", items)
+			raise ValueError("Wat? How did you get duplicate primary keys?")
+		if len(items) == 0:
+			raise ValueError("Wat? Gallery not found, and it should exist at this point!")
+
+		row = items.pop()
+		names = ['daid', 'faid', 'hfid', 'pxid', 'ibid', 'wyid']
+		ret = dict(zip(names, row))
+
+		return ret
+
 
 
 	def haveUploaded(self, imagePath):

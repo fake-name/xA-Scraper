@@ -29,6 +29,76 @@ from threading import Lock
 cookieWriteLock = Lock()
 
 
+
+import itertools
+import mimetypes
+import email.generator
+
+class MultiPartForm():
+	"""Accumulate the data to be used when posting a form."""
+
+	def __init__(self):
+		self.form_fields = []
+		self.files = []
+		self.boundary = email.generator._make_boundary()
+		return
+
+	def get_content_type(self):
+		return 'multipart/form-data; boundary=%s' % self.boundary
+
+	def add_field(self, name, value):
+		"""Add a simple field to the form data."""
+		self.form_fields.append((name, value))
+		return
+
+	def add_file(self, fieldname, filename, fContents, mimetype=None):
+		"""Add a file to be uploaded."""
+		if mimetype is None:
+			mimetype = mimetypes.guess_type(filename)[0] or 'application/octet-stream'
+		self.files.append((fieldname, filename, mimetype, fContents))
+		return
+
+	def make_result(self):
+		"""Return bytes representing the form data, including attached files."""
+		# Build a list of lists, each containing "lines" of the
+		# request.  Each part is separated by a boundary string.
+		# Once the list is built, return a string where each
+		# line is separated by '\r\n'.
+		parts = []
+		part_boundary = '--' + self.boundary
+
+		# Add the form fields
+		parts.extend(
+			[ bytes(part_boundary, 'utf-8'),
+			  bytes('Content-Disposition: form-data; name="%s"' % name, 'utf-8'),
+			  b'',
+			  bytes(value, 'utf-8'),
+			]
+			for name, value in self.form_fields
+			)
+
+		# Add the files to upload
+		parts.extend(
+			[ bytes(part_boundary, 'utf-8'),
+			  bytes('Content-Disposition: file; name="%s"; filename="%s"' % (field_name, filename), 'utf-8'),
+			  bytes('Content-Type: %s' % content_type, 'utf-8'),
+			  b'',
+			  body,
+			]
+			for field_name, filename, content_type, body in self.files
+			)
+
+		# Flatten the list and add closing boundary marker,
+		# then return CR+LF separated data
+		flattened = list(itertools.chain(*parts))
+		flattened.append(bytes('--' + self.boundary + '--', 'utf-8'))
+		flattened.append(b'')
+		return b'\r\n'.join(flattened)
+
+
+
+
+
 class WebGetRobust:
 	COOKIEFILE = 'cookies.lwp'				# the path and filename to save your cookies in
 	cj = None
@@ -172,12 +242,14 @@ class WebGetRobust:
 
 		# postData expects a dict
 		# addlHeaders also expects a dict
-	def getpage(self, pgreq, addlHeaders = None, returnMultiple = False, callBack=None, postData=None, soup=False):
+	def getpage(self, pgreq, addlHeaders = None, returnMultiple = False, callBack=None, postData=None, soup=False, binaryForm=False):
 
 		# pgreq = fixurl(pgreq)
 
 		if soup:
 			self.log.warn("'soup' kwarg is depreciated. Please use the `getSoup()` call instead.")
+
+
 
 
 
@@ -194,14 +266,24 @@ class WebGetRobust:
 
 		try:
 			params = {}
+			headers = {}
 			if postData != None:
 				self.log.info("Making a post-request!")
 				params['data'] = urllib.parse.urlencode(postData).encode("utf-8")
 			if addlHeaders != None:
 				self.log.info("Have additional GET parameters!")
-				params['headers'] = addlHeaders
+				headers = addlHeaders
+			if binaryForm:
+				self.log.info("Binary form submission!")
+				if 'data' in params:
+					raise ValueError("You cannot make a binary form post and a plain post request at the same time!")
 
-			pgreq = urllib.request.Request(pgreq, **params)
+				params['data']            = binaryForm.make_result()
+				headers['Content-type']   =  binaryForm.get_content_type()
+				headers['Content-length'] =  len(params['data'])
+
+
+			pgreq = urllib.request.Request(pgreq, headers=headers, **params)
 
 		except:
 			self.log.critical("Invalid header or url")
