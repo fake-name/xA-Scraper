@@ -87,6 +87,18 @@ class UploadBase(plugins.PluginBase.PluginBase):
 		return rets
 
 
+	def getGalleryIdById(self, rowId):
+		cur = self.conn.cursor()
+
+		ret = cur.execute("""SELECT galleryId FROM %s WHERE id=?;""" % settings["dbConf"]["uploadGalleries"], (rowId, ))
+		rets = ret.fetchone()
+		if len(rets) > 1:
+			raise ValueError("More then one primary key?")
+		elif len(rets) == 1:
+			return rets[0]
+		return None
+
+
 	def getToProcess(self):
 		cur = self.conn.cursor()
 
@@ -178,6 +190,20 @@ class UploadBase(plugins.PluginBase.PluginBase):
 		cur.execute("UPDATE %s SET galleryId=? WHERE id=?;"  % (settings["dbConf"]["uploadGalleries"]), (galleryId, mainId))
 
 		self.conn.commit()
+
+
+
+	def getNamesForUlRow(self, rowId):
+		ret = self.getSiteIds(rowId)
+		# drop all keys which we're not uploading (v == None)
+
+		rows = [item for item in ret.values() if item]
+
+		ret = []
+		for value in rows:
+			ret.append(self.getByRowId(value)[-1])
+
+		return ret
 
 
 

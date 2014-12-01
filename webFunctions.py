@@ -236,7 +236,6 @@ class WebGetRobust:
 
 		return pgctnt, hName
 
-
 		# HUGE GOD-FUNCTION.
 		# OH GOD FIXME.
 
@@ -250,11 +249,7 @@ class WebGetRobust:
 			self.log.warn("'soup' kwarg is depreciated. Please use the `getSoup()` call instead.")
 
 
-
-
-
 		originalString = pgreq
-
 
 		pgctnt = None
 		pghandle = None

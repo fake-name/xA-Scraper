@@ -22,7 +22,7 @@ namespace.run=True
 def go():
 
 	ul = plugins.uploaders.eHentai.eHentaiUl.UploadEh()
-	# ul.syncGalleryIds()
+	ul.syncGalleryIds()
 	ul.go(ctrlNamespace=namespace)
 
 

@@ -191,7 +191,7 @@ class UploadEh(plugins.uploaders.UploadBase.UploadBase):
 		title       = "%s - Collected Works" % aName.title()
 		description = """Assorted art from varied sources for artist: %s.
 
-		Auto-Gallery System 0.0001a (really, really alpha release)
+		Auto-Gallery System 0.0001b (really, really alpha release)
 		This is an automatically maintained gallery. Please direct any issues/complaints/complements to fake0name@tfwno.gf.
 
 		Items are sorted alphabetically. Sorry, not much I can do about any ordering issues, if there is a problem,
@@ -201,7 +201,7 @@ class UploadEh(plugins.uploaders.UploadBase.UploadBase):
 		a super-set of any previously uploaded galleries. These values only reflect the initial upload state, though, and will miss items
 		that have been recompressed/resaved.
 
-		If there is an artist on DeviantArt, HentaiFoundry, FurAffinity or Pixiv you would
+		If there is an artist on DeviantArt, HentaiFoundry, FurAffinity, Weasyl, InkBunny or Pixiv you would
 		like a mirror of, feel free to ask. I currently have automated systems in place to
 		periodically update my local mirror of all four of these sites, and adding
 		additional targets to scrape is a trivial matter.
@@ -287,11 +287,11 @@ class UploadEh(plugins.uploaders.UploadBase.UploadBase):
 
 
 
-	def unlockGallery(self, rowId):
+	def unlockGallery(self, ulRowId):
 
-		self.log.info("RowId to unlock: %s", rowId)
-		self.log.info("Row is for '%s'", self.getByRowId(rowId))
-		galId = self.getUploadState(rowId)[-1]
+		self.log.info("RowId to unlock: %s", ulRowId)
+		self.log.info("Row is for '%s'", self.getNamesForUlRow(ulRowId))
+		galId = self.getUploadState(ulRowId)[-1]
 		gurl = 'http://ul.exhentai.org/manage.php?act=add&gid={gId}'.format(gId=galId)
 		pg = self.wg.getpage(gurl, addlHeaders={"Referer":'http://ul.exhentai.org'})
 		if 'This gallery cannot be added to in its current published state' in pg:
@@ -310,7 +310,7 @@ class UploadEh(plugins.uploaders.UploadBase.UploadBase):
 
 			self.log.info("New galleryId = %s", newGid)
 
-			self.updateGalleryId(rowId, newGid)
+			self.updateGalleryId(ulRowId, newGid)
 
 		elif 'Upload new files to gallery' in pg:
 			self.log.info("Gallery already unlocked")
@@ -348,9 +348,9 @@ class UploadEh(plugins.uploaders.UploadBase.UploadBase):
 					)
 
 
-		print("Row", ulTableRowId)
-		for key, value in ret.items():
-			print(self.getByRowId(value))
+		# print("Row", ulTableRowId)
+		# for key, value in ret.items():
+		# 	print(self.getByRowId(value))
 
 
 		for sourceSite, artistRowId in ret.items():
@@ -362,10 +362,12 @@ class UploadEh(plugins.uploaders.UploadBase.UploadBase):
 				return
 
 			images = natsorted(images)
+			dummy_siteName, aName = self.getByRowId(artistRowId)
 
-			siteName, aName = self.getByRowId(artistRowId)
+			haveGalId = self.getGalleryIdById(ulTableRowId)
+			print(haveGalId)
+			if haveGalId == None:
 
-			if not aName.lower() in [name for name, gId in haveItems]:
 
 				numUnique = self.checkIfShouldUpload(images)
 
@@ -374,7 +376,7 @@ class UploadEh(plugins.uploaders.UploadBase.UploadBase):
 					self.insertGalleryId(ulTableRowId, newGid)
 					self.updateGallery(ulTableRowId, images)
 				else:
-					self.log.warn("Do not have sufficent unique items to warrant upload for artist %s!" % aName)
+					self.log.warn("Do not have sufficent unique items to warrant upload for artist %s!", aName)
 
 			else:
 
@@ -464,13 +466,13 @@ class UploadEh(plugins.uploaders.UploadBase.UploadBase):
 
 		for ulTableRowId, data in listIn.items():
 			lastUl = data[0]
-			if lastUl > time.time() - 60*60*24*21:
-				if data[3] != None:
-					self.log.info("Item '%s' (artist '%s') updated within the last 3 weeks. Skipping", ulTableRowId, nameLUT[data[3]])
-					continue
 
+			if lastUl < (time.time() - 60*60*24*21):
 
-			self.checkGallery(existingGalleries, ulTableRowId)
+				self.checkGallery(existingGalleries, ulTableRowId)
+			else:
+
+				self.log.info("Item '%s' (artist(s) '%s') updated within the last 3 weeks. Skipping", ulTableRowId, self.getNamesForUlRow(ulTableRowId))
 
 
 
@@ -488,7 +490,7 @@ class UploadEh(plugins.uploaders.UploadBase.UploadBase):
 		try:
 			self.wg.cj.clear("exhentai.org")
 		except KeyError:
-			print("Wat")
+			print("Keyerror = Wat")
 
 
 
