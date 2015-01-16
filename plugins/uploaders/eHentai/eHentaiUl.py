@@ -134,7 +134,7 @@ class UploadEh(plugins.uploaders.UploadBase.UploadBase):
 		opts = ["id={id}".format(id=val) for val in ids]
 		opts = " OR ".join(opts)
 
-		ret = cur.execute('SELECT id, artistName FROM {table} WHERE {condition};'.format(table=settings["dbConf"]["namesDb"], condition=opts))
+		ret = cur.execute('SELECT id, lower(artistName) FROM {table} WHERE {condition};'.format(table=settings["dbConf"]["namesDb"], condition=opts))
 		rets = ret.fetchall()
 		nameLUT = dict(rets)
 
@@ -191,7 +191,7 @@ class UploadEh(plugins.uploaders.UploadBase.UploadBase):
 		title       = "%s - Collected Works" % aName.title()
 		description = """Assorted art from varied sources for artist: %s.
 
-		Auto-Gallery System 0.0001b (really, really alpha release)
+		Auto-Gallery System 0.0001c (barrel-o-bugs version)
 		This is an automatically maintained gallery. Please direct any issues/complaints/complements to fake0name@tfwno.gf.
 
 		Items are sorted alphabetically. Sorry, not much I can do about any ordering issues, if there is a problem,
@@ -286,6 +286,42 @@ class UploadEh(plugins.uploaders.UploadBase.UploadBase):
 			raise ValueError("Failed to modify gallery page?")
 
 
+	def getGalleryStates(self):
+
+		ret = {}
+
+		pagetext = self.wg.getpage('http://ul.exhentai.org/manage.php', addlHeaders={"Referer" : "http://exhentai.org/"})
+		if pagetext == "err":
+			raise ValueError("Login cookies damaged. Error!")
+		soup = bs4.BeautifulSoup(pagetext)
+
+		types = (('unlocked', 'gtable2'), ('locked', 'gtable4'))
+
+		for type, tableId in types:
+			ret[type] = []
+
+			table = soup.find('table', id=tableId)
+
+			items1 = table.find_all("tr", class_="gtr1")
+			items2 = table.find_all("tr", class_="gtr0")
+
+			items = items1+items2
+
+			for item in items:
+				itemTd = item.find("td", class_="gtc1")
+				aName = itemTd.get_text().rsplit(" - ", 1)[0]
+				aName = aName.rstrip().lstrip().lower()
+
+				itemUrl = itemTd.a["href"]
+				urlQuery = urllib.parse.urlparse(itemUrl)[4]
+				itemGid = urllib.parse.parse_qs(urlQuery)["gid"].pop()
+
+				ret[type].append(int(itemGid))
+		if ret['unlocked'] == ret['locked']:
+			raise ValueError("Locked and unlocked?")
+
+		return ret
+
 
 	def unlockGallery(self, ulRowId):
 
@@ -324,6 +360,7 @@ class UploadEh(plugins.uploaders.UploadBase.UploadBase):
 	def updateGallery(self, rowId, images):
 		lastUl, ulQuantity, galleryId = self.getUploadState(rowId)
 
+		new = 0
 
 		remaining = len(images)
 		for image in images:
@@ -332,10 +369,12 @@ class UploadEh(plugins.uploaders.UploadBase.UploadBase):
 			else:
 				self.uploadFile(galleryId, image)
 				self.addUploaded(rowId, image)
+				new += 1
 
 			remaining -= 1
 			self.log.info("Remaining to upload - %s of %s", remaining, len(images))
 
+		return new
 
 		# print("rowId", rowId, "images", images)
 
@@ -348,9 +387,12 @@ class UploadEh(plugins.uploaders.UploadBase.UploadBase):
 					)
 
 
-		# print("Row", ulTableRowId)
-		# for key, value in ret.items():
-		# 	print(self.getByRowId(value))
+		states = self.getGalleryStates()
+		print(states)
+
+		print("Row", ulTableRowId)
+		for key, value in ret.items():
+			print(self.getByRowId(value))
 
 
 		for sourceSite, artistRowId in ret.items():
@@ -387,11 +429,30 @@ class UploadEh(plugins.uploaders.UploadBase.UploadBase):
 
 				newImages = len(images) - ulQuantity
 
-				self.log.info("Need to update gallery for '%s' (%s new item(s)).", aName, newImages)
-				self.unlockGallery(ulTableRowId)
-				self.updateGallery(ulTableRowId, images)
-				self.addUpdateNote(ulTableRowId, newImages)
-				self.setUpdateTimer(ulTableRowId, time.time())
+				try:
+
+					galId = self.getUploadState(ulTableRowId)[-1]
+
+					self.log.info("Need to update gallery for '%s' (%s new item(s)).", aName, newImages)
+					if galId in states['unlocked']:
+						self.log.info("Gallery already unlocked. No need to update.")
+					elif galId in states['locked']:
+						self.unlockGallery(ulTableRowId)
+					else:
+						self.log.error("Missing GId %s from locked and unlocked lists!", galId)
+						self.log.error("Locked list: %s", states['locked'])
+						self.log.error("Unlocked list: %s", states['unlocked'])
+						raise KeyError("GalleryID %s not in locked or unlocked lists!" % galId)
+
+
+					actuallyNew = self.updateGallery(ulTableRowId, images)
+					self.addUpdateNote(ulTableRowId, actuallyNew)
+					self.setUpdateTimer(ulTableRowId, time.time())
+				except ValueError:
+					self.log.critical("Update Failed!")
+					self.log.critical(traceback.format_exc())
+					raise
+
 
 
 
@@ -400,7 +461,7 @@ class UploadEh(plugins.uploaders.UploadBase.UploadBase):
 	# ---------------------------------------------------------------------------------------------------------------------------------------------------------
 
 	def syncGalleryIds(self):
-
+		self.log.info("Synchronizing gallery IDs")
 		existG = self.getExtantGalleries()
 
 		existG = dict(existG)
@@ -413,11 +474,22 @@ class UploadEh(plugins.uploaders.UploadBase.UploadBase):
 			names = [nameLUT[idNo] for idNo in row[3:] if idNo != None]
 
 			for name in existG:
-				if name in names:
 
+
+
+				if name in names:
 					if isId != existG[name]:
 						print("Bad GalleryId!", isId, existG[name])
 						self.updateGalleryId(dbId, existG[name])
+
+				if not name in existG:
+					print("Failed to cross-link!")
+					print(name)
+					print(names)
+					print(existG)
+					print(name in existG)
+					raise KeyError
+
 
 
 
@@ -467,9 +539,11 @@ class UploadEh(plugins.uploaders.UploadBase.UploadBase):
 		for ulTableRowId, data in listIn.items():
 			lastUl = data[0]
 
-			if lastUl < (time.time() - 60*60*24*21):
-
-				self.checkGallery(existingGalleries, ulTableRowId)
+			if lastUl < (time.time() - 60*60*24*28):
+				try:
+					self.checkGallery(existingGalleries, ulTableRowId)
+				except Exception:
+					self.log.error("Exception!")
 			else:
 
 				self.log.info("Item '%s' (artist(s) '%s') updated within the last 3 weeks. Skipping", ulTableRowId, self.getNamesForUlRow(ulTableRowId))
@@ -509,7 +583,7 @@ class UploadEh(plugins.uploaders.UploadBase.UploadBase):
 			self.wg.cj.clear("e-hentai.org")
 			raise ValueError("Logged in, but cannot access ex?")
 
-		# self.syncGalleryIds()
+		self.syncGalleryIds()
 
 
 		if not toDoList:
