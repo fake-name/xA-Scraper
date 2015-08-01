@@ -134,7 +134,7 @@ class ScraperBase(PluginBase, metaclass=abc.ABCMeta):
 
 		cur = self.conn.cursor()
 
-		cur.execute("SELECT id FROM %s WHERE sitename=%%s AND artistname=%%s AND pageurl=%%s;")
+		cur.execute("SELECT id FROM %s WHERE sitename=%%s AND artistname=%%s AND pageurl=%%s;" % settings["dbConf"]["erroredPagesDb"], (self.targetShortName, artist, errUrl))
 		have = cur.fetchone()
 		if have and have[0]:
 			cur.execute("UPDATE %s SET retreivalTime=%%s WHERE id=%%s;" % settings["dbConf"]["erroredPagesDb"], (time.time(), have[0]))
