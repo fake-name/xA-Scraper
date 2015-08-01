@@ -41,7 +41,7 @@ class GetDA(plugins.scrapers.ScraperBase.ScraperBase):
 
 		prepage = self.wg.getpage('https://www.deviantart.com/users/login')
 		# print prepage
-		soup = bs4.BeautifulSoup(prepage)
+		soup = bs4.BeautifulSoup(prepage, "lxml")
 		form = soup.find("form", action="https://www.deviantart.com/users/login")
 		items = form.find_all("input")
 		logDict = {}

@@ -57,7 +57,7 @@ print(siteSource)
 		niceName = contentSources[siteSource]["dlDirName"]
 		print(shortnames)
 		# artistName, pageUrl, retreivalTime
-		cur.execute('SELECT distinct(artistName) FROM retrieved_pages WHERE siteName=?;', (siteSource, ))
+		cur.execute('SELECT distinct(artistName) FROM retrieved_pages WHERE siteName=%s;', (siteSource, ))
 		artistName = cur.fetchall()
 		artistName = [link[0] for link in artistName]
 		artistName.sort()
@@ -84,7 +84,7 @@ print(siteSource)
 							<tr>
 								<%
 
-									cur.execute('SELECT count(pageUrl) FROM retrieved_pages WHERE siteName=? AND artistName=?;', (siteSource, aName))
+									cur.execute('SELECT count(pageUrl) FROM retrieved_pages WHERE siteName=%s AND artistName=%s;', (siteSource, aName))
 									itemCount = cur.fetchall()
 									count = 0
 								%>

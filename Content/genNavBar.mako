@@ -53,19 +53,19 @@ def compactDateStr(dateStr):
 
 	cur = sqlConnection.cursor()
 
-	cur.execute('SELECT siteName,statusText FROM statusDb WHERE sectionName="nextRun";')
+	cur.execute('SELECT siteName,statusText FROM statusDb WHERE sectionname=\'nextRun\';')
 	nextRuns = cur.fetchall()
 	nextRuns = dict(nextRuns)
 
-	cur.execute('SELECT siteName,statusText FROM statusDb WHERE sectionName="isRunning";')
+	cur.execute('SELECT siteName,statusText FROM statusDb WHERE sectionname=\'isRunning\';')
 	runState = cur.fetchall()
 	runState = dict(runState)
 
-	cur.execute('SELECT siteName,statusText FROM statusDb WHERE sectionName="prevRun";')
+	cur.execute('SELECT siteName,statusText FROM statusDb WHERE sectionname=\'prevRun\';')
 	lastRun = cur.fetchall()
 	lastRun = dict(lastRun)
 
-	cur.execute('SELECT siteName,statusText FROM statusDb WHERE sectionName="prevRunTime";')
+	cur.execute('SELECT siteName,statusText FROM statusDb WHERE sectionname=\'prevRunTime\';')
 	runTime = cur.fetchall()
 	runTime = dict(runTime)
 
@@ -121,10 +121,10 @@ def compactDateStr(dateStr):
 		% for key in keys:
 			<%
 
-			cur.execute('SELECT COUNT(*) FROM errored_pages WHERE siteName=?;', (key, ))
+			cur.execute('SELECT COUNT(*) FROM errored_pages WHERE siteName=%s;', (key, ))
 			errs = cur.fetchone()[0]
 
-			cur.execute('SELECT COUNT(*) FROM retrieved_pages WHERE siteName=?;', (key, ))
+			cur.execute('SELECT COUNT(*) FROM retrieved_pages WHERE siteName=%s;', (key, ))
 			succeed = cur.fetchone()[0]
 
 			%>

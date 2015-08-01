@@ -165,7 +165,7 @@ logger =  logging.getLogger("Main.WebSrv")
 def getNameDict():
 
 	ret = cur.execute('SELECT id, siteName, artistName FROM %s;' % settings["dbConf"]["namesDb"])
-	rets = ret.fetchall()
+	rets = cur.fetchall()
 
 	items = {}
 	for uId, site, name in rets:

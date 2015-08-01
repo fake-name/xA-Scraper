@@ -118,8 +118,8 @@ print(contentSources)
 			</tr>
 			<%
 				if not lim:
-					lim = -1 # Get all the rows
-				cur.execute('SELECT * FROM %s WHERE siteName=? ORDER BY retreivalTime DESC LIMIT ?;' % settings["dbConf"]["erroredPagesDb"], (tableName, lim))
+					lim = None # Get all the rows
+				cur.execute('SELECT * FROM %s WHERE siteName=%%s ORDER BY retreivalTime DESC LIMIT %%s;' % settings["dbConf"]["erroredPagesDb"], (tableName, lim))
 				errLinks = cur.fetchall()
 
 			%>

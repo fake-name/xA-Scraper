@@ -78,7 +78,7 @@ class GetPX(plugins.scrapers.ScraperBase.ScraperBase):
 			else:
 				mangaTitle = None
 
-			soup = bs4.BeautifulSoup(mangaPgCtnt)
+			soup = bs4.BeautifulSoup(mangaPgCtnt, 'lxml')
 			imageTags = soup.find_all("img", {"data-filter" : "manga-image"})
 
 			linkSet = set()
@@ -196,7 +196,7 @@ class GetPX(plugins.scrapers.ScraperBase.ScraperBase):
 
 		else:
 			try:
-				baseSoup = bs4.BeautifulSoup(basePageCtnt)
+				baseSoup = bs4.BeautifulSoup(basePageCtnt, 'lxml')
 				mainSection = baseSoup.find('div', attrs={"class" : "works_display"})
 				link = "%s%s" % ("http://www.pixiv.net/", mainSection.find("a")["href"])
 
@@ -223,7 +223,7 @@ class GetPX(plugins.scrapers.ScraperBase.ScraperBase):
 					return "Failed", ""
 
 				print("Page length = ", len(mpgctnt))
-				soup = bs4.BeautifulSoup(mpgctnt)
+				soup = bs4.BeautifulSoup(mpgctnt, 'lxml')
 				imgPath = soup.find("img")
 
 
@@ -345,7 +345,7 @@ class GetPX(plugins.scrapers.ScraperBase.ScraperBase):
 				self.log.critical("Gallery URL - %s" % turl)
 				return set()
 
-			soup = bs4.BeautifulSoup(mpgctnt)
+			soup = bs4.BeautifulSoup(mpgctnt, 'lxml')
 			new = self._getItemsOnPage(soup)
 			new = new - artlinks
 

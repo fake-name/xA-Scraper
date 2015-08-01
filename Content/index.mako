@@ -87,7 +87,7 @@ for key in settings.keys():
 				if not lim:
 					lim = -1 # Get all the rows
 				# artistName, pageUrl, retreivalTime
-				cur.execute('SELECT id, siteName, artistName, pageUrl, retreivalTime FROM retrieved_pages WHERE siteName=? ORDER BY retreivalTime DESC LIMIT ?;', (siteName, lim))
+				cur.execute('SELECT id, siteName, artistName, pageUrl, retreivalTime FROM retrieved_pages WHERE siteName=%s ORDER BY retreivalTime DESC LIMIT %s;', (siteName, lim))
 				pageLinks = cur.fetchall()
 				print(urlLut)
 

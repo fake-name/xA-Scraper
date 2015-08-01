@@ -62,9 +62,9 @@ cur = sqlCon.cursor()
 		cur.execute('SELECT count(*) FROM retrieved_pages WHERE siteName=? AND artistName=?;', (siteSource, artist))
 		itemNo = cur.fetchall()
 		if allImages:
-			cur.execute('SELECT downloadPath, itemPageContent, itemPageTitle, id FROM retrieved_pages WHERE siteName=? AND artistName=? ORDER BY downloadPath ASC;', (siteSource, artist))
+			cur.execute('SELECT downloadPath, itemPageContent, itemPageTitle, id FROM retrieved_pages WHERE siteName=%s AND artistName=%s ORDER BY downloadPath ASC;', (siteSource, artist))
 		else:
-			cur.execute('SELECT downloadPath, itemPageContent, itemPageTitle, id FROM retrieved_pages WHERE siteName=? AND artistName=? ORDER BY downloadPath ASC LIMIT ? OFFSET ?;', (siteSource, artist, chunkStep, pageNumber*chunkStep))
+			cur.execute('SELECT downloadPath, itemPageContent, itemPageTitle, id FROM retrieved_pages WHERE siteName=%s AND artistName=%s ORDER BY downloadPath ASC LIMIT %s OFFSET %s;', (siteSource, artist, chunkStep, pageNumber*chunkStep))
 		imageIDs = cur.fetchall()
 		imageIDs.sort()
 		# imageIDs = [link[0] for link in imageIDs]

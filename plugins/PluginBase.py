@@ -2,7 +2,7 @@
 import os
 import os.path
 import logging
-import sqlite3
+import psycopg2
 from settings import settings
 import threading
 from webFunctions import WebGetRobust
@@ -54,12 +54,20 @@ class PluginBase(metaclass=abc.ABCMeta):
 		self.dbConnections = {}
 
 
-		self.log.info("DB opened. Activating 'wal' mode, exclusive locking")
-		rets = self.conn.execute('''PRAGMA journal_mode=wal;''')
-		# rets = self.conn.execute('''PRAGMA locking_mode=EXCLUSIVE;''')
-		rets = rets.fetchall()
+		self.conn = psycopg2.connect(
+			database = settings["postgres"]['database'],
+			user     = settings["postgres"]['username'],
+			password = settings["postgres"]['password'],
+			host     = settings["postgres"]['address']
+			)
 
-		self.log.info("PRAGMA return value = %s", rets)
+
+		# self.log.info("DB opened. Activating 'wal' mode, exclusive locking")
+		# rets = self.conn.execute('''PRAGMA journal_mode=wal;''')
+		# # rets = self.conn.execute('''PRAGMA locking_mode=EXCLUSIVE;''')
+		# rets = rets.fetchall()
+
+		# self.log.info("PRAGMA return value = %s", rets)
 
 	def closeDB(self):
 		self.log.info("Closing DB...",)
@@ -87,7 +95,12 @@ class PluginBase(metaclass=abc.ABCMeta):
 
 		elif name == "conn":
 			if threadName not in self.dbConnections:
-				self.dbConnections[threadName] = sqlite3.connect(settings["dbPath"], timeout=10)
+				self.dbConnections[threadName] = psycopg2.connect(
+						database = settings["postgres"]['database'],
+						user     = settings["postgres"]['username'],
+						password = settings["postgres"]['password'],
+						host     = settings["postgres"]['address']
+						)
 			return self.dbConnections[threadName]
 
 
@@ -104,13 +117,22 @@ class PluginBase(metaclass=abc.ABCMeta):
 	def checkInitPrimaryDb(self):
 
 		cur = self.conn.cursor()
-		ret = cur.execute('''SELECT name FROM sqlite_master WHERE type='table';''')
-		rets = ret.fetchall()
+		ret = cur.execute('''
+				SELECT table_name
+				FROM information_schema.tables
+				WHERE table_schema='public'
+				ORDER BY table_schema,table_name;
+			''')
+
+		rets = cur.fetchall()
+
 		tables = [item for sublist in rets for item in sublist]
 
+		cur = self.conn.cursor()
 		if not rets or not settings["dbConf"]["successPagesDb"] in tables:   # If the DB doesn't exist, set it up.
 			self.log.info("Need to setup initial suceeded page database....")
-			self.conn.execute('''CREATE TABLE %s (id INTEGER PRIMARY KEY,
+			cur.execute('''CREATE TABLE %s (
+												id SERIAL PRIMARY KEY,
 												siteName text NOT NULL,
 												artistName text NOT NULL,
 												pageUrl text NOT NULL,
@@ -119,51 +141,51 @@ class PluginBase(metaclass=abc.ABCMeta):
 												itemPageContent text,
 												itemPageTitle text,
 												seqNum int,
-												UNIQUE(siteName, artistName, pageUrl, seqNum) ON CONFLICT REPLACE)''' % settings["dbConf"]["successPagesDb"])
+												UNIQUE(siteName, artistName, pageUrl, seqNum))''' % settings["dbConf"]["successPagesDb"])
 
-			self.conn.execute('''CREATE INDEX IF NOT EXISTS %s ON %s (retreivalTime)'''           % ("%s_time_index"          % settings["dbConf"]["successPagesDb"], settings["dbConf"]["successPagesDb"]))
-			self.conn.execute('''CREATE INDEX IF NOT EXISTS %s ON %s (pageUrl)'''                 % ("%s_pageurl_index"       % settings["dbConf"]["successPagesDb"], settings["dbConf"]["successPagesDb"]))
-			self.conn.execute('''CREATE INDEX IF NOT EXISTS %s ON %s (artistName)'''              % ("%s_artistname_index"    % settings["dbConf"]["successPagesDb"], settings["dbConf"]["successPagesDb"]))
-			self.conn.execute('''CREATE INDEX IF NOT EXISTS %s ON %s (siteName, retreivalTime)''' % ("%s_site_src_time_index" % settings["dbConf"]["successPagesDb"], settings["dbConf"]["successPagesDb"]))
+			cur.execute('''CREATE INDEX %s ON %s (retreivalTime)'''           % ("%s_time_index"          % settings["dbConf"]["successPagesDb"], settings["dbConf"]["successPagesDb"]))
+			cur.execute('''CREATE INDEX %s ON %s (pageUrl)'''                 % ("%s_pageurl_index"       % settings["dbConf"]["successPagesDb"], settings["dbConf"]["successPagesDb"]))
+			cur.execute('''CREATE INDEX %s ON %s (artistName)'''              % ("%s_artistname_index"    % settings["dbConf"]["successPagesDb"], settings["dbConf"]["successPagesDb"]))
+			cur.execute('''CREATE INDEX %s ON %s (siteName, retreivalTime)''' % ("%s_site_src_time_index" % settings["dbConf"]["successPagesDb"], settings["dbConf"]["successPagesDb"]))
 
-			self.conn.commit()
+			cur.execute("commit")
 			self.log.info("Retreived page database created")
 
 		if not rets or not settings["dbConf"]["retrevialTimeDB"] in tables:   # If the DB doesn't exist, set it up.
 			self.log.info("Need to setup initial retreival time database....")
-			self.conn.execute('''CREATE TABLE %s (id INTEGER PRIMARY KEY,
+			cur.execute('''CREATE TABLE %s (id SERIAL PRIMARY KEY,
 												siteName text NOT NULL,
 												artistName text NOT NULL,
 												retreivalTime real NOT NULL,
-												UNIQUE(siteName, artistName) ON CONFLICT REPLACE)''' % settings["dbConf"]["retrevialTimeDB"])
-			self.conn.execute('''CREATE INDEX IF NOT EXISTS %s ON %s (artistName)'''     % ("%s_artistname_index" % settings["dbConf"]["retrevialTimeDB"], settings["dbConf"]["retrevialTimeDB"]))
-			self.conn.commit()
+												UNIQUE(siteName, artistName))''' % settings["dbConf"]["retrevialTimeDB"])
+			cur.execute('''CREATE INDEX %s ON %s (artistName)'''     % ("%s_artistname_index" % settings["dbConf"]["retrevialTimeDB"], settings["dbConf"]["retrevialTimeDB"]))
+			cur.execute("commit")
 			self.log.info("Retreival time database created")
 
 		if not rets or not settings["dbConf"]["erroredPagesDb"] in tables:   # If the DB doesn't exist, set it up.
 			self.log.info("Need to setup initial retreival time database....")
-			self.conn.execute('''CREATE TABLE %s (id INTEGER PRIMARY KEY,
+			cur.execute('''CREATE TABLE %s (id SERIAL PRIMARY KEY,
 												siteName text NOT NULL,
 												artistName text NOT NULL,
 												pageUrl text NOT NULL,
 												retreivalTime real NOT NULL,
-												UNIQUE(siteName, artistName, pageUrl) ON CONFLICT REPLACE)''' % settings["dbConf"]["erroredPagesDb"])
-			self.conn.execute('''CREATE INDEX IF NOT EXISTS %s ON %s (retreivalTime)'''  % ("%s_time_index"       % settings["dbConf"]["erroredPagesDb"], settings["dbConf"]["erroredPagesDb"]))
-			self.conn.execute('''CREATE INDEX IF NOT EXISTS %s ON %s (pageUrl)'''        % ("%s_pageurl_index"    % settings["dbConf"]["erroredPagesDb"], settings["dbConf"]["erroredPagesDb"]))
-			self.conn.execute('''CREATE INDEX IF NOT EXISTS %s ON %s (artistName)'''     % ("%s_artistname_index" % settings["dbConf"]["erroredPagesDb"], settings["dbConf"]["erroredPagesDb"]))
-			self.conn.commit()
+												UNIQUE(siteName, artistName, pageUrl))''' % settings["dbConf"]["erroredPagesDb"])
+			cur.execute('''CREATE INDEX %s ON %s (retreivalTime)'''  % ("%s_time_index"       % settings["dbConf"]["erroredPagesDb"], settings["dbConf"]["erroredPagesDb"]))
+			cur.execute('''CREATE INDEX %s ON %s (pageUrl)'''        % ("%s_pageurl_index"    % settings["dbConf"]["erroredPagesDb"], settings["dbConf"]["erroredPagesDb"]))
+			cur.execute('''CREATE INDEX %s ON %s (artistName)'''     % ("%s_artistname_index" % settings["dbConf"]["erroredPagesDb"], settings["dbConf"]["erroredPagesDb"]))
+			cur.execute("commit")
 			self.log.info("Error log database created")
 
 
 		if not rets or not settings["dbConf"]["namesDb"] in tables:   # If the DB doesn't exist, set it up.
 			self.log.info("Need to setup initial retreival time database....")
-			self.conn.execute('''CREATE TABLE %s (id INTEGER PRIMARY KEY,
+			cur.execute('''CREATE TABLE %s (id SERIAL PRIMARY KEY,
 												siteName text NOT NULL,
 												artistName text NOT NULL,
 												uploadEh integer default 0,
-												UNIQUE(siteName, artistName) ON CONFLICT REPLACE)''' % settings["dbConf"]["namesDb"])
-			self.conn.execute('''CREATE INDEX IF NOT EXISTS %s ON %s (siteName, artistName)'''       % ("%s_index" % settings["dbConf"]["namesDb"], settings["dbConf"]["namesDb"]))
-			self.conn.commit()
+												UNIQUE(siteName, artistName))''' % settings["dbConf"]["namesDb"])
+			cur.execute('''CREATE INDEX %s ON %s (siteName, artistName)'''       % ("%s_index" % settings["dbConf"]["namesDb"], settings["dbConf"]["namesDb"]))
+			cur.execute("commit")
 			self.log.info("Scanned Artist Name database created")
 
 

@@ -20,6 +20,8 @@ from settings import settings
 import os.path
 users = {"herp" : "wattttttt"}
 
+import psycopg2
+
 def userCheck(userid, dummy_request):
 	if userid in users:
 		return True
@@ -48,17 +50,23 @@ class PageResource(object):
 
 	def openDB(self):
 		self.log.info("Info Generator Opening DB...")
-		self.log.info("DB Path = %s", self.dbPath)
-		self.conn = sqlite3.connect(self.dbPath, check_same_thread=False)
+		# self.log.info("DB Path = %s", self.dbPath)
+		# self.conn = sqlite3.connect(self.dbPath, check_same_thread=False)
+		self.conn = psycopg2.connect(
+					database = settings["postgres"]['database'],
+					user     = settings["postgres"]['username'],
+					password = settings["postgres"]['password'],
+					host     = settings["postgres"]['address']
+					)
 		self.log.info("DB opened")
 
 
 		self.log.info("DB opened. Activating 'wal' mode")
-		rets = self.conn.execute('''PRAGMA journal_mode=wal;''')
+		# rets = self.conn.execute('''PRAGMA journal_mode=wal;''')
 		# rets = self.conn.execute('''PRAGMA locking_mode=EXCLUSIVE;''')
-		rets = rets.fetchall()
+		# rets = rets.fetchall()
 
-		self.log.info("PRAGMA return value = %s", rets)
+		# self.log.info("PRAGMA return value = %s", rets)
 
 
 	def closeDB(self):

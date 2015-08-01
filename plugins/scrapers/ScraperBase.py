@@ -91,9 +91,9 @@ class ScraperBase(PluginBase, metaclass=abc.ABCMeta):
 	def _getPreviouslyRetreived(self, artist):
 		cur = self.conn.cursor()
 
-		# ret = cur.execute("SELECT (pageUrl) FROM %s WHERE siteName=? AND artistName=? AND itemPageContent IS NULL AND itemPageTitle IS NULL;" % settings["dbConf"]["successPagesDb"], (self.targetShortName, artist))
-		ret = cur.execute("SELECT (pageUrl) FROM %s WHERE siteName=? AND artistName=?;" % settings["dbConf"]["successPagesDb"], (self.targetShortName, artist))
-		rets = ret.fetchall()
+		# cur.execute("SELECT (pageUrl) FROM %s WHERE siteName=? AND artistName=? AND itemPageContent IS NULL AND itemPageTitle IS NULL;" % settings["dbConf"]["successPagesDb"], (self.targetShortName, artist))
+		cur.execute("SELECT (pageUrl) FROM %s WHERE siteName=%%s AND artistName=%%s;" % settings["dbConf"]["successPagesDb"], (self.targetShortName, artist))
+		rets = cur.fetchall()
 		self.log.info("Previously retreived %s items", len(rets))
 		return set([item for sublist in rets for item in sublist])
 
@@ -113,16 +113,16 @@ class ScraperBase(PluginBase, metaclass=abc.ABCMeta):
 		self.log.info("Inserting retrieved page %s into %s", pageUrl, settings["dbConf"]["successPagesDb"])
 
 		cur = self.conn.cursor()
-		ret = cur.execute("INSERT INTO %s (siteName, artistName, pageUrl, retreivalTime, downloadPath, seqNum, itemPageContent, itemPageTitle) VALUES (?, ?, ?, ?, ?, ?, ?, ?);" % settings["dbConf"]["successPagesDb"],
+		cur.execute("INSERT INTO %s (siteName, artistName, pageUrl, retreivalTime, downloadPath, seqNum, itemPageContent, itemPageTitle) VALUES (%%s, %%s, %%s, %%s, %%s, %%s, %%s, %%s);" % settings["dbConf"]["successPagesDb"],
 		                      (self.targetShortName, artist,     pageUrl, time.time(),   fqDlPath,     seqNum, pageDesc,        pageTitle))
-		dummy_rets = ret.fetchall()
+		# dummy_rets = cur.fetchall()
 
 		# Delete from the failed database if it got put there in the past
-		ret = cur.execute("DELETE FROM %s WHERE siteName=? AND pageUrl=? AND artistName=?;" % settings["dbConf"]["erroredPagesDb"], (self.targetShortName, pageUrl, artist))
-		dummy_rets = ret.fetchall()
+		cur.execute("DELETE FROM %s WHERE siteName=%%s AND pageUrl=%%s AND artistName=%%s;" % settings["dbConf"]["erroredPagesDb"], (self.targetShortName, pageUrl, artist))
+		# dummy_rets = cur.fetchall()
 
 		self.log.info("DB Updated")
-		self.conn.commit()
+		cur.execute("commit")
 
 
 
@@ -133,9 +133,9 @@ class ScraperBase(PluginBase, metaclass=abc.ABCMeta):
 		self.log.error("Inserting errored page %s for artist %s into %s", errUrl, artist, settings["dbConf"]["erroredPagesDb"])
 
 		cur = self.conn.cursor()
-		ret = cur.execute("INSERT INTO %s (siteName, artistName, pageUrl, retreivalTime) VALUES (?, ?, ?, ?);" % settings["dbConf"]["erroredPagesDb"], (self.targetShortName, artist, errUrl, time.time()))
-		dummy_rets = ret.fetchall()
-		self.conn.commit()
+		cur.execute("INSERT INTO %s (siteName, artistName, pageUrl, retreivalTime) VALUES (%%s, %%s, %%s, %%s);" % settings["dbConf"]["erroredPagesDb"], (self.targetShortName, artist, errUrl, time.time()))
+		# dummy_rets = cur.fetchall()
+		cur.execute("commit")
 		self.log.info("DB Updated")
 
 
@@ -164,8 +164,8 @@ class ScraperBase(PluginBase, metaclass=abc.ABCMeta):
 
 		cur = self.conn.cursor()
 
-		ret = cur.execute("SELECT artistName FROM %s WHERE siteName=?;" % settings["dbConf"]["namesDb"], (settings[self.settingsDictKey]["shortName"], ))
-		links = [link[0] for link in ret.fetchall()]
+		cur.execute("SELECT artistName FROM %s WHERE siteName=%%s;" % settings["dbConf"]["namesDb"], (settings[self.settingsDictKey]["shortName"], ))
+		links = [link[0] for link in cur.fetchall()]
 		return links
 
 	# ---------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -305,9 +305,9 @@ class ScraperBase(PluginBase, metaclass=abc.ABCMeta):
 		if errored:
 			self.log.warn("Had errors!")
 
-		ul = plugins.uploaders.eHentai.eHentaiUl.UploadEh()
-		# ul.syncGalleryIds()
-		ul.go(ctrlNamespace=ctrlNamespace, ulFilter=[self.settingsDictKey])
+		# ul = plugins.uploaders.eHentai.eHentaiUl.UploadEh()
+		# # ul.syncGalleryIds()
+		# ul.go(ctrlNamespace=ctrlNamespace, ulFilter=[self.settingsDictKey])
 
 		self.statusMgr.updateRunningStatus(self.settingsDictKey, False)
 		runTime = time.time()-startTime
