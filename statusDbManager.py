@@ -61,15 +61,6 @@ class StatusResource(object):
 			host     = settings["postgres"]['address']
 			)
 
-		# self.log.info("DB Path = %s", self.dbPath)
-		# self.conn = sqlite3.connect(self.dbPath, check_same_thread=False)
-		# self.log.info("DB opened")
-
-
-		# self.log.info("DB opened. Activating 'wal' mode")
-		# rets = self.conn.execute('''PRAGMA journal_mode=wal;''')
-		# # rets = self.conn.execute('''PRAGMA locking_mode=EXCLUSIVE;''')
-		# rets = rets.fetchall()
 
 		# self.log.info("PRAGMA return value = %s", rets)
 		self.checkInitStatusDatabase()
@@ -78,38 +69,30 @@ class StatusResource(object):
 		cur = self.conn.cursor()
 		cur.execute("""SELECT id FROM statusdb WHERE sitename=%s AND sectionName=%s;""", (sitename, key))
 		ret = cur.fetchone()
-		if ret and ret[0]:
-			cur.execute("""UPDATE statusdb SET statusText=%s WHERE id=%s""", (value, ret[0]))
+
+		print((sitename, key, value, ret))
+		if ret and len(ret) > 0:
+			dbid = ret[0]
+		else:
+			dbid = None
+
+		if dbid:
+			cur.execute("""UPDATE statusdb SET statusText=%s WHERE id=%s""", (str(value), dbid))
 		else:
 			cur.execute('''INSERT INTO statusdb (siteName, sectionName, statusText) VALUES (%s, %s, %s);''', (sitename, key, value))
 
 
 	def updateNextRunTime(self, name, timestamp):
 		self.updateValue(name, "nextRun", timestamp)
-		# cur = self.conn.cursor()
-		# cur.execute("""SELECT id FROM statusdb WHERE sitename=%s AND sectionName=%s;""", ())
-		# cur.execute('''INSERT INTO statusdb (siteName, sectionName, statusText) VALUES (%s, 'nextRun', %s);''', (name, timestamp))
-		# cur.execute("commit")
-
 
 	def updateLastRunStartTime(self, name, timestamp):
 		self.updateValue(name, "prevRun", timestamp)
-		# cur = self.conn.cursor()
-		# cur.execute('''INSERT INTO statusdb (siteName, sectionName, statusText) VALUES (%s, 'prevRun', %s);''', (name, timestamp))
-		# cur.execute("commit")
 
 	def updateLastRunDuration(self, name, timeDelta):
 		self.updateValue(name, "prevRunTime", timeDelta)
-		# cur = self.conn.cursor()
-		# cur.execute('''INSERT INTO statusdb (siteName, sectionName, statusText) VALUES (%s, 'prevRunTime', %s);''', (name, timeDelta))
-		# cur.execute("commit")
-
 
 	def updateRunningStatus(self, name, state):
 		self.updateValue(name, "isRunning", state)
-		# cur = self.conn.cursor()
-		# cur.execute('''INSERT INTO statusdb (siteName, sectionName, statusText) VALUES (%s, 'isRunning', %s);''', (name, state))
-		# cur.execute("commit")
 
 
 
