@@ -79,7 +79,7 @@ class StatusResource(object):
 		cur.execute("""SELECT id FROM statusdb WHERE sitename=%s AND sectionName=%s;""", (sitename, key))
 		ret = cur.fetchone()
 		if ret and ret[0]:
-			cur.execute("""UPDATE statusdb SET statusText=%s WHERE id=%s""", (ret[0], value))
+			cur.execute("""UPDATE statusdb SET statusText=%s WHERE id=%s""", (value, ret[0]))
 		else:
 			cur.execute('''INSERT INTO statusdb (siteName, sectionName, statusText) VALUES (%s, %s, %s);''', (sitename, key, value))
 

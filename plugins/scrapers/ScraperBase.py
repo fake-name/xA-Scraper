@@ -133,7 +133,13 @@ class ScraperBase(PluginBase, metaclass=abc.ABCMeta):
 		self.log.error("Inserting errored page %s for artist %s into %s", errUrl, artist, settings["dbConf"]["erroredPagesDb"])
 
 		cur = self.conn.cursor()
-		cur.execute("INSERT INTO %s (siteName, artistName, pageUrl, retreivalTime) VALUES (%%s, %%s, %%s, %%s);" % settings["dbConf"]["erroredPagesDb"], (self.targetShortName, artist, errUrl, time.time()))
+
+		cur.execute("SELECT id FROM %s WHERE sitename=%%s AND artistname=%%s AND pageurl=%%s;")
+		have = cur.fetchone()
+		if have and have[0]:
+			cur.execute("UPDATE %s SET retreivalTime=%%s WHERE id=%%s;" % settings["dbConf"]["erroredPagesDb"], (time.time(), have[0]))
+		else:
+			cur.execute("INSERT INTO %s (siteName, artistName, pageUrl, retreivalTime) VALUES (%%s, %%s, %%s, %%s);" % settings["dbConf"]["erroredPagesDb"], (self.targetShortName, artist, errUrl, time.time()))
 		# dummy_rets = cur.fetchall()
 		cur.execute("commit")
 		self.log.info("DB Updated")
@@ -261,6 +267,12 @@ class ScraperBase(PluginBase, metaclass=abc.ABCMeta):
 		except:
 			self.log.error("Exception when retreiving artist %s", artist)
 			self.log.error("%s", traceback.format_exc())
+			try:
+				cur = self.conn.cursor()
+				cur.execute("rollback;")
+			except:
+				print("Failed to roll-back")
+				print(traceback.print_exc())
 			return True
 
 
