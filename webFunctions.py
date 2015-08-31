@@ -306,7 +306,7 @@ class WebGetRobust:
 
 				#print "execution", retryCount
 				try:
-					pghandle = self.opener.open(pgreq)					# Get Webpage
+					pghandle = self.opener.open(pgreq, timeout=10)					# Get Webpage
 
 				except urllib.error.HTTPError as e:								# Lotta logging
 					self.log.warning("Error opening page: %s at %s On Attempt %s.", pgreq.get_full_url(), time.ctime(time.time()), retryCount)

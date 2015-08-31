@@ -42,10 +42,11 @@ class GetPX(plugins.scrapers.ScraperBase.ScraperBase):
 					"pixiv_id" : settings[self.settingsDictKey]["username"],
 					"pass"     : settings[self.settingsDictKey]["password"],
 					"skip"     : "1"}
-
-		pagetext = self.wg.getpage('http://www.pixiv.net/login.php', postData = logondict, addlHeaders={'Referer': 'http://www.pixiv.net/login.php'})
+		self.wg.getpage('https://www.secure.pixiv.net/login.php?return_to=%2F', addlHeaders={'Referer': 'http://www.pixiv.net/'})
+		pagetext = self.wg.getpage('https://www.secure.pixiv.net/login.php', postData = logondict, addlHeaders={'Referer': 'https://www.secure.pixiv.net/login.php?return_to=%2F'})
 		# print(pagetext)
-		if re.search("Logout", pagetext):
+		self.wg.syncCookiesFromFile()
+		if 'class="item header-logout">ログアウト</a>' in pagetext:
 			return True, "Logged In"
 		else:
 			return False, "Login Failed"
@@ -92,6 +93,8 @@ class GetPX(plugins.scrapers.ScraperBase.ScraperBase):
 			if len(linkSet) < 1:
 				self.log.error("No Images on page?")
 				return "Failed", ""
+
+			print(linkSet)
 
 			for link, indice in linkSet:
 				filename = regx4.sub("" , link)
@@ -172,118 +175,70 @@ class GetPX(plugins.scrapers.ScraperBase.ScraperBase):
 
 		return itemTitle, itemCaption
 
-	def _getArtPage(self, dlPathBase, artPageUrl, artistName):
+
+	def _getSinglePageContent(self, dlPathBase, imageTag, baseSoup, artPageUrl):
+		imgurl   = imageTag['data-src']
+		imgTitle = imageTag['alt']
+
+
+		itemTitle, itemCaption = self._extractTitleDescription(baseSoup)
+
+		regx4 = re.compile("http://.+/")				# FileName RE
+		fname = regx4.sub("" , imgurl)
+		fname = fname.rsplit("?")[0] 		# Sometimes there is some PHP stuff tacked on the end of the Image URL. Split on the indicator("?"), and throw away everything after it.
+
+		self.log.info("			Filename = " + fname)
+		self.log.info("			Page Image Title = " + imgTitle)
+		self.log.info("			FileURL = " + imgurl)
+
+		filePath = os.path.join(dlPathBase, fname)
+		if not self._checkFileExists(filePath):
+
+			imgdath = self.wg.getpage(imgurl, addlHeaders={'Referer': artPageUrl})							# Request Image
+
+			if imgdath == "Failed":
+				self.log.info("cannot get image")
+				return "Failed", ""
+			self.log.info("Successfully got: " + fname)
+			# print fname
+			try:
+				with open(filePath, "wb") as fp:
+					fp.write(imgdath)
+			except:
+				self.log.critical("cannot save image")
+				self.log.critical(traceback.print_exc())
+				self.log.critical("cannot save image")
+
+				return "Failed", ""
+
+			self.log.info("Successfully got: " + imgurl)
+			self.log.info("Saved to path: " + filePath)
+			return "Succeeded", filePath, itemCaption, itemTitle
+		else:
+			self.log.info("Exists, skipping... (path = %s)", filePath)
+			return "Exists", filePath, itemCaption, itemTitle
+
+
+	def _getArtPage(self, dlPathBase, pgurl, artistName):
 
 		'''
 		Pixiv does a whole lot of referrer sniffing. They block images, and do page redirects if you don't submit the correct referrer.
 		Also, I *think* they will block flooding, so that's the reason for the delays everywhere.
 		'''
 
-		imgurl = ""
-		mpgctnt = ""
+		baseSoup = self.wg.getSoup(pgurl)
 
 
-		self.log.info("Waiting...")
+		imageTag = baseSoup.find('img', class_="original-image")
+		if imageTag:
+			return self._getSinglePageContent(dlPathBase, imageTag, baseSoup, pgurl)
 
-		self.log.info("Getting = %s" % artPageUrl)
-		refL = artPageUrl
-
-
-		basePageCtnt = self.wg.getpage(refL)
-
-		if basePageCtnt == "Failed" or not basePageCtnt:
-			self.log.info("cannot get manga test page")
-
-		else:
-			try:
-				baseSoup = bs4.BeautifulSoup(basePageCtnt, 'lxml')
-				mainSection = baseSoup.find('div', attrs={"class" : "works_display"})
-				link = "%s%s" % ("http://www.pixiv.net/", mainSection.find("a")["href"])
-
-			except:
-				self.lot.error("link - %s", link)
-				self.lot.error("Mainsection - %s", mainSection)
-				self.lot.error("Soup - %s", baseSoup)
-
-				traceback.print_exc()
-
-				return "Failed", ""
-
-			if link.find("manga") + 1:
-				self.log.info("Multipage/Manga link")
-				return self.getManga(artistName, link, dlPathBase, artPageUrl)
-			else:
-
-				titleRE = re.compile("<title>(.*?)</title>", re.IGNORECASE)
-
-				mpgctnt = self.wg.getpage(link, addlHeaders={'Referer': refL})			# Spoof the referrer to get the big image version
-
-				if mpgctnt == "Failed":
-					self.log.info("cannot get page")
-					return "Failed", ""
-
-				print("Page length = ", len(mpgctnt))
-				soup = bs4.BeautifulSoup(mpgctnt, 'lxml')
-				imgPath = soup.find("img")
-
-
-				if imgPath:
-					self.log.info("%s%s" % ("Found Image URL : ", imgPath["src"]))
-
-					imgurl = imgPath["src"]
-
-				regx4 = re.compile("http://.+/")				# FileName RE
-				fname = regx4.sub("" , imgurl)
-
-				titleReResult = titleRE.search(mpgctnt)
-
-				if titleReResult:
-					self.log.info("%s%s" % ("Found file Title : ", titleReResult.group(1)))
-
-				imgTitle = fname		# No imagename on page
-
-				itemTitle, itemCaption = self._extractTitleDescription(baseSoup)
-
-
-				if imgurl == "" :
-					self.log.error("OH NOES!!! No image on page = " + link)
-
-					return "Failed", ""										# Return Fail
-				else:
-
-					# fname = "%s.%s" % (fname, ftype)
-					fname = fname.rsplit("?")[0] 		# Sometimes there is some PHP stuff tacked on the end of the Image URL. Split on the indicator("?"), and throw away everything after it.
-
-					self.log.info("			Filename = " + fname)
-					self.log.info("			Page Image Title = " + imgTitle)
-					self.log.info("			FileURL = " + imgurl)
-
-					filePath = os.path.join(dlPathBase, fname)
-					if not self._checkFileExists(filePath):
-
-						imgdath = self.wg.getpage(imgurl, addlHeaders={'Referer': link})							# Request Image
-
-						if imgdath == "Failed":
-							self.log.info("cannot get image")
-							return "Failed", ""
-						self.log.info("Successfully got: " + fname)
-						# print fname
-						try:
-							with open(filePath, "wb") as fp:
-								fp.write(imgdath)
-						except:
-							self.log.critical("cannot save image")
-							self.log.critical(traceback.print_exc())
-							self.log.critical("cannot save image")
-
-							return "Failed", ""
-
-						self.log.info("Successfully got: " + imgurl)
-						self.log.info("Saved to path: " + filePath)
-						return "Succeeded", filePath, itemCaption, itemTitle
-					else:
-						self.log.info("Exists, skipping... (path = %s)", filePath)
-						return "Exists", filePath, itemCaption, itemTitle
+		work_div = baseSoup.find("div", class_='works_display')
+		mangaContent = work_div.find("a", class_='multiple')
+		if mangaContent:
+			link = urllib.parse.urljoin(pgurl, mangaContent['href'])
+			self.log.info("Multipage/Manga link")
+			return self.getManga(artistName, link, dlPathBase, pgurl)
 
 		raise RuntimeError("How did this ever execute?")
 

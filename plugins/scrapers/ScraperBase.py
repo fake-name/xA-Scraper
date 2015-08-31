@@ -109,12 +109,17 @@ class ScraperBase(PluginBase, metaclass=abc.ABCMeta):
 		# print("DB Arg pageTitle = ", pageTitle)
 		# print("DB Arg seqNum    = ", seqNum)
 
+		# print("Inserting sequence: ", seqNum)
 
 		self.log.info("Inserting retrieved page %s into %s", pageUrl, settings["dbConf"]["successPagesDb"])
 
 		cur = self.conn.cursor()
-		cur.execute("INSERT INTO %s (siteName, artistName, pageUrl, retreivalTime, downloadPath, seqNum, itemPageContent, itemPageTitle) VALUES (%%s, %%s, %%s, %%s, %%s, %%s, %%s, %%s);" % settings["dbConf"]["successPagesDb"],
-		                      (self.targetShortName, artist,     pageUrl, time.time(),   fqDlPath,     seqNum, pageDesc,        pageTitle))
+		cur.execute("""INSERT INTO {table}
+		                     (siteName, artistName, pageUrl, retreivalTime, downloadPath, seqNum, itemPageContent, itemPageTitle)
+		              VALUES
+		                     (%s,        %s,         %s,      %s,            %s,           %s,     %s,              %s)
+		              ;""".format(table=settings["dbConf"]["successPagesDb"]),
+		                      (self.targetShortName, artist, pageUrl, time.time(), fqDlPath, seqNum, pageDesc,      pageTitle))
 		# dummy_rets = cur.fetchall()
 
 		# Delete from the failed database if it got put there in the past

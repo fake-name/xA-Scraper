@@ -26,12 +26,8 @@ def go():
 	faGrabber.go(ctrlNamespace=namespace)
 
 
-	pxGrabber = plugins.scrapers.px.pxScrape.GetPX()
-	pxGrabber.go(ctrlNamespace=namespace)
-
-
-	grab = plugins.scrapers.ib.ibScrape.GetIb()
-	grab.go(ctrlNamespace=namespace)
+	ibGrab = plugins.scrapers.ib.ibScrape.GetIb()
+	ibGrab.go(ctrlNamespace=namespace)
 
 
 	hfGrabber = plugins.scrapers.hf.hfScrape.GetHF()
@@ -42,8 +38,12 @@ def go():
 	daGrabber.go(ctrlNamespace=namespace)
 
 
-	grab = plugins.scrapers.wy.wyScrape.GetWy()
-	grab.go(ctrlNamespace=namespace)
+	wyGrab = plugins.scrapers.wy.wyScrape.GetWy()
+	wyGrab.go(ctrlNamespace=namespace)
+
+	pxGrabber = plugins.scrapers.px.pxScrape.GetPX()
+	pxGrabber.go(ctrlNamespace=namespace)
+
 
 
 def signal_handler(dummy_signal, dummy_frame):
