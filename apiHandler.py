@@ -25,7 +25,7 @@ class ApiInterface(object):
 
 		cur = self.conn.cursor()
 
-		ret = cur.execute('SELECT id, siteName, artistName FROM %s WHERE id=?;' % settings["dbConf"]["namesDb"], (request.params["id"], ))
+		ret = cur.execute('SELECT id, siteName, artistName FROM %s WHERE id=%%s;' % settings["dbConf"]["namesDb"], (request.params["id"], ))
 
 		rets = ret.fetchone()
 		if not len(rets):
@@ -36,7 +36,7 @@ class ApiInterface(object):
 		if artistName == request.params["aName"]:
 			return Response(body=json.dumps({"Status": "Error", "Message": "No changes made?"}))
 
-		cur.execute("UPDATE %s SET artistName=?, WHERE id=?" % settings["dbConf"]["namesDb"], (request.params["aName"],
+		cur.execute("UPDATE %s SET artistName=%%s, WHERE id=%%s" % settings["dbConf"]["namesDb"], (request.params["aName"],
 																										request.params["id"]))
 		self.conn.commit()
 
@@ -92,7 +92,7 @@ class ApiInterface(object):
 
 		params = setParams + [request.params["id"]]
 
-		query = "UPDATE {table} SET {cols} WHERE id=?;".format(table=settings["dbConf"]["uploadGalleries"], cols=', '.join(setKeys))
+		query = "UPDATE {table} SET {cols} WHERE id=%s;".format(table=settings["dbConf"]["uploadGalleries"], cols=', '.join(setKeys))
 
 		print('query', query)
 		print('params', params)
@@ -135,13 +135,13 @@ class ApiInterface(object):
 
 		cur = self.conn.cursor()
 
-		ret = cur.execute("SELECT * FROM %s WHERE siteName=? AND artistName=?;" % settings["dbConf"]["namesDb"], (site, name))
-		have = ret.fetchall()
+		ret = cur.execute("SELECT * FROM %s WHERE siteName=%%s AND artistName=%%s;" % settings["dbConf"]["namesDb"], (site, name))
+		have = cur.fetchall()
 		if have:
 			return Response(body=json.dumps({"Status": "Failed", "Message": "Name is already in database!"}))
 
 
-		cur.execute("INSERT INTO %s (siteName, artistName) VALUES (?, ?);" % settings["dbConf"]["namesDb"], (site, name))
+		cur.execute("INSERT INTO %s (siteName, artistName) VALUES (%%s, %%s);" % settings["dbConf"]["namesDb"], (site, name))
 		self.conn.commit()
 
 

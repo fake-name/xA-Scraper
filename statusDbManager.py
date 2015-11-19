@@ -70,7 +70,7 @@ class StatusResource(object):
 		cur.execute("""SELECT id FROM statusdb WHERE sitename=%s AND sectionName=%s;""", (sitename, key))
 		ret = cur.fetchone()
 
-		print((sitename, key, value, ret))
+		# print((sitename, key, value, ret))
 		if ret and len(ret) > 0:
 			dbid = ret[0]
 		else:

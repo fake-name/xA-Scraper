@@ -159,26 +159,27 @@ class PageResource(object):
 	def getImagePathFromID(self, imageID):
 		cur = self.conn.cursor()
 
-		ret = cur.execute("SELECT (downloadPath) FROM retrieved_pages WHERE id=?;", (imageID, ))
-		rets = ret.fetchone()
+		ret = cur.execute("SELECT (downloadPath) FROM retrieved_pages WHERE id=%s;", (imageID, ))
+		rets = cur.fetchall()
 		if not rets:
 			raise ValueError("How did an invalid key get queried for?")
-		pathS = rets[0]
+		pathS = rets[0][0]
+		print("PathS: ", pathS)
 		if not settings["dldCtntPath"] in pathS:
 			pathS = os.path.join(settings["dldCtntPath"], pathS)
 		return pathS
 
 	def getImagePathOffsetName(self, offset, name):
 		cur = self.conn.cursor()
-		ret = cur.execute("SELECT count(downloadPath) FROM retrieved_pages WHERE artistName=?;", (name,))
-		maxItems = ret.fetchone()[0]
+		ret = cur.execute("SELECT count(downloadPath) FROM retrieved_pages WHERE artistName=%s;", (name,))
+		maxItems = cur.fetchall()[0][0]
 
 		offset = int(offset)
 		while offset > maxItems: # Clamp to the valid range, modulo so it loops
 			offset -= maxItems
 
-		ret = cur.execute("SELECT (downloadPath) FROM retrieved_pages WHERE artistName=? LIMIT 1 OFFSET ?;", (name, offset))
-		rets = ret.fetchone()
+		ret = cur.execute("SELECT (downloadPath) FROM retrieved_pages WHERE artistName=%s LIMIT 1 OFFSET %s;", (name, offset))
+		rets = cur.fetchall()
 		if not rets:
 			raise ValueError("How did an invalid key get queried for?")
 
