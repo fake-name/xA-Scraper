@@ -18,3 +18,4 @@ __pycache__
 /settings.py
 
 /ctntCache
+/test-*.py

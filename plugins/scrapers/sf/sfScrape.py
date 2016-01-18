@@ -1,0 +1,325 @@
+
+import os
+import os.path
+import traceback
+import re
+import bs4
+import urllib.request
+import urllib.parse
+from settings import settings
+import flags
+import json
+
+import plugins.scrapers.ScraperBase
+
+class GetSf(plugins.scrapers.ScraperBase.ScraperBase):
+
+	settingsDictKey = "sf"
+
+	pluginName = "SfGet"
+
+	urlBase = "https://www.sofurry.com/"
+
+
+	ovwMode = "Check Files"
+
+	numThreads = 1
+
+
+
+	# # ---------------------------------------------------------------------------------------------------------------------------------------------------------
+	# # Cookie Management
+	# # ---------------------------------------------------------------------------------------------------------------------------------------------------------
+
+	def checkCookie(self):
+
+
+		pagetext = self.wg.getpage('https://www.sofurry.com/user/preferences')
+		if '<a href="https://%s.sofurry.com/" class="avatar">' % settings["sf"]["username"] in pagetext:
+			return True, "Have Wy Cookie."
+		else:
+			return False, "Do not have Wy login Cookies"
+
+
+	def getToken(self):
+			self.log.info("Getting Entrance Cookie")
+			soup = self.wg.getSoup('https://www.weasyl.com/signin')
+			inputs = soup.find_all("input")
+
+			for intag in inputs:
+				if 'name' in intag.attrs and intag['name'] == 'token':
+					return intag['value']
+
+			return False
+
+	def getCookie(self):
+		try:
+
+			logondict = {
+							"yt0"                        : "Login",
+							"LoginForm[sfLoginUsername]" : settings["sf"]["username"],
+							"LoginForm[sfLoginPassword]" : settings["sf"]["password"],
+							"YII_CSRF_TOKEN"             : ""
+						}
+
+			extraHeaders = {
+						"Referer"       : "https://www.sofurry.com/user/login",
+			}
+
+			pagetext = self.wg.getpage('https://www.sofurry.com/user/login', postData=logondict, addlHeaders=extraHeaders)
+			if '<a href="https://%s.sofurry.com/" class="avatar">' % settings["sf"]["username"] in pagetext:
+				print("Login Succeeded")
+				self.wg.saveCookies()
+				return True, "Logged In"
+			else:
+				self.log.error("Login failed!")
+				return False, "Failed to log in"
+
+		except Exception:
+			self.log.critical("Caught Error")
+			self.log.critical(traceback.format_exc())
+			traceback.print_exc()
+			return "Login Failed"
+
+
+
+
+	# # ---------------------------------------------------------------------------------------------------------------------------------------------------------
+	# # Individual page scraping
+	# # ---------------------------------------------------------------------------------------------------------------------------------------------------------
+
+	def _getContentUrlFromPage(self, soup):
+
+		dlBar = soup.find('ul', id='detail-actions')
+
+
+		dummy, dlLink, dummy = dlBar.find_all('li')
+		if 'Download' in dlLink.get_text():
+			itemUrl = urllib.parse.urljoin(self.urlBase, dlLink.a['href'])
+
+			return itemUrl
+
+		raise ValueError("Wat?")
+
+	def _extractTitleDescription(self, soup):
+		title = soup.find('h2', id='detail-bar-title')
+		title = title.get_text().strip()
+
+		descContainer = soup.find('div', id='detail-description')
+		desc = descContainer.find('div', class_='formatted-content')
+
+		tags = soup.find('div', id='di-tags')
+
+		# Horrible hack using ** to work around the fact that 'class' is a reserved keyword
+		tagDiv = soup.new_tag('div', **{'class' : 'tags'})
+
+		tagHeader = soup.new_tag('b')
+		tagHeader.append('Tags:')
+		tagDiv.append(tagHeader)
+
+		for tag in tags.div.find_all('a'):
+			new = soup.new_tag('div', **{'class' : 'tag'})
+			new.append(tag.get_text())
+			tagDiv.append(new)
+
+		desc.append(tagDiv)
+		desc = str(desc.prettify())
+		return title, desc
+
+	def _getArtPage(self, dlPathBase, artPageUrl, artistName):
+
+		params = json.loads(artPageUrl)
+
+		print(params)
+		return
+
+		soup = self.wg.getSoup(artPageUrl)
+
+
+		imageURL = self._getContentUrlFromPage(soup)
+		itemTitle, itemCaption = self._extractTitleDescription(soup)
+
+		if not imageURL:
+			self.log.error("OH NOES!!! No image on page = " + artPageUrl)
+			raise ValueError("No image found!")
+
+		urlPath = urllib.parse.urlparse(imageURL).path
+		fName = urlPath.split("/")[-1]
+
+		if not fName:
+			self.log.error("OH NOES!!! No filename for image on page = " + artPageUrl)
+			raise ValueError("No filename found!")
+
+
+		filePath = os.path.join(dlPathBase, fName)
+
+		self.log.info("			Filename			= %s", fName)
+		self.log.info("			Page Image Title	= %s", itemTitle)
+		self.log.info("			FileURL				= %s", imageURL)
+		self.log.info("			dlPath				= %s", filePath)
+
+		if self._checkFileExists(filePath):
+			self.log.info("Exists, skipping...")
+			return "Exists", filePath, itemCaption, itemTitle
+		else:
+			imgdat = self.wg.getpage(imageURL, addlHeaders={'Referer':artPageUrl})
+
+			errs = 0
+			fp = None
+
+			while not fp:
+				try:
+					# For text, the URL fetcher returns decoded strings, rather then bytes.
+					# Therefore, if the file is a string type, we encode it with utf-8
+					# so we can write it to a file.
+					if isinstance(imgdat, str):
+						imgdat = imgdat.encode(encoding='UTF-8')
+
+					fp = open(filePath, "wb")								# Open file for saving image (Binary)
+					fp.write(imgdat)						# Write Image to File
+					fp.close()
+				except IOError:
+					try:
+						fp.close()
+					except:
+						pass
+					errs += 1
+					self.log.critical("Error attempting to save image file - %s", filePath)
+					if errs > 3:
+						self.log.critical("Could not open file for writing!")
+						return "Failed", ""
+
+
+
+			self.log.info("Successfully got: %s" % imageURL)
+			return "Succeeded", filePath, itemCaption, itemTitle
+
+	# 	raise RuntimeError("How did this ever execute?")
+
+	# ---------------------------------------------------------------------------------------------------------------------------------------------------------
+	# Gallery Scraping
+	# ---------------------------------------------------------------------------------------------------------------------------------------------------------
+
+	def _getTotalArtCount(self, artist):
+		self.log.warn("Fix art count extraction!")
+		return -1
+
+		# basePage = "https://www.weasyl.com/~{user}".format(user=artist)
+
+		# page = self.wg.getSoup(basePage)
+		# stats = page.find('div', id='user-stats')
+
+		# item = stats.find("dd", text='Submissions')
+		# if item:
+		# 	# This feels a bit brittle, but I can't see how else to get the row
+		# 	# I want.
+		# 	items = item.previous_sibling.previous_sibling.get_text()
+		# 	return int(items)
+
+		# raise LookupError("Could not retreive artist item quantity!")
+
+
+
+	def _getItemsOnPage(self, inSoup):
+
+		links = set()
+		itemUl = inSoup.find("ul", class_='thumbnail-grid')
+		pages = itemUl.find_all("li", class_='grid-item')
+		for page in pages:
+			itemUrl = urllib.parse.urljoin(self.urlBase, page.a['href'])
+			links.add(itemUrl)
+
+		nextPage = False
+		buttons = inSoup.find_all("a", class_='button')
+		for link in buttons:
+			if 'next' in link.get_text().lower():
+				nextPage = urllib.parse.urljoin(self.urlBase, link['href'])
+
+		return links, nextPage
+
+
+
+	def _dumpUrl(self, url, art_type, directory="/"):
+		data = {
+			'url'       : url,
+			'directory' : directory,
+			'type'      : art_type,
+		}
+		return json.dumps(data, sort_keys=True)
+
+	def _getFolders(self, soup, path, baseUrl):
+		folder_div = soup.find('div', class_='sfBrowseListFolders')
+		if not folder_div:
+			return set()
+		folder_div = folder_div.find('div', class_='items')
+		folders = folder_div.find_all('div', recursive=False)
+
+		ret = set()
+		for folder in folders:
+			url = folder.a['href']
+			# Fix protocol relative URL (if present)
+			url = urllib.parse.urljoin(baseUrl, url)
+
+			ret |= self._getContent(path + "/" + folder.get_text().strip(), url)
+
+		return ret
+
+	def _getItems(self, soup, path, baseUrl):
+		item_div = soup.find('div', class_='sfBrowseListContent')
+
+		ret  = set()
+		pager = item_div.find('div', class_='pager')
+		if pager:
+			nextpg = pager.find('li', class_='next')
+			if not "hidden" in nextpg['class']:
+				url = nextpg.a['href']
+				# Fix protocol relative URL (if present)
+				url = urllib.parse.urljoin(baseUrl, url)
+				ret |= self._getContent(path=path, url=url)
+
+		for artcontainer in item_div.find_all('div', class_='sfArtworkSmallWrapper'):
+			link = artcontainer.find('a', class_='sfArtworkSmallInner')
+			arturl = urllib.parse.urljoin(baseUrl, link['href'])
+			link = self._dumpUrl(arturl, "artwork", path)
+			ret.add(link)
+
+		item_type = "journals" if baseUrl.startswith('/journals') else 'stories'
+
+		for text_container in item_div.find_all('div', class_=re.compile(r'sf-story(?:-big)?-headline', re.IGNORECASE)):
+			journalurl = urllib.parse.urljoin(baseUrl, text_container.a['href'])
+			link = self._dumpUrl(journalurl, item_type, path)
+			ret.add(link)
+
+
+		return ret
+
+
+	def _getContent(self, path, url):
+		soup = self.wg.getSoup(url)
+		ret  = set()
+
+		# Since folders are common across all sequence pages, only enter them if we're on the first page
+		if not ("art-page=" in url or "journals-page=" in url or "stories-page=" in url):
+			ret |= self._getFolders(soup, path, url)
+		ret |= self._getItems(soup, path, url)
+
+		return ret
+
+	def _getGalleries(self, artist):
+
+		artist = artist.strip()
+
+		baseUrl = 'https://{user}.sofurry.com/'.format(user=artist)
+
+		items  = set()
+
+		items |= self._getContent(path='/stories',  url="{base}stories".format(base=baseUrl))
+		items |= self._getContent(path='/artwork',  url="{base}artwork".format(base=baseUrl))
+		items |= self._getContent(path='/journals', url="{base}journals".format(base=baseUrl))
+
+
+		self.log.info("Found %s links", len(items))
+		return items
+
+
+

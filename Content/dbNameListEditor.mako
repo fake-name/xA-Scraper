@@ -153,7 +153,7 @@ logger =  logging.getLogger("Main.WebSrv")
 
 		$(".toggle_${siteShortName}").toggle(200);
 
-	});​
+	});
 	</script>
 
 </%def>
