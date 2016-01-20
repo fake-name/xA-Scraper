@@ -59,12 +59,12 @@ cur = sqlCon.cursor()
 		pageNumber = int(pageNumberStr)
 		pageNumber = pageNumber-1
 		print(pageNumber)
-		cur.execute('SELECT count(*) FROM retrieved_pages WHERE siteName=? AND artistName=?;', (siteSource, artist))
+		cur.execute('SELECT count(*) FROM retrieved_pages WHERE siteName=%s AND artistName=%s;', (siteSource, artist))
 		itemNo = cur.fetchall()
 		if allImages:
-			cur.execute('SELECT downloadPath, itemPageContent, itemPageTitle, id FROM retrieved_pages WHERE siteName=%s AND artistName=%s ORDER BY downloadPath ASC;', (siteSource, artist))
+			cur.execute('SELECT itemPageTitle, downloadPath, itemPageContent, id FROM retrieved_pages WHERE siteName=%s AND artistName=%s ORDER BY itemPageTitle ASC;', (siteSource, artist))
 		else:
-			cur.execute('SELECT downloadPath, itemPageContent, itemPageTitle, id FROM retrieved_pages WHERE siteName=%s AND artistName=%s ORDER BY downloadPath ASC LIMIT %s OFFSET %s;', (siteSource, artist, chunkStep, pageNumber*chunkStep))
+			cur.execute('SELECT itemPageTitle, downloadPath, itemPageContent, id FROM retrieved_pages WHERE siteName=%s AND artistName=%s ORDER BY itemPageTitle ASC LIMIT %s OFFSET %s;', (siteSource, artist, chunkStep, pageNumber*chunkStep))
 		imageIDs = cur.fetchall()
 		imageIDs.sort()
 		# imageIDs = [link[0] for link in imageIDs]
@@ -87,14 +87,16 @@ cur = sqlCon.cursor()
 						<table border="1px">
 
 
-								% for imagePath, imageDesc, imageTitle, imageID in imageIDs:
+								% for imageTitle, imagePath, imageDesc, imageID in imageIDs:
 									<tr>
 										<td class="padded" width="950">
 											% if imageTitle:
 												<b>${imageTitle}</b>
 											% endif
-											<small>${imagePath.split("/")[-1]}</small><br>
-											<img style='max-width:825px' src='/images/byid/${imageID}'>
+											% if imagePath:
+												<small>${imagePath.split("/")[-1]}</small><br>
+												<img style='max-width:825px' src='/images/byid/${imageID}'>
+											%endif
 											% if imageDesc:
 
 												<p>${imageDesc}</p>

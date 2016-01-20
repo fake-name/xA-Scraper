@@ -90,25 +90,34 @@ class GetSf(plugins.scrapers.ScraperBase.ScraperBase):
 
 	def _getContentUrlFromPage(self, soup):
 
-		dlBar = soup.find('ul', id='detail-actions')
+		dl_link = soup.find('a', id='sfDownload')
 
-
-		dummy, dlLink, dummy = dlBar.find_all('li')
-		if 'Download' in dlLink.get_text():
-			itemUrl = urllib.parse.urljoin(self.urlBase, dlLink.a['href'])
-
+		if dl_link:
+			itemUrl = urllib.parse.urljoin(self.urlBase, dl_link['href'])
 			return itemUrl
-
-		raise ValueError("Wat?")
+		return None
 
 	def _extractTitleDescription(self, soup):
-		title = soup.find('h2', id='detail-bar-title')
+		title = soup.find('span', id='sfContentTitle')
 		title = title.get_text().strip()
 
-		descContainer = soup.find('div', id='detail-description')
-		desc = descContainer.find('div', class_='formatted-content')
+		desc_div = soup.find('div', id='sfContentBody')
 
-		tags = soup.find('div', id='di-tags')
+		for bad_input in desc_div.find_all("input", type='hidden'):
+			bad_input.decompose()
+		for bad_input in desc_div.find_all("input", type='submit'):
+			bad_input.decompose()
+
+		for bad_input in desc_div.find_all("div", style="display:none"):
+			bad_input.unwrap()
+		for bad_input in desc_div.find_all("form"):
+			bad_input.unwrap()
+
+		for empty_tag in desc_div.find_all("a"):
+			if empty_tag.get_text().strip() == "":
+				empty_tag.decompose()
+
+		tags = soup.find('div', id='submission_tags')
 
 		# Horrible hack using ** to work around the fact that 'class' is a reserved keyword
 		tagDiv = soup.new_tag('div', **{'class' : 'tags'})
@@ -117,82 +126,83 @@ class GetSf(plugins.scrapers.ScraperBase.ScraperBase):
 		tagHeader.append('Tags:')
 		tagDiv.append(tagHeader)
 
-		for tag in tags.div.find_all('a'):
-			new = soup.new_tag('div', **{'class' : 'tag'})
-			new.append(tag.get_text())
-			tagDiv.append(new)
 
-		desc.append(tagDiv)
-		desc = str(desc.prettify())
+		for tag_section in tags.find_all("div", class_='section'):
+			type = tag_section.find("div", class_='section-title')
+			typename = type.get_text().strip().split(" ")[0]
+			for tag in tag_section.find_all('a', class_='sf-tag'):
+				new = soup.new_tag('div', **{'class' : 'tag ' + typename.lower()})
+				new.append(tag.get_text())
+				tagDiv.append(new)
+
+		desc_div.append(tagDiv)
+		desc = str(desc_div.prettify())
 		return title, desc
 
 	def _getArtPage(self, dlPathBase, artPageUrl, artistName):
-
+		print("GetArtPage!")
 		params = json.loads(artPageUrl)
-
-		print(params)
-		return
-
-		soup = self.wg.getSoup(artPageUrl)
+		soup = self.wg.getSoup(params['url'])
 
 
 		imageURL = self._getContentUrlFromPage(soup)
 		itemTitle, itemCaption = self._extractTitleDescription(soup)
 
+
 		if not imageURL:
-			self.log.error("OH NOES!!! No image on page = " + artPageUrl)
-			raise ValueError("No image found!")
-
-		urlPath = urllib.parse.urlparse(imageURL).path
-		fName = urlPath.split("/")[-1]
-
-		if not fName:
-			self.log.error("OH NOES!!! No filename for image on page = " + artPageUrl)
-			raise ValueError("No filename found!")
-
-
-		filePath = os.path.join(dlPathBase, fName)
-
-		self.log.info("			Filename			= %s", fName)
-		self.log.info("			Page Image Title	= %s", itemTitle)
-		self.log.info("			FileURL				= %s", imageURL)
-		self.log.info("			dlPath				= %s", filePath)
-
-		if self._checkFileExists(filePath):
-			self.log.info("Exists, skipping...")
-			return "Exists", filePath, itemCaption, itemTitle
+			self.log.error("Warning! No image on page = " + artPageUrl)
+			filePath = None
 		else:
-			imgdat = self.wg.getpage(imageURL, addlHeaders={'Referer':artPageUrl})
+			urlPath = urllib.parse.urlparse(imageURL).path
+			fName = urlPath.split("/")[-1]
 
-			errs = 0
-			fp = None
+			if not fName:
+				self.log.error("OH NOES!!! No filename for image on page = " + artPageUrl)
+				raise ValueError("No filename found!")
 
-			while not fp:
-				try:
-					# For text, the URL fetcher returns decoded strings, rather then bytes.
-					# Therefore, if the file is a string type, we encode it with utf-8
-					# so we can write it to a file.
-					if isinstance(imgdat, str):
-						imgdat = imgdat.encode(encoding='UTF-8')
 
-					fp = open(filePath, "wb")								# Open file for saving image (Binary)
-					fp.write(imgdat)						# Write Image to File
-					fp.close()
-				except IOError:
+			filePath = os.path.join(dlPathBase, fName)
+
+			self.log.info("			Filename			= %s", fName)
+			self.log.info("			Page Image Title	= %s", itemTitle)
+			self.log.info("			FileURL				= %s", imageURL)
+			self.log.info("			dlPath				= %s", filePath)
+
+			if self._checkFileExists(filePath):
+				self.log.info("Exists, skipping...")
+				return "Exists", filePath, itemCaption, itemTitle
+			else:
+				imgdat = self.wg.getpage(imageURL, addlHeaders={'Referer':artPageUrl})
+
+				errs = 0
+				fp = None
+
+				while not fp:
 					try:
+						# For text, the URL fetcher returns decoded strings, rather then bytes.
+						# Therefore, if the file is a string type, we encode it with utf-8
+						# so we can write it to a file.
+						if isinstance(imgdat, str):
+							imgdat = imgdat.encode(encoding='UTF-8')
+
+						fp = open(filePath, "wb")								# Open file for saving image (Binary)
+						fp.write(imgdat)						# Write Image to File
 						fp.close()
-					except:
-						pass
-					errs += 1
-					self.log.critical("Error attempting to save image file - %s", filePath)
-					if errs > 3:
-						self.log.critical("Could not open file for writing!")
-						return "Failed", ""
+					except IOError:
+						try:
+							fp.close()
+						except:
+							pass
+						errs += 1
+						self.log.critical("Error attempting to save image file - %s", filePath)
+						if errs > 3:
+							self.log.critical("Could not open file for writing!")
+							return "Failed", ""
 
 
 
-			self.log.info("Successfully got: %s" % imageURL)
-			return "Succeeded", filePath, itemCaption, itemTitle
+		self.log.info("Successfully got: %s", imageURL)
+		return "Succeeded", filePath, itemCaption, itemTitle
 
 	# 	raise RuntimeError("How did this ever execute?")
 

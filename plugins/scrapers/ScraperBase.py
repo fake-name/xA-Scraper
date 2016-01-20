@@ -249,6 +249,8 @@ class ScraperBase(PluginBase, metaclass=abc.ABCMeta):
 						elif isinstance(fqDlPath, str):
 							fqDlPath = os.path.relpath(fqDlPath, settings["dldCtntPath"])
 							self._updatePreviouslyRetreived(artist=artist, pageUrl=pageURL, fqDlPath=fqDlPath, pageDesc=pageDesc, pageTitle=pageTitle, seqNum=0)
+						elif fqDlPath == None:
+							self._updatePreviouslyRetreived(artist=artist, pageUrl=pageURL, fqDlPath=None, pageDesc=pageDesc, pageTitle=pageTitle, seqNum=0)
 						else:
 							raise ValueError("Unknown type for received downloadpath")
 					elif status == "Ignore":  # Used for compound pages (like Pixiv's manga pages), where the page has multiple sub-pages that are managed by the plugin
