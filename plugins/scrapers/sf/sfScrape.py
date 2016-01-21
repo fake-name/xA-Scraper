@@ -12,6 +12,46 @@ import json
 
 import plugins.scrapers.ScraperBase
 
+def makeFilenameSafe(inStr):
+
+	# FUCK YOU SMART-QUOTES.
+	inStr = inStr.replace("“",  " ") \
+				 .replace("”",  " ")
+
+	inStr = inStr.replace("%20", " ") \
+				 .replace("<",  " ") \
+				 .replace(">",  " ") \
+				 .replace(":",  " ") \
+				 .replace("\"", " ") \
+				 .replace("/",  " ") \
+				 .replace("\\", " ") \
+				 .replace("|",  " ") \
+				 .replace("?",  " ") \
+				 .replace("*",  " ") \
+				 .replace('"', " ")
+
+	# zero-width space bullshit (goddammit unicode)
+	inStr = inStr.replace("\u2009",  " ") \
+				 .replace("\u200A",  " ") \
+				 .replace("\u200B",  " ") \
+				 .replace("\u200C",  " ") \
+				 .replace("\u200D",  " ") \
+				 .replace("\uFEFF",  " ")
+
+	# Collapse all the repeated spaces down.
+	while inStr.find("  ")+1:
+		inStr = inStr.replace("  ", " ")
+
+
+	# inStr = inStr.rstrip(".")  # Windows file names can't end in dot. For some reason.
+	# Fukkit, disabling. Just run on linux.
+
+	inStr = inStr.rstrip("! ")   # Clean up trailing exclamation points
+	inStr = inStr.strip(" ")    # And can't have leading or trailing spaces
+
+	return inStr
+
+
 class GetSf(plugins.scrapers.ScraperBase.ScraperBase):
 
 	settingsDictKey = "sf"
@@ -23,7 +63,7 @@ class GetSf(plugins.scrapers.ScraperBase.ScraperBase):
 
 	ovwMode = "Check Files"
 
-	numThreads = 1
+	numThreads = 2
 
 
 
@@ -154,7 +194,7 @@ class GetSf(plugins.scrapers.ScraperBase.ScraperBase):
 			filePath = None
 		else:
 			urlPath = urllib.parse.urlparse(imageURL).path
-			fName = urlPath.split("/")[-1]
+			fName = makeFilenameSafe(itemTitle)
 
 			if not fName:
 				self.log.error("OH NOES!!! No filename for image on page = " + artPageUrl)
@@ -172,7 +212,7 @@ class GetSf(plugins.scrapers.ScraperBase.ScraperBase):
 				self.log.info("Exists, skipping...")
 				return "Exists", filePath, itemCaption, itemTitle
 			else:
-				imgdat = self.wg.getpage(imageURL, addlHeaders={'Referer':artPageUrl})
+				imgdat, imName = self.wg.getFileAndName(imageURL, addlHeaders={'Referer':artPageUrl})
 
 				errs = 0
 				fp = None
@@ -185,7 +225,7 @@ class GetSf(plugins.scrapers.ScraperBase.ScraperBase):
 						if isinstance(imgdat, str):
 							imgdat = imgdat.encode(encoding='UTF-8')
 
-						fp = open(filePath, "wb")								# Open file for saving image (Binary)
+						fp = open(filePath+imName, "wb")								# Open file for saving image (Binary)
 						fp.write(imgdat)						# Write Image to File
 						fp.close()
 					except IOError:
