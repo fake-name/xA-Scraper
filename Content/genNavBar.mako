@@ -40,6 +40,7 @@ def compactDateStr(dateStr):
 	contentSources = {}
 	for key in settings.keys():
 		if not isinstance(settings[key], dict):
+			print("Ignoring: ", key)
 			continue
 
 		if 'user-url' in settings[key]:

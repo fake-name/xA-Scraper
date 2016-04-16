@@ -183,7 +183,7 @@ class PageResource(object):
 		if not rets:
 			raise ValueError("How did an invalid key get queried for?")
 
-		pathS = rets[0]
+		pathS = rets[0][0]
 		if not settings["dldCtntPath"] in pathS:
 			pathS = os.path.join(settings["dldCtntPath"], pathS)
 		return pathS

@@ -230,8 +230,13 @@ class WebGetRobust:
 		kwargs["returnMultiple"] = True
 
 		pgctnt, pghandle = self.getpage(*args, **kwargs)
-		print(pghandle.info())
-		hName = pghandle.info()['Content-Disposition'].split('filename=')[1]
+		# print(pghandle.info())
+		if pghandle.info()['Content-Disposition']:
+			hName = pghandle.info()['Content-Disposition'].split('filename=')[1]
+		elif args:
+			hName = urllib.parse.urlsplit(args[0]).path.split("/")[-1]
+		else:
+			raise ValueError("No Content-Disposition header and url doesn't seem to contain a file!")
 
 
 		return pgctnt, hName

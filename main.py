@@ -23,6 +23,7 @@ import plugins.scrapers.px.pxScrape as pxs
 import plugins.scrapers.wy.wyScrape as wys
 import plugins.scrapers.ib.ibScrape as ibs
 import plugins.scrapers.sf.sfScrape as sfs
+import plugins.scrapers.tumblr.tumblrScrape as tus
 
 import wsgi_server
 
@@ -32,13 +33,13 @@ import statusDbManager
 
 
 JOBS = [
-	(das.GetDA, settings["da"]["runInterval"], "da"),
-	(fas.GetFA, settings["fa"]["runInterval"], "fa"),
-	(hfs.GetHF, settings["hf"]["runInterval"], "hf"),
-	(wys.GetWy, settings["wy"]["runInterval"], "wy"),
-	(ibs.GetIb, settings["ib"]["runInterval"], "ib"),
-	(pxs.GetPX, settings["px"]["runInterval"], "px"),
-	(sfs.GetSf, settings["sf"]["runInterval"], "sf"),
+	(das.GetDA,     settings["da"]["runInterval"],   "da"),
+	(fas.GetFA,     settings["fa"]["runInterval"],   "fa"),
+	(hfs.GetHF,     settings["hf"]["runInterval"],   "hf"),
+	(wys.GetWy,     settings["wy"]["runInterval"],   "wy"),
+	(ibs.GetIb,     settings["ib"]["runInterval"],   "ib"),
+	(pxs.GetPX,     settings["px"]["runInterval"],   "px"),
+	(tus.GetTumblr, settings["tum"]["runInterval"], "tum"),
 ]
 
 

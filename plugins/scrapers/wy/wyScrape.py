@@ -22,7 +22,7 @@ class GetWy(plugins.scrapers.ScraperBase.ScraperBase):
 
 	ovwMode = "Check Files"
 
-	numThreads = 2
+	numThreads = 1
 
 
 
@@ -223,7 +223,7 @@ class GetWy(plugins.scrapers.ScraperBase.ScraperBase):
 
 		links = set()
 		itemUl = inSoup.find("ul", class_='thumbnail-grid')
-		pages = itemUl.find_all("li", class_='grid-item')
+		pages = itemUl.find_all("li", class_='item')
 		for page in pages:
 			itemUrl = urllib.parse.urljoin(self.urlBase, page.a['href'])
 			links.add(itemUrl)

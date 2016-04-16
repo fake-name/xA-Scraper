@@ -6,6 +6,33 @@ import time
 from settings import settings
 
 %>
+
+
+
+
+<%def name="genItemDiv(imageTitle, imagePath, imageDesc, imageID, seqNum)">
+
+	<div>
+		% if imageTitle:
+		<h4>${seqNum} - ${imageTitle}</h4>
+		% endif
+		% if imagePath:
+			<small>${imagePath.split("/")[-1]}</small><br>
+			<img style='max-width:825px' src='/images/byid/${imageID}'>
+		%endif
+		% if imageDesc:
+
+			<p>${imageDesc}</p>
+		% endif
+
+	</div>
+
+
+</%def>
+
+
+
+
 <%
 startTime = time.time()
 
@@ -62,11 +89,11 @@ cur = sqlCon.cursor()
 		cur.execute('SELECT count(*) FROM retrieved_pages WHERE siteName=%s AND artistName=%s;', (siteSource, artist))
 		itemNo = cur.fetchall()
 		if allImages:
-			cur.execute('SELECT itemPageTitle, downloadPath, itemPageContent, id FROM retrieved_pages WHERE siteName=%s AND artistName=%s ORDER BY itemPageTitle ASC;', (siteSource, artist))
+			cur.execute('SELECT itemPageTitle, downloadPath, itemPageContent, id, seqNum FROM retrieved_pages WHERE siteName=%s AND artistName=%s ORDER BY pageUrl ASC, seqNum ASC;', (siteSource, artist))
 		else:
-			cur.execute('SELECT itemPageTitle, downloadPath, itemPageContent, id FROM retrieved_pages WHERE siteName=%s AND artistName=%s ORDER BY itemPageTitle ASC LIMIT %s OFFSET %s;', (siteSource, artist, chunkStep, pageNumber*chunkStep))
+			cur.execute('SELECT itemPageTitle, downloadPath, itemPageContent, id, seqNum FROM retrieved_pages WHERE siteName=%s AND artistName=%s ORDER BY pageUrl ASC, seqNum ASC LIMIT %s OFFSET %s;', (siteSource, artist, chunkStep, pageNumber*chunkStep))
 		imageIDs = cur.fetchall()
-		imageIDs.sort()
+		## imageIDs.sort()
 		# imageIDs = [link[0] for link in imageIDs]
 		# imageIDs.sort()
 
@@ -86,24 +113,28 @@ cur = sqlCon.cursor()
 					<div id="contentChunk">
 						<table border="1px">
 
+								<%
+								last = 1
+								%>
+								% for imageTitle, imagePath, imageDesc, imageID, seqNum in imageIDs:
 
-								% for imageTitle, imagePath, imageDesc, imageID in imageIDs:
-									<tr>
-										<td class="padded" width="950">
-											% if imageTitle:
-												<b>${imageTitle}</b>
-											% endif
-											% if imagePath:
-												<small>${imagePath.split("/")[-1]}</small><br>
-												<img style='max-width:825px' src='/images/byid/${imageID}'>
-											%endif
-											% if imageDesc:
+									% if seqNum == last:
+											</td>
+										</tr>
+									%endif
 
-												<p>${imageDesc}</p>
-											% endif
-										</td>
+									% if seqNum == last:
+										<tr>
+											<td class="padded" width="950">
+									%endif
 
-									</tr>
+									${genItemDiv(imageTitle, imagePath, imageDesc, imageID, seqNum)}
+
+
+									<%
+									last = seqNum
+									%>
+
 								% endfor
 						</table>
 					</div>

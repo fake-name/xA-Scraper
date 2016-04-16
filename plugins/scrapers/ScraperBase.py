@@ -129,6 +129,12 @@ class ScraperBase(PluginBase, metaclass=abc.ABCMeta):
 		self.log.info("DB Updated")
 		cur.execute("commit")
 
+	def _checkHaveUrl(self, url):
+		cur = self.conn.cursor()
+
+		cur.execute("SELECT COUNT(*) FROM %s WHERE pageUrl=%%s;" % settings["dbConf"]["successPagesDb"], (url, ))
+		have = cur.fetchall()[0][0]
+		return have
 
 
 	# Insert bad item into DB

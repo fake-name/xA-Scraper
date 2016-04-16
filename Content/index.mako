@@ -15,6 +15,7 @@ cur = sqlCon.cursor()
 urlLut = {}
 contentSources = {}
 for key in settings.keys():
+	print("Key: ", key)
 	if not isinstance(settings[key], dict):
 		continue
 
@@ -89,7 +90,6 @@ for key in settings.keys():
 				# artistName, pageUrl, retreivalTime
 				cur.execute('SELECT id, siteName, artistName, pageUrl, retreivalTime FROM retrieved_pages WHERE siteName=%s ORDER BY retreivalTime DESC LIMIT %s;', (siteName, lim))
 				pageLinks = cur.fetchall()
-				print(urlLut)
 
 				# 	"da" : "http://%s.deviantart.com/",
 				# 	"fa" : "http://www.furaffinity.net/user/%s/",
