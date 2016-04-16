@@ -7,6 +7,9 @@ This is a automated tool for scraping content from a number of art sites:
 - FurAffinity
 - HentaFoundry
 - Pixiv
+- Tumblr art blogs
+- SoFurry
+- Weaslyl
 
 To Add:
 
@@ -36,7 +39,7 @@ in the process of converting it from being based on text-files to being stored i
 
 
 Anyways, Pictures!
-
+	
 These are a few DeviantArt Artists culled from the Reddit [ImaginaryLandscapes](http://www.reddit.com/r/ImaginaryLandscapes/) subreddit.
 
 The web-interface has a lot of fancy mouseover preview stuff. Since this is primarily intended to run off a local network, bandwidth concerns are not too relevant, and I went a bit nuts with jQuery.
