@@ -9,6 +9,8 @@ import urllib.parse
 from settings import settings
 import flags
 
+import util.unclassify
+
 import plugins.scrapers.ScraperBase
 
 class GetIb(plugins.scrapers.ScraperBase.ScraperBase):
@@ -154,16 +156,46 @@ class GetIb(plugins.scrapers.ScraperBase.ScraperBase):
 			soup = self.wg.getSoup(url)
 
 		resize       = soup.find('div', title='Click to show max preview size')
-		origSize     = soup.find('div', class_='widget_imageFromSubmission')
+		origSize     = soup.find_all('a', target='_blank')
 		swfContainer = soup.find('embed', type='application/x-shockwave-flash')
+
+		origSize = list(set([tmp['href'] for tmp in origSize if tmp.get('href') and '/full/' in tmp.get('href')]))
+		if len(origSize) > 1:
+			self.log.error("Too many content images? Wat?")
+			self.log.error("%s", origSize)
+		elif not origSize:
+			ctnt_l = soup.select("div.content.magicboxParent")
+			for ctnt in ctnt_l:
+
+				if ctnt and ctnt.img and ctnt:
+					for img in ctnt.find_all("img"):
+						if "/full/" in img['src']:
+							origSize = [img['src']]
+				if origSize:
+					break
+				if not origSize and ctnt:
+					links = ctnt.find_all("a")
+					for link in links:
+						if "/full/" in link['href']:
+							origSize = [link['href']]
+				if origSize:
+					break
+			if not origSize:
+				self.log.error("No image on page?")
+				self.log.error("%s", origSize)
+
 		if resize:
+			# print("Resize link found:", resize.a['href'])
 			return resize.a['href']
 		elif origSize:
-			return origSize.img['src']
+			# print("OrigSize valid:", origSize)
+			return origSize[0]
 		elif swfContainer:
+			# print("SwfContainer found: ", swfContainer)
 			return swfContainer['src']
 		else:
 			self.log.error("No content found on page!")
+			# print("Nothing found?")
 			return None
 
 
@@ -175,50 +207,72 @@ class GetIb(plugins.scrapers.ScraperBase.ScraperBase):
 			dummy_avatar, titleTd, dummy_smiley, dummy_donate = tds
 		elif len(tds) == 2:
 			dummy_avatar, titleTd = tds
+		elif len(tds) == 6:
+			dummy_prev_release, dummy_author_1, dummy_author_2, dummy_avatar, titleTd, dummy_next_release = tds
 		else:
+			print("TDS:", len(tds))
+			for td in tds:
+				print()
+				print("----------------------------------------")
+				print(td)
+				print("----------------------------------------")
+				print()
 			raise ValueError("Do not know how to unpack title!")
 
+		if len(tds) == 6:
+			return titleTd.get_text()
+		else:
+			title, dummy_by = titleTd.find_all('div')
+			return title.get_text()
 
-		title, dummy_by = titleTd.find_all('div')
-		return title.get_text()
 
+	def _extractDescription(self, desc_soup, tag_soup):
 
-	def _extractDescription(self, soup):
-		div = soup.find('div', class_='content')
-
-		desc = bs4.BeautifulSoup().new_tag('div')
-		desc.append(div.div.span)
-
-		kwdHeader = soup.find('div', id='kw_scroll')
+		# Tag extraction has to go before description extraction, because
+		# the desc extraction modifies the tree
+		kwdHeader = tag_soup.find('div', id='kw_scroll')
 		tags = kwdHeader.next_sibling.next_sibling
 
 		# Horrible hack using ** to work around the fact that 'class' is a reserved keyword
-		tagDiv = bs4.BeautifulSoup().new_tag('div', **{'class' : 'tags'})
+		tagDiv = bs4.BeautifulSoup('', "lxml").new_tag('div', **{'class' : 'tags'})
 
-		tagHeader = bs4.BeautifulSoup().new_tag('b')
+		tagHeader = bs4.BeautifulSoup('', "lxml").new_tag('b')
 		tagHeader.append('Tags:')
 		tagDiv.append(tagHeader)
 
 		for tag in tags.find_all('a'):
 			if 'block by ' in tag.get_text():
 				continue
-			new = bs4.BeautifulSoup().new_tag('div', **{'class' : 'tag'})
-			new.append(tag.get_text())
-			tagDiv.append(new)
+			new = bs4.BeautifulSoup('', "lxml").new_tag('div', **{'class' : 'tag'})
+			tagtxt = tag.get_text().strip()
+			if tagtxt != "keywording policy":
+				new.append(tagtxt)
+				tagDiv.append(new)
+
+
+		div = desc_soup.find('div', class_='content')
+		div = util.unclassify.unclassify(div)
+
+		desc = bs4.BeautifulSoup('', "lxml").new_tag('div')
+		if div.div.span:
+			desc.append(div.div.span)
+		else:
+			desc.append(div)
 
 		desc.append(tagDiv)
 		desc = str(desc.prettify())
-
 		return desc
 
 	def _getSeqImageDivs(self, seqDiv):
 		ret = set()
 
 		pages = seqDiv.find_all('div', class_='widget_imageFromSubmission')
-		for page in pages:
 
+		for page in pages:
 			pgUrl = urllib.parse.urljoin(self.urlBase, page.a['href'])
-			ret.add(self._getContentUrlFromPage(url=pgUrl))
+			ctnt = self._getContentUrlFromPage(url=pgUrl)
+			if ctnt:
+				ret.add(ctnt)
 		return ret
 
 	def _getArtPage(self, dlPathBase, artPageUrl, artistName):
@@ -227,29 +281,42 @@ class GetIb(plugins.scrapers.ScraperBase.ScraperBase):
 
 		titleBar, dummy_stats, dummy_footer = soup.body.find_all('div', class_='elephant_555753', recursive=False)
 
-
-
 		mainDivs = soup.body.find_all('div', class_='elephant_white', recursive=False)
 		if len(mainDivs) == 2:
 			imgDiv, desc_div = mainDivs
+			footer = desc_div
 			imageURL    = [self._getContentUrlFromPage(imgDiv)]
 		elif len(mainDivs) == 3 or len(mainDivs) == 4:
 			if len(mainDivs) == 3:
 				imgDiv, seqDiv, desc_div = mainDivs
-			elif len(mainDivs) == 4:
-				dummy_header, imgDiv, seqDiv, desc_div = mainDivs
+				footer = desc_div
+			if len(mainDivs) == 4:
+				imgDiv, seqDiv, desc_div, footer = mainDivs
 
 			imageURL = set()
-			imageURL.add(self._getContentUrlFromPage(imgDiv))
+			base_img = self._getContentUrlFromPage(imgDiv)
+			if base_img:
+				imageURL.add(base_img)
+
 			for img in self._getSeqImageDivs(seqDiv):
+				# print("Adding: ", img)
+				imageURL.add(img)
+			for img in self._getSeqImageDivs(desc_div):
+				# print("Adding: ", img)
 				imageURL.add(img)
 			self.log.info("Found %s item series on page!", len(imageURL))
 		else:
 			raise ValueError("Unknown number of mainDivs! %s" % len(mainDivs))
 
+		# print(imageURL)
 
 		itemTitle   = self._extractTitle(titleBar)
-		itemCaption = self._extractDescription(desc_div)
+		itemCaption = self._extractDescription(desc_div, footer)
+
+		# print("Title:")
+		# print(itemTitle)
+		# print("Caption:")
+		# print(itemCaption)
 
 
 		if not imageURL:
@@ -275,7 +342,7 @@ class GetIb(plugins.scrapers.ScraperBase.ScraperBase):
 		page = self.wg.getSoup(basePage)
 		stats = page.find('span', class_='lucicrescens_stat', title='Submissions Uploaded')
 		if stats and stats.strong:
-			return int(stats.strong.get_text())
+			return int(stats.strong.get_text().replace(",", ""))
 
 		raise LookupError("Could not retreive artist item quantity!")
 

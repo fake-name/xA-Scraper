@@ -449,7 +449,7 @@ class WebGetRobust:
 										pgctnt = pgctnt.decode('utf-8', errors='ignore')
 
 									if soup:
-										pgctnt = bs4.BeautifulSoup(pgctnt)
+										pgctnt = bs4.BeautifulSoup(pgctnt, "lxml")
 								elif "text/plain" in cType or "text/xml" in cType:
 									pgctnt = bs4.UnicodeDammit(pgctnt).unicode_markup
 

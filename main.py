@@ -39,6 +39,7 @@ JOBS = [
 	(wys.GetWy,     settings["wy"]["runInterval"],   "wy"),
 	(ibs.GetIb,     settings["ib"]["runInterval"],   "ib"),
 	(pxs.GetPX,     settings["px"]["runInterval"],   "px"),
+	(sfs.GetSf,     settings["sf"]["runInterval"],   "sf"),
 	(tus.GetTumblr, settings["tum"]["runInterval"], "tum"),
 ]
 
