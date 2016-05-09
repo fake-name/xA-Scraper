@@ -42,11 +42,11 @@ class GetPX(plugins.scrapers.ScraperBase.ScraperBase):
 					"pixiv_id" : settings[self.settingsDictKey]["username"],
 					"pass"     : settings[self.settingsDictKey]["password"],
 					"skip"     : "1"}
-		self.wg.getpage('https://www.secure.pixiv.net/login.php?return_to=%2F', addlHeaders={'Referer': 'http://www.pixiv.net/'})
-		pagetext = self.wg.getpage('https://www.secure.pixiv.net/login.php', postData = logondict, addlHeaders={'Referer': 'https://www.secure.pixiv.net/login.php?return_to=%2F'})
+		self.wg.getpage('https://www.pixiv.net/')
+		pagetext = self.wg.getpage('https://www.pixiv.net/login.php', postData = logondict, addlHeaders={'Referer': 'https://www.pixiv.net/'})
 		# print(pagetext)
 		self.wg.syncCookiesFromFile()
-		if 'class="item header-logout">ログアウト</a>' in pagetext:
+		if '<a href="/logout.php?return_to=%2F" data-text-confirm="ログアウトします。よろしいですか？" onclick="return confirm(this.getAttribute(\'data-text-confirm\'))" class="item header-logout">ログアウト</a>' in pagetext:
 			return True, "Logged In"
 		else:
 			return False, "Login Failed"
