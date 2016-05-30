@@ -30,6 +30,13 @@ Dependencies:
  - Pyramid
  - Mako
  - BeautifulSoup 4
+ - others
+
+The preferred bootstrap method is to use `run.sh` from the repository root. It will
+ensure the required packages are available (build-essential, libxml2 libxslt1-dev 
+python3-dev libz-dev), and then install all the required python modules in a local 
+virtualenv. Additonally, it checks if the virtualenv is present, so once it's created,
+`./run.sh` will just source the venv, and run the scraper witout any reinstallation.
 
 Currently, there are some aspects that need work. The artist selection system is currently a bit broken, as I was
 in the process of converting it from being based on text-files to being stored in the database. Currently, there isn't a clean way to remove artists from the scrape list, though you can add or modify them.
