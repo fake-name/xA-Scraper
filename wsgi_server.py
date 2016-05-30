@@ -38,7 +38,6 @@ class PageResource(object):
 
 	def __init__(self):
 		self.base_directory = settings["webCtntPath"]
-		self.dbPath = settings["dbPath"]
 		self.lookupEngine = TemplateLookup(directories=[self.base_directory], module_directory='./ctntCache')
 
 		self.openDB()
@@ -50,8 +49,6 @@ class PageResource(object):
 
 	def openDB(self):
 		self.log.info("Info Generator Opening DB...")
-		# self.log.info("DB Path = %s", self.dbPath)
-		# self.conn = sqlite3.connect(self.dbPath, check_same_thread=False)
 		self.conn = psycopg2.connect(
 					database = settings["postgres"]['database'],
 					user     = settings["postgres"]['username'],

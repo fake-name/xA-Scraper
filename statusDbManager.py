@@ -12,8 +12,6 @@ class StatusResource(object):
 	log = logging.getLogger("Main.StatusMgr")
 
 	def __init__(self):
-		self.dbPath = settings["dbPath"]
-
 		self.openDB()
 
 	def __del__(self):
