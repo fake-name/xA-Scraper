@@ -26,11 +26,23 @@ it before now.
 
 Dependencies:
 
+ - Postgres >= 9.3
  - CherryPy
  - Pyramid
  - Mako
  - BeautifulSoup 4
  - others
+
+DB setup is left to the user. xA-Scraper requires it's own database, and the ability
+to make IP-based connections to the hosting PG instance. The connection information,
+DB name, and client name must be set by copying settings.base.py to settings.py,
+and updating the appropriate strings. 
+
+Settings.py is also where the login information for the various plugins goes.
+
+Disabling of select plugins can be accomplished by commenting out the appropriate
+line in `main.py`. The `JOBS` list dictates the various scheduled scraper tasks 
+that are placed into the scheduling system.
 
 The preferred bootstrap method is to use `run.sh` from the repository root. It will
 ensure the required packages are available (build-essential, libxml2 libxslt1-dev 
