@@ -134,7 +134,8 @@ class GetPX(plugins.scrapers.ScraperBase.ScraperBase):
 						#(self, artist, pageUrl, fqDlPath, seqNum=0):
 
 						self.log.info("Successfully got: " + link)
-						self._updatePreviouslyRetreived(artistName, sourceUrl, filePath, indice)
+						# def _updatePreviouslyRetreived(self, artist, pageUrl, fqDlPath, pageDesc="", pageTitle="", seqNum=0)
+						self._updatePreviouslyRetreived(artist=artistName, pageUrl=sourceUrl, fqDlPath=filePath, seqNum=indice)
 
 				else:
 					self.log.info("%s Exists, skipping..." % filename)
@@ -148,7 +149,7 @@ class GetPX(plugins.scrapers.ScraperBase.ScraperBase):
 			else:
 				return "Failed", ""
 
-		raise RuntimeError("How did this ever execute?")
+		raise RuntimeError("How did this ever execute? (pagecontent = %s)" % mangaPgCtnt)
 
 
 
@@ -240,7 +241,7 @@ class GetPX(plugins.scrapers.ScraperBase.ScraperBase):
 			self.log.info("Multipage/Manga link")
 			return self.getManga(artistName, link, dlPathBase, pgurl)
 
-		raise RuntimeError("How did this ever execute?")
+		raise RuntimeError("Unknown content type!")
 
 	# ---------------------------------------------------------------------------------------------------------------------------------------------------------
 	# Gallery Scraping
