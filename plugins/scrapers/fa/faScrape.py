@@ -40,20 +40,21 @@ class GetFA(plugins.scrapers.ScraperBase.ScraperBase):
 
 
 	def getCookie(self):
+		raise RuntimeError("No automated login at the moment, sorry. Blame FA's captcha")
 
-		logondict = {"retard_protection" : "1",
-					"action" : "login"}
+		# logondict = {"retard_protection" : "1",
+		# 			"action" : "login"}
 
-		logondict["name"] = settings[self.settingsDictKey]["username"]
-		logondict["pass"] = settings[self.settingsDictKey]["password"]
+		# logondict["name"] = settings[self.settingsDictKey]["username"]
+		# logondict["pass"] = settings[self.settingsDictKey]["password"]
 
-		pagetext = self.wg.getpage('https://www.furaffinity.net/login/?url=/', postData = logondict)
+		# pagetext = self.wg.getpage('https://www.furaffinity.net/login/?url=/', postData = logondict)
 
 
-		if re.search("You have typed in an erroneous username or password, please try again", pagetext):
-			return "Login Failed"
-		else:
-			return "Logged In"
+		# if re.search("You have typed in an erroneous username or password, please try again", pagetext):
+		# 	return "Login Failed"
+		# else:
+		# 	return "Logged In"
 
 
 	# ---------------------------------------------------------------------------------------------------------------------------------------------------------

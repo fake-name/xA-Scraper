@@ -110,6 +110,8 @@ def compactDateStr(dateStr):
 					<li><a href="/source/bysite/${key}">${key.upper()} Artists</a>
 				% endfor
 				<hr>
+				<li><a href='/fa-manual-login'>Manual FA Login</a>
+				<hr>
 				<li><a href="/dbNameListEditor">Monitored Names</a>
 				<li><a href="/uploadEditor">Upload Settings</a>
 			</ul>

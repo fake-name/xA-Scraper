@@ -13,6 +13,7 @@ This is a automated tool for scraping content from a number of art sites:
 
 To Add:
 
+ - Artstation
  - https://beta.furrynetwork.com/?
 
 It also has grown a lot of other functions over time. It has a fairly complex,

@@ -7,10 +7,13 @@ from pyramid.exceptions import NotFound
 from pyramid.httpexceptions import HTTPFound
 from pyramid.authentication import AuthTktAuthenticationPolicy
 from pyramid.authorization import ACLAuthorizationPolicy
+from pyramid.session import SignedCookieSessionFactory
+
 
 import pyramid.security as pys
 import cherrypy
 import apiHandler
+import webFunctions
 
 import mako.exceptions
 from mako.lookup import TemplateLookup
@@ -31,6 +34,11 @@ def userCheck(userid, dummy_request):
 import logging
 import sqlite3
 import traceback
+
+
+request_sessions = {}
+request_cookies = {}
+
 
 class PageResource(object):
 
@@ -128,7 +136,7 @@ class PageResource(object):
 			# Conditionally parse and render mako files.
 			if reqPath.endswith(".mako"):
 				pgTemplate = self.lookupEngine.get_template(reqPath)
-				pageContent = pgTemplate.render_unicode(request=request, sqlCon=self.conn, api=self.apiInterface)
+				pageContent = pgTemplate.render_unicode(request=request, sqlCon=self.conn, api=self.apiInterface, request_sessions=request_sessions, request_cookies=request_cookies)
 				return Response(body=pageContent)
 			else:
 				absolute_path = os.path.join(self.base_directory, reqPath)
@@ -233,6 +241,74 @@ class PageResource(object):
 
 
 
+	def getFaCapcha(self, request):
+		if 'uuid' not in request.session:
+			return HTTPFound(location='/')
+
+		r = request_sessions[request.session['uuid']].get('https://www.furaffinity.net/captcha.jpg')
+		resp = Response(body=r.content)
+		resp.content_type = 'image/jpeg'
+
+		return resp
+
+	def doFaCaptchaLogin(self, request):
+		print(request)
+		print(request.method)
+		if request.method != "POST":
+			return HTTPFound(location='/')
+		if 'uuid' not in request.session:
+			return HTTPFound(location='/')
+
+		# action:login
+		# name:bleh
+		# pass:blehhhhh
+		# g-recaptcha-response:
+		# use_old_captcha:1
+		# captcha:qyphba
+		# login:Login to FurAffinity
+
+		values = {
+			'action'               : 'login',
+			'name'                 : request.POST['username'],
+			'pass'                 : request.POST['password'],
+			'g-recaptcha-response' : "",
+			'use_old_captcha'      : 1,
+			'captcha'              : request.POST['captcha'],
+			'login'                : 'Login to FurAffinity',
+		}
+
+		print("Login values:", values)
+
+		r = request_sessions[request.session['uuid']].post('https://www.furaffinity.net/login/', data=values, allow_redirects=False)
+		# r = request_sessions[request.session['uuid']].post('https://www.furaffinity.net/login/', data=values)
+		# print(r.content)
+		print(r)
+		print(r.cookies)
+
+
+		for k, v in r.cookies.iteritems():
+			print("Cookie: ", k, v)
+		print(r.cookies.get_dict())
+
+		print("---------session----------")
+		print(request_sessions[request.session['uuid']].cookies)
+		for k, v in request_sessions[request.session['uuid']].cookies.iteritems():
+			print("Cookie: ", k, v)
+		print(request_sessions[request.session['uuid']].cookies.get_dict())
+
+
+
+		# Flush cookies into file.
+		wg = webFunctions.WebGetRobust()
+		for cookie in request_sessions[request.session['uuid']].cookies:
+			wg.addCookie(cookie)
+		wg.syncCookiesFromFile()
+
+
+		return HTTPFound(location='/fa-manual-login')
+
+
+
 	def sign_in_out(self, request):
 		username = request.POST.get('username')
 		password = request.POST.get('password')
@@ -269,11 +345,20 @@ def buildApp():
 
 	authn_policy = AuthTktAuthenticationPolicy('lolwattttt', hashalg='sha256', callback=userCheck)
 	authz_policy = ACLAuthorizationPolicy()
+	session_factory = SignedCookieSessionFactory('LOLWUTTTTTT')
+
 
 	config = Configurator()
 
 	config.set_authentication_policy(authn_policy)
 	config.set_authorization_policy(authz_policy)
+	config.set_session_factory(session_factory)
+
+	config.add_route(name='get-fa-captcha-img',          pattern='/faCaptchaImage')
+	config.add_view(resource.getFaCapcha,             http_cache=0, route_name='get-fa-captcha-img')
+
+	config.add_route(name='do-fa-captcha-login',          pattern='/doFaCaptchaLogin')
+	config.add_view(resource.doFaCaptchaLogin,             http_cache=0, route_name='do-fa-captcha-login')
 
 	config.add_route(name='login',                   pattern='/login')
 	config.add_route(name='do_login',                pattern='/login-check')
@@ -296,6 +381,8 @@ def buildApp():
 	config.add_view(resource.getPage,                http_cache=0, route_name='leaf')
 	config.add_view(resource.getApi,                 http_cache=0, route_name='api')
 	config.add_view(resource.getPage,                http_cache=0, context=NotFound)
+
+
 
 	config.add_view(route_name='auth', match_param='action=in', renderer='string', request_method='POST')
 	config.add_view(route_name='auth', match_param='action=out', renderer='string')
