@@ -78,7 +78,7 @@ class StatusResource(object):
 			cur.execute("""UPDATE statusdb SET statusText=%s WHERE id=%s""", (str(value), dbid))
 		else:
 			cur.execute('''INSERT INTO statusdb (siteName, sectionName, statusText) VALUES (%s, %s, %s);''', (sitename, key, value))
-
+		cur.execute("COMMIT;")
 
 	def updateNextRunTime(self, name, timestamp):
 		self.updateValue(name, "nextRun", timestamp)
