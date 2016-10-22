@@ -7,6 +7,7 @@
 import datetime
 from babel.dates import format_timedelta
 import time
+import psycopg2
 
 from settings import settings
 
@@ -35,7 +36,14 @@ def compactDateStr(dateStr):
 
 
 	<%
+	cur = sqlConnection.cursor()
 
+	try:
+
+		cur.execute('SELECT siteName,statusText FROM statusDb WHERE sectionname=\'nextRun\';')
+		cur.fetchall()
+	except psycopg2.InternalError:
+		cur.execute("ROLLBACK;")
 
 	contentSources = {}
 	for key in settings.keys():
@@ -52,7 +60,6 @@ def compactDateStr(dateStr):
 
 	# Counting stuff
 
-	cur = sqlConnection.cursor()
 
 	cur.execute('SELECT siteName,statusText FROM statusDb WHERE sectionname=\'nextRun\';')
 	nextRuns = cur.fetchall()

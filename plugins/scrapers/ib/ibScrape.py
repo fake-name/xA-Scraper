@@ -340,7 +340,7 @@ class GetIb(plugins.scrapers.ScraperBase.ScraperBase):
 		basePage = 'https://inkbunny.net/{user}'.format(user=artist)
 
 		page = self.wg.getSoup(basePage)
-		stats = page.find('span', class_='lucicrescens_stat', title='Submissions Uploaded')
+		stats = page.find('span', class_='stat', title='Submissions Uploaded')
 		if stats and stats.strong:
 			return int(stats.strong.get_text().replace(",", ""))
 

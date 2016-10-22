@@ -60,6 +60,8 @@ for key in settings.keys():
 	<div class="maindiv">
 		<%
 
+		if ('uuid' in request.session) and (not request.session['uuid'] in request_sessions):
+			del request.session['uuid']
 
 		if 'uuid' not in request.session:
 			request.session['uuid'] = uuid.uuid1()
@@ -69,9 +71,6 @@ for key in settings.keys():
 
 			request_cookies[request.session['uuid']] = r.cookies['b']
 
-		else:
-
-			print(request_sessions[request.session['uuid']].cookies)
 
 
 		%>

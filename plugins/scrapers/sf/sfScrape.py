@@ -234,7 +234,7 @@ class GetSf(plugins.scrapers.ScraperBase.ScraperBase):
 						except:
 							pass
 						errs += 1
-						self.log.critical("Error attempting to save image file - %s", filePath)
+						self.log.critical("Error attempting to save image file - %s", filePath+imName)
 						if errs > 3:
 							self.log.critical("Could not open file for writing!")
 							return "Failed", ""
@@ -242,7 +242,7 @@ class GetSf(plugins.scrapers.ScraperBase.ScraperBase):
 
 
 		self.log.info("Successfully got: %s", imageURL)
-		return "Succeeded", filePath, itemCaption, itemTitle
+		return "Succeeded", filePath+imName, itemCaption, itemTitle
 
 	# 	raise RuntimeError("How did this ever execute?")
 
