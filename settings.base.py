@@ -148,3 +148,5 @@ for key in settings.keys():
 	if 'user-url' in settings[key]:
 		settings['artSites'].append(key)
 		settings['ulConf'][key] = settings[key]['dlDirName'].replace(" ", "")
+
+
