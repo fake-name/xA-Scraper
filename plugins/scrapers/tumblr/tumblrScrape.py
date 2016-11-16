@@ -66,33 +66,13 @@ class GetTumblr(plugins.scrapers.ScraperBase.ScraperBase):
 			#print soup.find_all("input")
 			#print soup
 			if accessToken:
-				self.log.info("Got Entrance token, logging in")
-				print("accessToken", accessToken)
-
-				logondict = {"token"        : accessToken,
-							"username"      : settings["wy"]["username"],
-							"password"      : settings["wy"]["password"],
-							"Referer"       : "https://www.weasyl.com/"}
-
-				extraHeaders = {
-							"Referer"       : "https://www.weasyl.com/signin",
-				}
-
-				pagetext = self.wg.getpage('https://www.weasyl.com/signin', postData=logondict, addlHeaders=extraHeaders)
-				if settings["wy"]["username"] in pagetext:
-
-					self.wg.saveCookies()
-					return True, "Logged In"
-				else:
-					self.log.error("Login failed!")
-					return False, "Failed to log in"
-			return "No hidden input - entry step-through failed"
+				return True, "Logged In"
 
 		except:
 			self.log.critical("Caught Error")
 			self.log.critical(traceback.format_exc())
 			traceback.print_exc()
-			return "Login Failed"
+		return False, "Login Failed"
 
 
 

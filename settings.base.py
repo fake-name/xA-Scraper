@@ -116,7 +116,6 @@ settings = {
 	"tum" :  # Tumblr
 	{
 		"username"        : "your_username",
-		"password"        : "your_password",
 
 		# Fuck you tumblr, really.
 		'consumer_key'    : 'tumblr_garbage',
