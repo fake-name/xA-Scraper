@@ -152,7 +152,7 @@ class GetFA(plugins.scrapers.ScraperBase.ScraperBase):
 
 		try:
 			filePath = os.path.join(dlPathBase, fname)
-			pageDesc, pageTitle = self._getContentDescriptionTitleFromSoup(bs4.BeautifulSoup(pageCtnt))
+			pageDesc, pageTitle = self._getContentDescriptionTitleFromSoup(bs4.BeautifulSoup(pageCtnt, "lxml"))
 
 		except:
 			print("file path issue")
@@ -235,7 +235,7 @@ class GetFA(plugins.scrapers.ScraperBase.ScraperBase):
 	def _getItemsOnPage(self, inSoup):
 
 		links = set()
-		pageContainers = inSoup("b", id=re.compile(r"sid_\d+"))
+		pageContainers = inSoup("figure", id=re.compile(r"sid-\d+"))
 
 		for item in pageContainers:
 			link = urllib.parse.urljoin(self.urlBase, item.find("a")["href"])
