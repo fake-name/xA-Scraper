@@ -208,8 +208,10 @@ class ScraperBase(PluginBase, metaclass=abc.ABCMeta):
 			totalArt = self._getTotalArtCount(artist)
 			artPages = self._getGalleries(artist)
 
-			if totalArt != len(artPages):
+			if totalArt > len(artPages):
 				self.log.warning("May be missing art? Total claimed art items from front-page = %s, total gallery items %s", totalArt, len(artPages))
+			elif totalArt < len(artPages):
+				self.log.warning("Too many art pages found? Total claimed art items from front-page = %s, total gallery items %s.", totalArt, len(artPages))
 			else:
 				self.log.info("Total claimed art items from front-page = %s, total gallery items %s", totalArt, len(artPages))
 

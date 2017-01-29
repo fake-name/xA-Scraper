@@ -92,6 +92,10 @@ class GetDA(plugins.scrapers.ScraperBase.ScraperBase):
 			self.log.info("Whoops, had to manually extract Img URL - %s", imgurl)
 			return imgurl
 
+		if soupIn.find("div", class_='journal-wrapper'):
+			self.log.info("Item is prose, rather then art.")
+			return "Prose"
+
 		self.log.info("Trying for Video Link")
 		try:
 			link = soupIn.findAll("a", attrs={"class" : "b"})[-1]
@@ -108,10 +112,22 @@ class GetDA(plugins.scrapers.ScraperBase.ScraperBase):
 
 		pageDesc = ""
 		pageTitle = ""
+
+		text_content = inSoup.find("div", class_='journal-wrapper')
 		commentary = inSoup.find("div", attrs={"class" : "text block"})
+
+		pageDesc = ""
+
+		if text_content:
+			textContentTag = text_content.extract()
+			pageDesc += str(textContentTag)
+
+		if text_content and commentary:
+			pageDesc += "<br><br>"
+
 		if commentary:
-			pageDesc = commentary.extract()
-			pageDesc = str(pageDesc)
+			pageDescTag = commentary.extract()
+			pageDesc += str(pageDescTag)
 
 		titleCont = inSoup.find("div", class_="dev-title-container")
 		if titleCont:
@@ -134,6 +150,10 @@ class GetDA(plugins.scrapers.ScraperBase.ScraperBase):
 			self.log.critical("OH NOES!!! No image on page = %s", artPageUrl)
 			# print mpgctnt
 			return "Failed", ""
+
+		if imgurl == "Prose":
+			return "Succeeded", None, pageDesc, pageTitle
+
 		else:
 
 			regx3 = re.compile("http://.+/")							# Pull out filename only
@@ -215,7 +235,7 @@ class GetDA(plugins.scrapers.ScraperBase.ScraperBase):
 
 	def _getItemsOnPage(self, inSoup):
 		mainSection = inSoup.find('div', attrs={"name" : "gmi-ResourceStream", "id" : "gmi-ResourceStream"})
-		links = mainSection.findAllNext("a", class_="t")
+		links = mainSection.findAllNext("a", class_="torpedo-thumb-link")
 		ret = set()
 		for link in links:
 			ret.add(link["href"])
