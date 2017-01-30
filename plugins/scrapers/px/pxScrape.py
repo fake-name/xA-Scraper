@@ -27,24 +27,32 @@ class GetPX(plugins.scrapers.ScraperBase.ScraperBase):
 	# ---------------------------------------------------------------------------------------------------------------------------------------------------------
 
 	def checkCookie(self):
-
-		userID = re.search(r"<Cookie PHPSESSID=[0-9a-f_]*? for \.pixiv\.net/>", "%s" % self.wg.cj, re.IGNORECASE)
-		if userID:
-			return True, "Have Pixiv Cookie:\n	%s" % (userID.group(0))
+		userID_1 = re.search(r"<Cookie PHPSESSID=[0-9a-f_]*? for \.pixiv\.net/>", "%s" % self.wg.cj, re.IGNORECASE)
+		userID_2 = re.search(r"<Cookie p_ab_id=[0-9a-f_]*? for \.pixiv\.net/>", "%s" % self.wg.cj, re.IGNORECASE)
+		if all([userID_1, userID_2]):
+			return True, "Have Pixiv Cookie:\n	%s -> %s" % (userID_1.group(0), userID_2.group(0))
 
 		return False, "Do not have Pixiv Cookies"
 
 	def getCookie(self):
 		self.log.info("Pixiv Getting cookie")
 
+		soup = self.wg.getSoup('https://accounts.pixiv.net/login', addlHeaders={'Referer': 'https://www.pixiv.net/'})
+		container = soup.find("div", id='old-login')
 
-		logondict = {"mode"    : "login",
-					"pixiv_id" : settings[self.settingsDictKey]["username"],
-					"pass"     : settings[self.settingsDictKey]["password"],
-					"skip"     : "1"}
-		self.wg.getpage('https://www.pixiv.net/')
-		pagetext = self.wg.getpage('https://www.pixiv.net/login.php', postData = logondict, addlHeaders={'Referer': 'https://www.pixiv.net/'})
-		# print(pagetext)
+		inputs = container.find_all("input")
+		logondict = {}
+		for input_item in inputs:
+			if input_item.has_attr('name') and input_item.has_attr('value'):
+				key = input_item['name']
+				val = input_item['value']
+				logondict[key] = val
+
+		logondict["pixiv_id"] = settings[self.settingsDictKey]["username"]
+		logondict["password"] = settings[self.settingsDictKey]["password"]
+
+		pagetext = self.wg.getpage('https://accounts.pixiv.net/login', postData = logondict, addlHeaders={'Referer': 'https://accounts.pixiv.net/login'})
+
 		self.wg.syncCookiesFromFile()
 		if '<a href="/logout.php?return_to=%2F" data-text-confirm="ログアウトします。よろしいですか？" onclick="return confirm(this.getAttribute(\'data-text-confirm\'))" class="item header-logout">ログアウト</a>' in pagetext:
 			return True, "Logged In"
@@ -336,6 +344,10 @@ class GetPX(plugins.scrapers.ScraperBase.ScraperBase):
 	# ---------------------------------------------------------------------------------------------------------------------------------------------------------
 
 	def getNameList(self):
+		if not self.checkCookie()[0]:
+			ok, message = self.getCookie()
+			if not ok:
+				raise RuntimeError("Could not log in?")
 
 		self.log.info("Getting list of favourite artists.")
 
