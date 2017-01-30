@@ -114,7 +114,7 @@ class GetWy(plugins.scrapers.ScraperBase.ScraperBase):
 		descContainer = soup.find('div', id='detail-description')
 		desc = descContainer.find('div', class_='formatted-content')
 
-		tags = soup.find('div', id='di-tags')
+		tags = soup.find('div', class_='di-tags')
 
 		# Horrible hack using ** to work around the fact that 'class' is a reserved keyword
 		tagDiv = soup.new_tag('div', **{'class' : 'tags'})
@@ -123,7 +123,7 @@ class GetWy(plugins.scrapers.ScraperBase.ScraperBase):
 		tagHeader.append('Tags:')
 		tagDiv.append(tagHeader)
 
-		for tag in tags.div.find_all('a'):
+		for tag in tags.find_all('a'):
 			new = soup.new_tag('div', **{'class' : 'tag'})
 			new.append(tag.get_text())
 			tagDiv.append(new)
@@ -223,6 +223,8 @@ class GetWy(plugins.scrapers.ScraperBase.ScraperBase):
 
 		links = set()
 		itemUl = inSoup.find("ul", class_='thumbnail-grid')
+		if not itemUl:
+			return [], False
 		pages = itemUl.find_all("li", class_='item')
 		for page in pages:
 			itemUrl = urllib.parse.urljoin(self.urlBase, page.a['href'])
