@@ -202,13 +202,19 @@ class GetWy(plugins.scrapers.ScraperBase.ScraperBase):
 	# ---------------------------------------------------------------------------------------------------------------------------------------------------------
 
 	def _getTotalArtCount(self, artist):
+		# Apparently users can turn this off? Fucking annoying.
 
 		basePage = "https://www.weasyl.com/~{user}".format(user=artist)
 
 		page = self.wg.getSoup(basePage)
 		stats = page.find('div', id='user-stats')
+		if not stats:
+			return None
 
 		item = stats.find("dd", text='Submissions')
+		if not item:
+			return None
+
 		if item:
 			# This feels a bit brittle, but I can't see how else to get the row
 			# I want.
