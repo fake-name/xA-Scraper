@@ -22,24 +22,28 @@ namespace.run=True
 def go():
 
 
-	faGrabber = plugins.scrapers.fa.faScrape.GetFA()
-	faGrabber.go(ctrlNamespace=namespace)
+	# daGrabber = plugins.scrapers.da.daScrape.GetDA()
+	# daGrabber.go(ctrlNamespace=namespace)
 
 
-	ibGrab = plugins.scrapers.ib.ibScrape.GetIb()
-	ibGrab.go(ctrlNamespace=namespace)
+	# faGrabber = plugins.scrapers.fa.faScrape.GetFA()
+	# faGrabber.go(ctrlNamespace=namespace)
 
 
-	hfGrabber = plugins.scrapers.hf.hfScrape.GetHF()
-	hfGrabber.go(ctrlNamespace=namespace)
+	# ibGrab = plugins.scrapers.ib.ibScrape.GetIb()
+	# ibGrab.go(ctrlNamespace=namespace)
 
 
-	daGrabber = plugins.scrapers.da.daScrape.GetDA()
-	daGrabber.go(ctrlNamespace=namespace)
+	# hfGrabber = plugins.scrapers.hf.hfScrape.GetHF()
+	# hfGrabber.go(ctrlNamespace=namespace)
 
 
-	wyGrab = plugins.scrapers.wy.wyScrape.GetWy()
-	wyGrab.go(ctrlNamespace=namespace)
+	# daGrabber = plugins.scrapers.da.daScrape.GetDA()
+	# daGrabber.go(ctrlNamespace=namespace)
+
+
+	# wyGrab = plugins.scrapers.wy.wyScrape.GetWy()
+	# wyGrab.go(ctrlNamespace=namespace)
 
 	pxGrabber = plugins.scrapers.px.pxScrape.GetPX()
 	pxGrabber.go(ctrlNamespace=namespace)

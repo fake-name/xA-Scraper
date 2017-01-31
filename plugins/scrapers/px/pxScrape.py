@@ -4,6 +4,7 @@ import os.path
 import traceback
 import re
 import bs4
+import json
 import urllib.request
 import urllib.parse
 from settings import settings
@@ -59,6 +60,12 @@ class GetPX(plugins.scrapers.ScraperBase.ScraperBase):
 		else:
 			return False, "Login Failed"
 
+	def checkLogin(self):
+
+		if not self.checkCookie()[0]:
+			ok, message = self.getCookie()
+			if not ok:
+				raise RuntimeError("Could not log in?")
 
 	# ---------------------------------------------------------------------------------------------------------------------------------------------------------
 	# Individual page scraping
@@ -189,8 +196,9 @@ class GetPX(plugins.scrapers.ScraperBase.ScraperBase):
 		imgurl   = imageTag['data-src']
 		imgTitle = imageTag['alt']
 
-
 		itemTitle, itemCaption = self._extractTitleDescription(baseSoup)
+
+
 
 		regx4 = re.compile("http://.+/")				# FileName RE
 		fname = regx4.sub("" , imgurl)
@@ -227,6 +235,118 @@ class GetPX(plugins.scrapers.ScraperBase.ScraperBase):
 			self.log.info("Exists, skipping... (path = %s)", filePath)
 			return "Exists", filePath, itemCaption, itemTitle
 
+	def _getSinglePageManga(self, dlPathBase, imageTag, baseSoup, artPageUrl):
+		imgurl   = imageTag['href']
+		imgurl = urllib.parse.urljoin(artPageUrl, imageTag['href'])
+
+		imgTitle = imageTag.img['alt']
+
+		imgpage = self.wg.getSoup(imgurl, addlHeaders={'Referer': artPageUrl})
+
+		if not imgpage.img:
+			return "Failed", ""
+
+		imgref = imgurl
+		imgurl = imgpage.img['src']
+
+		itemTitle, itemCaption = self._extractTitleDescription(baseSoup)
+
+		regx4 = re.compile("https?://.+/")				# FileName RE
+		fname = regx4.sub("" , imgurl)
+		fname = fname.rsplit("?")[0] 		# Sometimes there is some PHP stuff tacked on the end of the Image URL. Split on the indicator("?"), and throw away everything after it.
+
+		self.log.info("			Filename = " + fname)
+		self.log.info("			Page Image Title = " + imgTitle)
+		self.log.info("			FileURL = " + imgurl)
+
+		filePath = os.path.join(dlPathBase, fname)
+		if not self._checkFileExists(filePath):
+
+			imgdath = self.wg.getpage(imgurl, addlHeaders={'Referer': imgref})							# Request Image
+
+			if imgdath == "Failed":
+				self.log.info("cannot get image")
+				return "Failed", ""
+			self.log.info("Successfully got: " + fname)
+			# print fname
+			try:
+				with open(filePath, "wb") as fp:
+					fp.write(imgdath)
+			except:
+				self.log.critical("cannot save image")
+				self.log.critical(traceback.print_exc())
+				self.log.critical("cannot save image")
+
+				return "Failed", ""
+
+			self.log.info("Successfully got: " + imgurl)
+			self.log.info("Saved to path: " + filePath)
+			return "Succeeded", filePath, itemCaption, itemTitle
+		else:
+			self.log.info("Exists, skipping... (path = %s)", filePath)
+			return "Exists", filePath, itemCaption, itemTitle
+
+	def _getAnimation(self, dlPathBase, imageTag, soup, artPageUrl):
+		itemTitle, itemCaption = self._extractTitleDescription(soup)
+
+		scripts = soup.find("script", text=re.compile("ugokuIllustFullscreenData"))
+		if not scripts:
+			return "Failed", ""
+
+		script = scripts.string
+		lines = script.split(";")
+
+		tgtline = None
+		for line in lines:
+			if "pixiv.context.ugokuIllustFullscreenData" in line and "=" in line:
+				tgtline = line
+
+		if not tgtline:
+			return "Failed", ""
+
+		dat = json.loads(tgtline.split("=")[-1])
+		itemCaption += "\n\n<pre>" + tgtline + "</pre>"
+
+		if not 'src' in dat:
+			return "Failed", ""
+
+		ctntsrc = dat['src']
+
+		regx4 = re.compile("https?://.+/")				# FileName RE
+		fname = regx4.sub("" , ctntsrc)
+		fname = fname.rsplit("?")[0] 		# Sometimes there is some PHP stuff tacked on the end of the Image URL. Split on the indicator("?"), and throw away everything after it.
+
+		self.log.info("			Filename = " + fname)
+		self.log.info("			Page Image Title = " + itemTitle)
+		self.log.info("			FileURL = " + ctntsrc)
+
+		filePath = os.path.join(dlPathBase, fname)
+		if not self._checkFileExists(filePath):
+
+			imgdath = self.wg.getpage(ctntsrc, addlHeaders={'Referer': artPageUrl})							# Request Image
+
+			if imgdath == "Failed":
+				self.log.info("cannot get image")
+				return "Failed", ""
+			self.log.info("Successfully got: " + fname)
+			# print fname
+			try:
+				with open(filePath, "wb") as fp:
+					fp.write(imgdath)
+			except:
+				self.log.critical("cannot save image")
+				self.log.critical(traceback.print_exc())
+				self.log.critical("cannot save image")
+
+				return "Failed", ""
+
+			self.log.info("Successfully got: " + ctntsrc)
+			self.log.info("Saved to path: " + filePath)
+			return "Succeeded", filePath, itemCaption, itemTitle
+		else:
+			self.log.info("Exists, skipping... (path = %s)", filePath)
+			return "Exists", filePath, itemCaption, itemTitle
+
 
 	def _getArtPage(self, dlPathBase, pgurl, artistName):
 
@@ -243,11 +363,20 @@ class GetPX(plugins.scrapers.ScraperBase.ScraperBase):
 			return self._getSinglePageContent(dlPathBase, imageTag, baseSoup, pgurl)
 
 		work_div = baseSoup.find("div", class_='works_display')
-		mangaContent = work_div.find("a", class_='multiple')
-		if mangaContent:
-			link = urllib.parse.urljoin(pgurl, mangaContent['href'])
-			self.log.info("Multipage/Manga link")
-			return self.getManga(artistName, link, dlPathBase, pgurl)
+		if work_div:
+
+			mangaContent = work_div.find("a", class_='multiple')
+			if mangaContent:
+				link = urllib.parse.urljoin(pgurl, mangaContent['href'])
+				self.log.info("Multipage/Manga link")
+				return self.getManga(artistName, link, dlPathBase, pgurl)
+
+			singleManga = work_div.find("a", class_='manga')
+			if singleManga:
+				return self._getSinglePageManga(dlPathBase, singleManga, baseSoup, pgurl)
+			animation = work_div.find("div", class_='_ugoku-illust-player-container')
+			if animation:
+				return self._getAnimation(dlPathBase, animation, baseSoup, pgurl)
 
 		raise RuntimeError("Unknown content type!")
 
@@ -344,10 +473,7 @@ class GetPX(plugins.scrapers.ScraperBase.ScraperBase):
 	# ---------------------------------------------------------------------------------------------------------------------------------------------------------
 
 	def getNameList(self):
-		if not self.checkCookie()[0]:
-			ok, message = self.getCookie()
-			if not ok:
-				raise RuntimeError("Could not log in?")
+		self.checkLogin()
 
 		self.log.info("Getting list of favourite artists.")
 
