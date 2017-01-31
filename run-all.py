@@ -46,6 +46,8 @@ def go():
 	# wyGrab.go(ctrlNamespace=namespace)
 
 	pxGrabber = plugins.scrapers.px.pxScrape.GetPX()
+	pxGrabber.checkLogin()
+
 	pxGrabber.go(ctrlNamespace=namespace)
 
 

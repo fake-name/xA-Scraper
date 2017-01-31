@@ -71,101 +71,91 @@ class GetPX(plugins.scrapers.ScraperBase.ScraperBase):
 	# Individual page scraping
 	# ---------------------------------------------------------------------------------------------------------------------------------------------------------
 
-	def getManga(self, artistName, mangaAddr, dlPath, sourceUrl):
+	def getManga(self, artistName, mangaAddr, dlPath, parentSoup, sourceUrl):
 		self.log.info("Params = %s, %s, %s, %s", artistName, mangaAddr, dlPath, sourceUrl)
-		titleRE = re.compile("<title>(.*?)</title>", re.IGNORECASE)
 
 		successed = True
 
-		# print mangaAddr,
+		soup = self.wg.getSoup(mangaAddr, addlHeaders={'Referer': sourceUrl})			# Spoof the referrer to get the big image version
 
-		mangaPgCtnt = self.wg.getpage(mangaAddr, addlHeaders={'Referer': sourceUrl})			# Spoof the referrer to get the big image version
-
-		if mangaPgCtnt == "Failed":
-			self.log.info("cannot get manga page")
-
+		if soup.title:
+			mangaTitle = soup.title.get_text()
+			mangaTitle = re.sub('[\\/:*?"<>|]', "", mangaTitle)
+			self.log.info("Title : %s" % (mangaTitle))
 		else:
-			titleReResult = titleRE.search(mangaPgCtnt)
+			mangaTitle = None
 
-			if titleReResult:
-				self.log.info("Found file Title : %s" % (titleReResult.group(1)))
-				mangaTitle = titleReResult.group(1)
-				mangaTitle = re.sub('[\\/:*?"<>|]', "", mangaTitle)
-			else:
-				mangaTitle = None
+		scripts = soup.find_all("script", text=re.compile(r"pixiv\.context\.originalImages\["))
+		if not scripts:
+			return "Failed", ""
 
-			soup = bs4.BeautifulSoup(mangaPgCtnt, 'lxml')
-			imageTags = soup.find_all("img", {"data-filter" : "manga-image"})
+		images = []
+		img_idx = 1
+		for script in scripts:
+			script_s = script.string
+			dat_key = "originalImages" if "originalImages" in script_s else 'images'
 
-			linkSet = set()
-			for imTag in imageTags:
-				linkSet.add((imTag["data-src"], imTag["data-index"]))
+			lines = script_s.split(";")
+			for line in [tmp for tmp in lines if dat_key in tmp]:
+				url = line.split("=")[-1]
+				url = json.loads(url)
+				images.append((img_idx, url))
+				img_idx += 1
 
-
-			regx4 = re.compile("http://.+/")				# FileName RE
-
-			self.log.info("Found %s page manga!" % len(linkSet))
-			if len(linkSet) < 1:
-				self.log.error("No Images on page?")
-				return "Failed", ""
-
-			print(linkSet)
-
-			for link, indice in linkSet:
-				filename = regx4.sub("" , link)
-				filename = filename.rsplit("?")[0]
-
-				if mangaTitle != None:
-					pass
-					# self.log.info("%s - %s" % (regx4.sub("" , link), mangaTitle))
+		self.log.info("Found %s page manga!" % len(images))
+		if len(images) < 1:
+			self.log.error("No Images on page?")
+			return "Failed", ""
 
 
-				filePath = os.path.join(dlPath, filename)
-				if not self._checkFileExists(filePath):
+		for indice, link in images:
+			regx4 = re.compile("http://.+/")
+			filename = regx4.sub("" , link)
+			filename = filename.rsplit("?")[0]
 
-					imgdath = self.wg.getpage(link, addlHeaders={'Referer': mangaAddr})							# Request Image
+			filePath = os.path.join(dlPath, filename)
+			if not self._checkFileExists(filePath):
 
-					if imgdath == "Failed":
-						self.log.error("cannot get manga page")
-						successed = False
+				imgdath = self.wg.getpage(link, addlHeaders={'Referer': mangaAddr})							# Request Image
 
-					else:
-						self.log.info("Successfully got: " + filename)
-						#print os.access(imPath, os.W_OK), imPath
-						#print "Saving"
-						writeErrors = 0
-						while writeErrors < 3:
-							try:
-								with open(filePath, "wb") as fp:
-									fp.write(imgdath)
-								break
-							except:
-								self.log.critical(traceback.format_exc())
-								writeErrors += 1
-						else:
-							self.log.critical("Could not save file - %s " % filePath)
-							successed = False
-
-						#(self, artist, pageUrl, fqDlPath, seqNum=0):
-
-						self.log.info("Successfully got: " + link)
-						# def _updatePreviouslyRetreived(self, artist, pageUrl, fqDlPath, pageDesc="", pageTitle="", seqNum=0)
-						self._updatePreviouslyRetreived(artist=artistName, pageUrl=sourceUrl, fqDlPath=filePath, seqNum=indice)
+				if imgdath == "Failed":
+					self.log.error("cannot get manga page")
+					successed = False
 
 				else:
-					self.log.info("%s Exists, skipping..." % filename)
+					self.log.info("Successfully got: " + filename)
+					#print os.access(imPath, os.W_OK), imPath
+					#print "Saving"
+					writeErrors = 0
+					while writeErrors < 3:
+						try:
+							with open(filePath, "wb") as fp:
+								fp.write(imgdath)
+							break
+						except:
+							self.log.critical(traceback.format_exc())
+							writeErrors += 1
+					else:
+						self.log.critical("Could not save file - %s " % filePath)
+						successed = False
 
+					#(self, artist, pageUrl, fqDlPath, seqNum=0):
 
-
-			self.log.info("Total %s " % len(linkSet))
-			if successed:
-				return "Ignore", None
+					self.log.info("Successfully got: " + link)
+					# def _updatePreviouslyRetreived(self, artist, pageUrl, fqDlPath, pageDesc="", pageTitle="", seqNum=0)
+					self._updatePreviouslyRetreived(artist=artistName, pageUrl=sourceUrl, fqDlPath=filePath, seqNum=indice)
 
 			else:
-				return "Failed", ""
+				self.log.info("%s Exists, skipping..." % filename)
 
-		raise RuntimeError("How did this ever execute? (pagecontent = %s)" % mangaPgCtnt)
 
+
+		self.log.info("Total %s " % len(images))
+		if successed:
+			return "Ignore", None
+
+		else:
+			return "Failed", ""
 
 
 	def _getContentUrlFromPage(self, soupIn):
@@ -369,7 +359,7 @@ class GetPX(plugins.scrapers.ScraperBase.ScraperBase):
 			if mangaContent:
 				link = urllib.parse.urljoin(pgurl, mangaContent['href'])
 				self.log.info("Multipage/Manga link")
-				return self.getManga(artistName, link, dlPathBase, pgurl)
+				return self.getManga(artistName, link, dlPathBase, baseSoup, pgurl)
 
 			singleManga = work_div.find("a", class_='manga')
 			if singleManga:
