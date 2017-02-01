@@ -178,7 +178,8 @@ class GetPX(plugins.scrapers.ScraperBase.ScraperBase):
 		else:
 			itemTitle = ""
 			itemCaption = ""
-
+		if itemCaption is None:
+			itemCaption = ""
 		return itemTitle, itemCaption
 
 
@@ -286,7 +287,7 @@ class GetPX(plugins.scrapers.ScraperBase.ScraperBase):
 		script = scripts.string
 		lines = script.split(";")
 
-		tgtline = None
+		tgtline = ""
 		for line in lines:
 			if "pixiv.context.ugokuIllustFullscreenData" in line and "=" in line:
 				tgtline = line
