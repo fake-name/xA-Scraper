@@ -16,9 +16,6 @@ from settings import settings
 import statusDbManager
 from plugins.PluginBase import PluginBase
 
-import plugins.uploaders.eHentai.eHentaiUl
-
-
 class ScraperBase(PluginBase, metaclass=abc.ABCMeta):
 
 	# Abstract class (must be subclassed)
@@ -333,10 +330,6 @@ class ScraperBase(PluginBase, metaclass=abc.ABCMeta):
 
 		if errored:
 			self.log.warn("Had errors!")
-
-		# ul = plugins.uploaders.eHentai.eHentaiUl.UploadEh()
-		# # ul.syncGalleryIds()
-		# ul.go(ctrlNamespace=ctrlNamespace, ulFilter=[self.settingsDictKey])
 
 		self.statusMgr.updateRunningStatus(self.settingsDictKey, False)
 		runTime = time.time()-startTime

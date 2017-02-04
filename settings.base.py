@@ -34,7 +34,6 @@ settings = {
 	{
 		"username"        : "your_username",
 		"password"        : "your_password",
-		"threads"         : 5,
 		"runInterval"     : 60*60*24*2,
 		"dlDirName"       : "DeviantArt",
 		"shortName"       : "da",
@@ -45,7 +44,6 @@ settings = {
 	{
 		"username"        : "your_username",
 		"password"        : "your_password",
-		"threads"         : 5,
 		"runInterval"     : 60*60*24*3,   # every 72 hours
 		"dlDirName"       : "Fur Affinity",
 		"shortName"       : "fa",
@@ -56,7 +54,6 @@ settings = {
 	{
 		"username"        : "your_username",
 		"password"        : "your_password",
-		"threads"         : 5,
 		"runInterval"     : 60*60*24*2,   # every 36 hours
 		"dlDirName"       : "Hentai Foundry",
 		"shortName"       : "hf",
@@ -67,7 +64,6 @@ settings = {
 	{
 		"username"        : "your_username",
 		"password"        : "your_password",
-		"threads"         : 5,
 		"runInterval"     : 60*60*24*2,
 		"dlDirName"       : "Pixiv",
 		"shortName"       : "px",
@@ -79,7 +75,6 @@ settings = {
 	{
 		"username"        : "your_username",
 		"password"        : "your_password",
-		"threads"         : 5,
 		"runInterval"     : 60*60*24*2,
 		"dlDirName"       : "InkBunny",
 		"shortName"       : "ib",
@@ -91,7 +86,6 @@ settings = {
 	{
 		"username"        : "your_username",
 		"password"        : "your_password",
-		"threads"         : 5,
 		"runInterval"     : 60*60*24*2,
 		"dlDirName"       : "Weasyl",
 		"shortName"       : "wy",
@@ -99,13 +93,21 @@ settings = {
 		'user-url'        : "https://www.weasyl.com/~%s"
 	},
 
+	"as" :  # Artstation
+	{
+		# No password here.
+		"runInterval"     : 60*60*24*2,
+		"dlDirName"       : "ArtStation",
+		"shortName"       : "as",
+
+		'user-url'        : "https://www.artstation.com/artist/%s"
+	},
 
 
-	"sf" :  # InkBunny
+	"sf" :  # SoFurry
 	{
 		"username"        : "your_username",
 		"password"        : "your_password",
-		"threads"         : 5,
 		"runInterval"     : 60*60*24*2,
 		"dlDirName"       : "SoFurry",
 		"shortName"       : "sf",
@@ -123,7 +125,6 @@ settings = {
 		'token'           : 'tumblr_garbage',
 		'token_secret'    : 'tumblr_garbage',
 
-		"threads"         : 5,
 		"runInterval"     : 60*60*24*2,
 		"dlDirName"       : "Tumblr",
 		"shortName"       : "tum",

@@ -23,6 +23,7 @@ import plugins.scrapers.px.pxScrape as pxs
 import plugins.scrapers.wy.wyScrape as wys
 import plugins.scrapers.ib.ibScrape as ibs
 import plugins.scrapers.sf.sfScrape as sfs
+import plugins.scrapers.artstation.asScrape as ass
 import plugins.scrapers.tumblr.tumblrScrape as tus
 
 import wsgi_server
@@ -40,6 +41,7 @@ JOBS = [
 	(ibs.GetIb,     settings["ib"]["runInterval"],   "ib"),
 	(pxs.GetPX,     settings["px"]["runInterval"],   "px"),
 	(sfs.GetSf,     settings["sf"]["runInterval"],   "sf"),
+	(ass.GetAs,     settings["as"]["runInterval"],   "as"),
 	(tus.GetTumblr, settings["tum"]["runInterval"], "tum"),
 ]
 

@@ -55,7 +55,7 @@ Currently, there are some aspects that need work. The artist selection system is
 in the process of converting it from being based on text-files to being stored in the database. Currently, there isn't a clean way to remove artists from the scrape list, though you can add or modify them.
 
 
-## Note: ## 
+## Note:  
 
 **This is my oldest "maintained" project, and the codebase is commensuarately *horrible*.
 Portions of it were designed and written while I was still learning python, so there
