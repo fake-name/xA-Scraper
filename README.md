@@ -39,7 +39,7 @@ to make IP-based connections to the hosting PG instance. The connection informat
 DB name, and client name must be set by copying settings.base.py to settings.py,
 and updating the appropriate strings. 
 
-Settings.py is also where the login information for the various plugins goes.
+`settings.py` is also where the login information for the various plugins goes.
 
 Disabling of select plugins can be accomplished by commenting out the appropriate
 line in `main.py`. The `JOBS` list dictates the various scheduled scraper tasks 
@@ -54,6 +54,17 @@ virtualenv. Additonally, it checks if the virtualenv is present, so once it's cr
 Currently, there are some aspects that need work. The artist selection system is currently a bit broken, as I was
 in the process of converting it from being based on text-files to being stored in the database. Currently, there isn't a clean way to remove artists from the scrape list, though you can add or modify them.
 
+
+## Note: ## 
+
+**This is my oldest "maintained" project, and the codebase is commensuarately *horrible*.
+Portions of it were designed and written while I was still learning python, so there
+are a bunch of really terrible design decisons baked into the class structure, and 
+much of the code just does stupid things.**
+
+Since it works, I haven't been able to muster the energy for a rewrite. The newer
+plugins are much better implemented, though the design constraints still place some
+limits on the structure.
 
 ---
 
