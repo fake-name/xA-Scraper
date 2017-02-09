@@ -30,7 +30,7 @@ import wsgi_server
 
 import cherrypy
 
-import statusDbManager
+import manage.statusDbManager
 
 
 JOBS = [
@@ -125,7 +125,7 @@ def checkInitDbs():
 
 
 def go(managedNamespace):
-	statusMgr = statusDbManager.StatusResource()
+	statusMgr = manage.statusDbManager.StatusResource()
 	managedNamespace.run = True
 	managedNamespace.serverRun = True
 

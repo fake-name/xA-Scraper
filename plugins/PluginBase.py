@@ -12,7 +12,7 @@ import hashlib
 import mimetypes
 mimetypes.init()
 
-import statusDbManager
+import manage.statusDbManager
 
 
 class PluginBase(metaclass=abc.ABCMeta):
@@ -38,7 +38,7 @@ class PluginBase(metaclass=abc.ABCMeta):
 		self.wg = WebGetRobust()
 		self.openDB()
 
-		self.statusMgr = statusDbManager.StatusResource()
+		self.statusMgr = manage.statusDbManager.StatusResource()
 		print("Starting up?")
 
 	def __del__(self):

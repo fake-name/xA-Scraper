@@ -13,7 +13,6 @@ from webFunctions import WebGetRobust
 import abc
 from settings import settings
 
-import statusDbManager
 from plugins.PluginBase import PluginBase
 
 class ScraperBase(PluginBase, metaclass=abc.ABCMeta):
