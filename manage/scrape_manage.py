@@ -40,31 +40,6 @@ PLUGINS = {
 
 }
 
-def cli_help():
-	print(" python3 test-scrape.py <command> [args]")
-	print("Commands:")
-	print("	help")
-	print("		print this message")
-	print("	fetch [sitename]")
-	print("		with no sitename, this executes all plugins in sequence.")
-	print("		With a sitename, executes the named plugin.")
-
-	print("	import <sitename> <filename>")
-	print("		Open a text file <filename>, and import the names from")
-	print("		it into the monitored names database for site <sitename>.")
-	print("		The file <filename> must be a simple text file with")
-	print("		one artist name per-line.")
-	print("		Note that this does not support pixiv names, due to the ")
-	print("		different mechanism used for supporting pixiv namelist")
-	print("		tracking.")
-
-
-
-	print("")
-	print("	Available plugins (sitename -> Human-Readable name):")
-	for key, tup in PLUGINS.items():
-		print("		{} -> {}".format(key.ljust(8), tup[1]))
-
 def do_plugin(plg):
 	instance = plg()
 	instance.go(ctrlNamespace=namespace)
@@ -83,11 +58,6 @@ def do_fetch(args):
 		for plgname in args[1:]:
 			if not plgname in PLUGINS:
 				print("Error! Plugin short-name '%s' is not known!" % plgname)
-				print("Showing help instead.")
-				print("")
-				print("")
-				cli_help()
-				return
 
 		for plgname in args[1:]:
 			plg, dummy_name = PLUGINS[plgname]
