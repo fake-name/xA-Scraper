@@ -24,7 +24,7 @@ import sys
 manager = multiprocessing.managers.SyncManager()
 manager.start()
 namespace = manager.Namespace()
-
+namespace.run = True
 
 
 PLUGINS = {
@@ -45,9 +45,8 @@ def do_plugin(plg):
 	instance.go(ctrlNamespace=namespace)
 
 def do_fetch(args):
-	print("fetch args", args)
-	assert args[0].lower() == 'fetch'
-	if len(args) == 1:
+	print("fetch args", args, type(args))
+	if len(args) == 0:
 		print("Fetching for all sites!")
 		keys = list(PLUGINS.keys())
 		keys.sort()
@@ -55,11 +54,11 @@ def do_fetch(args):
 			plg, dummy_name = PLUGINS[key]
 			do_plugin(plg)
 	else:
-		for plgname in args[1:]:
+		for plgname in args:
 			if not plgname in PLUGINS:
 				print("Error! Plugin short-name '%s' is not known!" % plgname)
 
-		for plgname in args[1:]:
+		for plgname in args:
 			plg, dummy_name = PLUGINS[plgname]
 			do_plugin(plg)
 
@@ -130,40 +129,4 @@ def do_import(sitename, filename):
 		add_name(cur, sitename, name)
 	cur.execute("COMMIT;")
 
-
-
-def go():
-
-	namespace.run=True
-
-	if len(sys.argv) < 2:
-		cli_help()
-		return
-
-	if sys.argv[1].lower() == "fetch":
-		do_fetch(sys.argv[1:])
-	elif sys.argv[1].lower() == "import" and len(sys.argv) == 4:
-		do_import(sys.argv[2], sys.argv[3])
-	else:
-		cli_help()
-
-
-
-	# daGrabber.go([", "])
-
-
-
-def signal_handler(dummy_signal, dummy_frame):
-	if flags.run:
-		flags.run = False
-		namespace.run=False
-		print("Telling threads to stop")
-	else:
-		print("Multiple keyboard interrupts. Raising")
-		raise KeyboardInterrupt
-
-if __name__ == "__main__":
-	signal.signal(signal.SIGINT, signal_handler)
-	logSetup.initLogging()
-	go()
 

@@ -45,7 +45,7 @@ def one_arg_go(command):
 def two_arg_go(command, param):
 
 	if command == "fetch":
-		do_fetch(param)
+		do_fetch([param])
 
 
 def three_arg_go(command, param_1, param_2):
