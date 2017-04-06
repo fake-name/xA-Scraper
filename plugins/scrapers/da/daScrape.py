@@ -19,8 +19,7 @@ class GetDA(plugins.scrapers.ScraperBase.ScraperBase):
 
 	ovwMode = "Check Files"
 
-	numThreads = 8
-
+	numThreads = 4
 
 	# ---------------------------------------------------------------------------------------------------------------------------------------------------------
 	# Cookie Management
@@ -234,7 +233,7 @@ class GetDA(plugins.scrapers.ScraperBase.ScraperBase):
 		return int(div.find("strong").text.replace(',', ''))
 
 	def _getItemsOnPage(self, inSoup):
-		mainSection = inSoup.find('div', attrs={"name" : "gmi-ResourceStream", "id" : "gmi-ResourceStream"})
+		mainSection = inSoup.find('div', attrs={"name" : "gmi-GZone", "id" : "gmi-GZone"})
 		links = mainSection.findAllNext("a", class_="torpedo-thumb-link")
 		ret = set()
 		for link in links:
