@@ -20,7 +20,6 @@ import multiprocessing.managers
 import sys
 
 
-
 manager = multiprocessing.managers.SyncManager()
 manager.start()
 namespace = manager.Namespace()

@@ -18,6 +18,8 @@ def print_help():
 	print("		print this message")
 	print("	'rss-import'")
 	print("		Import tumblr feeds from a ttrss database instance.")
+	print("	'upgrade-db'")
+	print("		Make any needed schema changes to the database, if needed.")
 	print("	fetch [sitename]")
 	print("		with no sitename, this executes all plugins in sequence.")
 	print("		With a sitename, executes the named plugin.")
@@ -41,6 +43,8 @@ def one_arg_go(command):
 		ttrssImport.go()
 	if command == "fetch":
 		do_fetch([])
+	if command == "upgrade-db":
+		statusDbManager.db_upgrade()
 
 def two_arg_go(command, param):
 

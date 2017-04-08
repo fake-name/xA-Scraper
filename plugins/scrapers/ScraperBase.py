@@ -151,6 +151,11 @@ class ScraperBase(PluginBase, metaclass=abc.ABCMeta):
 		cur.execute("commit")
 		self.log.info("DB Updated")
 
+	def _updateLastFetched(self, artist):
+		cur = self.conn.cursor()
+		cur.execute("UPDATE {table_name} SET last_fetched=%s WHERE artistName=%s AND siteName=%s;".format(table_name=settings["dbConf"]["namesDb"]), (time.time(), artist, self.targetShortName))
+		cur.execute("COMMIT;")
+
 
 	# ---------------------------------------------------------------------------------------------------------------------------------------------------------
 	# FS Management
@@ -177,7 +182,7 @@ class ScraperBase(PluginBase, metaclass=abc.ABCMeta):
 
 		cur = self.conn.cursor()
 
-		cur.execute("SELECT artistName FROM %s WHERE siteName=%%s;" % settings["dbConf"]["namesDb"], (settings[self.settingsDictKey]["shortName"], ))
+		cur.execute("SELECT artistName FROM %s WHERE siteName=%%s ORDER BY last_fetched ASC;" % settings["dbConf"]["namesDb"], (settings[self.settingsDictKey]["shortName"], ))
 		links = [link[0] for link in cur.fetchall()]
 		return links
 
@@ -198,8 +203,6 @@ class ScraperBase(PluginBase, metaclass=abc.ABCMeta):
 		try:
 			self.log.info("GetArtist - %s", artist)
 			self.setupDir(artist)
-
-
 
 			totalArt = self._getTotalArtCount(artist)
 			artPages = self._getGalleries(artist)
@@ -268,14 +271,9 @@ class ScraperBase(PluginBase, metaclass=abc.ABCMeta):
 				if ctrlNamespace.run == False:
 					break
 
-
-
-
-
-
-			# self._updatePreviouslyRetreived(artist, tmp)
-
+			self._updateLastFetched(artist)
 			self.log.info("Successfully retreived content for artist %s", artist)
+
 			return False
 		except:
 			self.log.error("Exception when retreiving artist %s", artist)

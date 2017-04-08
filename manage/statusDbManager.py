@@ -7,16 +7,48 @@ import logging
 import psycopg2
 import traceback
 
-class StatusResource(object):
 
-	log = logging.getLogger("Main.StatusMgr")
+class DbInterface(object):
 
 	def __init__(self):
+
+		self.log = logging.getLogger("Main.DbInterface")
 		self.openDB()
 
 	def __del__(self):
 		self.closeDB()
 
+
+	def openDB(self):
+		self.log.info("StatusManager Opening DB...")
+
+		self.conn = psycopg2.connect(
+			database = settings["postgres"]['database'],
+			user     = settings["postgres"]['username'],
+			password = settings["postgres"]['password'],
+			host     = settings["postgres"]['address']
+			)
+
+
+
+	def closeDB(self):
+		self.log.info("Closing DB...",)
+		try:
+			self.conn.close()
+		except:
+			self.log.error("wat")
+			self.log.error(traceback.format_exc())
+		self.log.info("done")
+
+
+class StatusResource(DbInterface):
+
+
+	def __init__(self):
+		super().__init__()
+
+		self.log = logging.getLogger("Main.StatusMgr")
+		self.checkInitStatusDatabase()
 
 	def checkInitStatusDatabase(self):
 
@@ -49,19 +81,6 @@ class StatusResource(object):
 			self.log.info("Status database created")
 
 
-	def openDB(self):
-		self.log.info("StatusManager Opening DB...")
-
-		self.conn = psycopg2.connect(
-			database = settings["postgres"]['database'],
-			user     = settings["postgres"]['username'],
-			password = settings["postgres"]['password'],
-			host     = settings["postgres"]['address']
-			)
-
-
-		# self.log.info("PRAGMA return value = %s", rets)
-		self.checkInitStatusDatabase()
 
 	def updateValue(self, sitename, key, value):
 		cur = self.conn.cursor()
@@ -93,19 +112,44 @@ class StatusResource(object):
 		self.updateValue(name, "isRunning", state)
 
 
+class DbUpgrader(DbInterface):
 
-	def closeDB(self):
-		self.log.info("Closing DB...",)
-		try:
-			self.conn.close()
-		except:
-			self.log.error("wat")
-			self.log.error(traceback.format_exc())
-		self.log.info("done")
+
+	def checkUpgradeR1(self):
+		table_info_query = '''
+			SELECT column_name FROM information_schema.columns
+			WHERE table_name = '{table_name}';
+		'''.format(table_name=settings["dbConf"]["namesDb"])
+
+		cur = self.conn.cursor()
+		cur.execute(table_info_query)
+		dat = cur.fetchall()
+		cols = [tmp[0] for tmp in dat]
+		for col in dat:
+			print(col)
+		print(cols)
+
+		if not 'last_fetched' in cols:
+			print("Need to add column!")
+			cur.execute('''
+					ALTER TABLE
+						{table_name}
+					ADD COLUMN last_fetched double precision default 0;
+				'''.format(table_name=settings["dbConf"]["namesDb"]))
+			cur.execute("COMMIT;")
+
+	def go(self):
+		self.checkUpgradeR1()
+
 
 def go():
 	wat = StatusResource()
 	print(wat)
+
+
+def db_upgrade():
+	d = DbUpgrader()
+	d.go()
 
 if __name__ == "__main__":
 	go()

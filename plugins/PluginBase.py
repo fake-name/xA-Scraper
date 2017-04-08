@@ -183,6 +183,7 @@ class PluginBase(metaclass=abc.ABCMeta):
 												siteName text NOT NULL,
 												artistName text NOT NULL,
 												uploadEh integer default 0,
+												lastFetched double precision default 0,
 												UNIQUE(siteName, artistName))''' % settings["dbConf"]["namesDb"])
 			cur.execute('''CREATE INDEX %s ON %s (siteName, artistName)'''       % ("%s_index" % settings["dbConf"]["namesDb"], settings["dbConf"]["namesDb"]))
 			cur.execute("commit")
