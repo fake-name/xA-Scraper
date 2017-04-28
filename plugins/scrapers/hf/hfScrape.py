@@ -22,7 +22,7 @@ class GetHF(plugins.scrapers.ScraperBase.ScraperBase):
 
 	ovwMode = "Check Files"
 
-	numThreads = 5
+	numThreads = 1
 
 
 
@@ -42,9 +42,9 @@ class GetHF(plugins.scrapers.ScraperBase.ScraperBase):
 
 	def stepThroughEntry(self):
 			self.log.info("Getting Entrance Cookie")
-			ctnt = self.wg.getpage('http://www.hentai-foundry.com/site/login?enterAgree=1&size=1250')
+			ctnt = self.wg.getpage('http://www.hentai-foundry.com/site/login?enterAgree=1&size=728')
 
-			soup = bs4.BeautifulSoup(''.join(ctnt))
+			soup = bs4.BeautifulSoup(''.join(ctnt), 'lxml')
 			hiddenInput = soup.find('input', attrs={"name" : "YII_CSRF_TOKEN"})
 			# print "ctnt = ", ctnt
 
@@ -102,23 +102,30 @@ class GetHF(plugins.scrapers.ScraperBase.ScraperBase):
 		# TODO: Proper page parsing, rather then regexes
 
 
-		contentDiv = soupIn.find('div', attrs={"class" : "box", "id" : "yw0"})			# Image should be in the first <div>
-		boxDiv = contentDiv.findNext("div", attrs={"class" : "boxbody"})
+		contentDiv = soupIn.find('div', attrs={"class" : "container", "id" : "page"})			# Image should be in the first <div>
+		boxDiv = contentDiv.findNext("div", class_="boxbody")
 		imgLink = boxDiv.findNext("img")
 
 
 		if imgLink:
-			try:
-				if imgLink["src"].find("pictures") + 1:			# Content is hosted on the  pictures.hentai-fountry.net subdomain. Therefore, we want the
-					imageURL = imgLink["src"]
-					self.log.info("%s%s" % ("Found Image URL : ", imageURL))
-					return imageURL
-			except:
-				self.log.error("Error:", soupIn)
-				self.log.error(traceback.format_exc())
+			# Content is hosted on the  pictures.hentai-fountry.net subdomain. Therefore, we want to validate that
+			if "//pictures." in imgLink.get("src", ""):
+				imageURL = imgLink["src"]
+				self.log.info("%s%s" % ("Found Image URL : ", imageURL))
+				return imageURL
+
+			if "//pictures." in imgLink.get("onclick", ""):
+				# This is untested. I'm not sure how the decision making for
+				# whether to serve the resized image works, and I can't seem to get
+				# it to serve the smaller images to my script.
+				onclick = imgLink.get("onclick", "")
+				extractre = re.compile(r"this\.src=\'(//pictures\..*?)\';", re.IGNORECASE)
+				res = extractre.search(onclick)
+				if res:
+					return res.group(1)
 
 
-		flashContent = boxDiv.findNext("div", attrs={"id" : "flash"})
+		flashContent = boxDiv.findNext("param", attrs={"name" : "movie"})
 		if flashContent:
 			imageURL = flashContent.findNext("embed")["src"]
 			self.log.info("%s%s" % ("Found Flash URL : ", imageURL))
@@ -158,22 +165,36 @@ class GetHF(plugins.scrapers.ScraperBase.ScraperBase):
 
 		return False
 
-	def _extractTitleDescription(self, soupin):
+	def _extractTitleDescription(self, soup):
 
-		infoContainer = soupin.find("div", class_="container", id="page")
-		if infoContainer:
-			itemTitle = infoContainer.find("span", class_="imageTitle")
-			if itemTitle:
-				itemTitle = itemTitle.get_text()
-			captionContainer = infoContainer.find("div", id="yw1")
-			if captionContainer:
-				itemCaption = captionContainer.find("div", class_="boxbody")
-				if itemCaption:
-					itemCaption = str(itemCaption.extract())
-		else:
-			itemTitle = ""
-			itemCaption = ""
+		itemTitle = ""
+		itemCaption = ""
 
+		itemTitle = soup.find("span", class_="imageTitle")
+		itemTitle = itemTitle.get_text()
+
+		itemCaptionDiv = soup.find("div", class_="picDescript")
+		itemCaption = itemCaptionDiv.extract()
+
+		# Horrible hack using ** to work around the fact that 'class' is a reserved keyword
+		tagDiv = soup.new_tag('div', **{'class' : 'tags'})
+
+		tagHeader = soup.new_tag('b')
+		tagHeader.append('Tags:')
+		tagDiv.append(tagHeader)
+
+		tags = soup.find('div', id='submission_tags')
+		tags = [tag.get_text().strip() for tag in soup.find_all('a', rel='tag')]
+		tags = set(tags)
+		self.log.info("Image tags: %s", list(tags))
+		for tag in tags:
+			new = soup.new_tag('div', **{'class' : 'tag'})
+			new.append(tag)
+			tagDiv.append(new)
+
+		itemCaption.append(tagDiv)
+
+		itemCaption = itemCaption.prettify()
 		return itemTitle, itemCaption
 
 	def _getArtPage(self, dlPathBase, artPageUrl, artistName):
@@ -187,7 +208,7 @@ class GetHF(plugins.scrapers.ScraperBase.ScraperBase):
 
 
 		imageURL = self._getContentUrlFromPage(pgSoup)
-		itemTitle, itemCaption = self._extractTitleDescription(pgSoup)
+		imgTitle, itemCaption = self._extractTitleDescription(pgSoup)
 
 		if not imageURL:
 			self.log.error("OH NOES!!! No image on page = " + artPageUrl)
@@ -195,7 +216,7 @@ class GetHF(plugins.scrapers.ScraperBase.ScraperBase):
 
 
 
-		if not "http" in imageURL:
+		if "http" not in imageURL.lower():
 			imageURL =  urllib.parse.urljoin("http://hentai-foundry.com", imageURL)
 
 		fTypeRegx	= re.compile(r"http://.+?\.com.*/.*?\.")
@@ -205,17 +226,6 @@ class GetHF(plugins.scrapers.ScraperBase.ScraperBase):
 
 		if ftype == imageURL:								# If someone forgot the filename it may not be a .jpg, but it's likely any image viewer can figure out what it is.
 			fname += ".jpg"
-
-
-		contentDiv = pgSoup.find('div', attrs={"class" : "box", "id" : "yw0"})			# Image should be in the first <div>
-
-		imgTitleContainer = contentDiv.findNext("span", class_="imageTitle")
-		imgTitle = None
-
-		if imgTitleContainer.contents:
-			imgTitle = imgTitleContainer.contents[0]
-		else:
-			self.log.info("No Title for Image!")
 
 
 		if imgTitle != None:
@@ -231,7 +241,7 @@ class GetHF(plugins.scrapers.ScraperBase.ScraperBase):
 
 		if self._checkFileExists(filePath):
 			self.log.info("Exists, skipping...")
-			return "Exists", filePath, itemCaption, itemTitle
+			return "Exists", filePath, itemCaption, imgTitle
 		else:
 			imgdat = self.wg.getpage(imageURL)							# Request Image
 
@@ -269,7 +279,7 @@ class GetHF(plugins.scrapers.ScraperBase.ScraperBase):
 
 
 			self.log.info("Successfully got: %s" % imageURL)
-			return "Succeeded", filePath, itemCaption, itemTitle
+			return "Succeeded", filePath, itemCaption, imgTitle
 
 		raise RuntimeError("How did this ever execute?")
 
@@ -294,7 +304,7 @@ class GetHF(plugins.scrapers.ScraperBase.ScraperBase):
 
 		links = set()
 
-		imageLinks = inSoup.find_all('img', class_="thumb")
+		imageLinks = inSoup.find_all('span', class_="thumb")
 
 		for imageLink in imageLinks:
 
@@ -331,7 +341,7 @@ class GetHF(plugins.scrapers.ScraperBase.ScraperBase):
 
 				self.log.info("Getting = " + turl)
 				pageSoup = self.wg.getSoup(turl)
-				if pageSoup == False:
+				if pageSoup is False:
 					self.log.error("Cannot get Page")
 					return "Failed"
 
@@ -347,4 +357,16 @@ class GetHF(plugins.scrapers.ScraperBase.ScraperBase):
 		return artlinks
 
 
+
+if __name__ == '__main__':
+
+	import logSetup
+	logSetup.initLogging()
+
+	ins = GetHF()
+	ins.getCookie()
+	print(ins)
+	print("Instance: ", ins)
+	# dlPathBase, artPageUrl, artistName
+	ins._getArtPage("xxxx", 'xxxx', 'testtt')
 
