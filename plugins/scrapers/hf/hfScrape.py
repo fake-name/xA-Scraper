@@ -22,7 +22,7 @@ class GetHF(plugins.scrapers.ScraperBase.ScraperBase):
 
 	ovwMode = "Check Files"
 
-	numThreads = 1
+	numThreads = 2
 
 
 
