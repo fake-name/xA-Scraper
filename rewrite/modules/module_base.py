@@ -1,160 +1,79 @@
-import sys
-import time
-import traceback
-import queue
-import datetime
 
-import bsonrpc.exceptions
 import os
+import os.path
+import logging
+from settings import settings
+from webFunctions import WebGetRobust
+import threading
+import abc
 
-# import common.database as db
-from rewrite import log_base
-from rewrite import get_rpc_interface
+import rewrite.status_monitor
+import rewrite.database
 
+class ModuleBase(metaclass=abc.ABCMeta):
 
-########################################################################################################################
-#
-#	##     ##    ###    #### ##    ##     ######  ##          ###     ######   ######
-#	###   ###   ## ##    ##  ###   ##    ##    ## ##         ## ##   ##    ## ##    ##
-#	#### ####  ##   ##   ##  ####  ##    ##       ##        ##   ##  ##       ##
-#	## ### ## ##     ##  ##  ## ## ##    ##       ##       ##     ##  ######   ######
-#	##     ## #########  ##  ##  ####    ##       ##       #########       ##       ##
-#	##     ## ##     ##  ##  ##   ###    ##    ## ##       ##     ## ##    ## ##    ##
-#	##     ## ##     ## #### ##    ##     ######  ######## ##     ##  ######   ######
-#
-########################################################################################################################
+	# Abstract class (must be subclassed)
+	__metaclass__ = abc.ABCMeta
 
 
 
-
-def buildjob(
-			module,
-			call,
-			dispatchKey,
-			jobid,
-			args           = [],
-			kwargs         = {},
-			additionalData = None,
-			postDelay      = 0,
-			extra_keys     = {},
-			unique_id      = None,
-		):
-
-	job = {
-			'call'         : call,
-			'module'       : module,
-			'args'         : args,
-			'kwargs'       : kwargs,
-			'extradat'     : additionalData,
-			'jobid'        : jobid,
-			'dispatch_key' : dispatchKey,
-			'postDelay'    : postDelay,
-		}
-	if unique_id is not None:
-		job['unique_id'] = unique_id
-	return job
+	@abc.abstractmethod
+	def pluginName(self):
+		return None
 
 
 
-class RpcPluginBase(log_base.LoggerMixin):
+	def __init__(self):
+		print("Starting up")
+		self.loggers = {}
+		self.lastLoggerIndex = 1
 
 
-	def __init__(self, job_queue, run_flag):
-		super().__init__()
+		self.log = logging.getLogger("Main.%s" % self.pluginName)
+		self.wg = WebGetRobust()
+
+		self.status_mgr = rewrite.status_monitor.StatusResource()
+		self.db = rewrite.database
+
+		print("Starting up?")
+
+	def __del__(self):
+		self.log.info("Unoading %s" % self.pluginName)
 
 
-	def put_outbound_job(self, jobid, joburl):
-		self.active_jobs += 1
-		self.log.info("Dispatching new job")
-		raw_job = buildjob(
-			module         = 'WebRequest',
-			call           = 'getItem',
-			dispatchKey    = "fetcher",
-			jobid          = jobid,
-			args           = [joburl],
-			kwargs         = {},
-			additionalData = {'mode' : 'fetch'},
-			postDelay      = 0
-		)
+	# ---------------------------------------------------------------------------------------------------------------------------------------------------------
+	# Messy hack to do log indirection so I can inject thread info into log statements, and give each thread it's own DB handle
+	# (sqlite handles can't be shared between threads).
+	# ---------------------------------------------------------------------------------------------------------------------------------------------------------
 
-		# Recycle the rpc interface if it ded
-		errors = 0
-		while 1:
-			try:
-				self.rpc_interface.put_job(raw_job)
-				return
-			except TypeError:
-				self.check_open_rpc_interface()
-			except KeyError:
-				self.check_open_rpc_interface()
-			except bsonrpc.exceptions.BsonRpcError as e:
-				errors += 1
-				self.check_open_rpc_interface()
-				if errors > 3:
-					raise e
-				else:
-					self.log.warning("Exception in RPC request:")
-					for line in traceback.format_exc().split("\n"):
-						self.log.warning(line)
+	def __getattribute__(self, name):
+
+		threadName = threading.current_thread().name
+		if name == "log" and "Thread-" in threadName:
+			if threadName not in self.loggers:
+				self.loggers[threadName] = logging.getLogger("Main.%s.Thread-%d" % (self.pluginName, self.lastLoggerIndex))
+				self.lastLoggerIndex += 1
+			return self.loggers[threadName]
+
+		else:
+			return object.__getattribute__(self, name)
 
 
 
-	def process_responses(self):
-		while 1:
+	# ---------------------------------------------------------------------------------------------------------------------------------------------------------
+	# FS Management
+	# ---------------------------------------------------------------------------------------------------------------------------------------------------------
 
-			# Something in the RPC stuff is resulting in a typeerror I don't quite
-			# understand the source of. anyways, if that happens, just reset the RPC interface.
-			try:
-				tmp = self.rpc_interface.get_job()
-			except queue.Empty:
-				return
+	def getDownloadPath(self, siteSource, artist):
+		return os.path.join(settings["dldCtntPath"], siteSource, artist)
 
-			except TypeError:
-				self.check_open_rpc_interface()
-				return
-			except KeyError:
-				self.check_open_rpc_interface()
-				return
+	def _checkFileExists(self, filePath):
+		# Return true if file exists
+		# false if it does not
+		# eventually will allow overwriting on command
 
-			except bsonrpc.exceptions.ResponseTimeout:
-				self.check_open_rpc_interface()
-				return
+		if os.path.exists(filePath):
+			if os.path.getsize(filePath) > 100:
+				return True
+		return False
 
-
-			if tmp:
-				self.active_jobs -= 1
-				self.jobs_in += 1
-				if self.active_jobs < 0:
-					self.active_jobs = 0
-				self.log.info("Job response received. Jobs in-flight: %s (qsize: %s)", self.active_jobs, self.normal_out_queue.qsize())
-				self.last_rx = datetime.datetime.now()
-
-				self.__blocking_put(tmp)
-			else:
-				self.print_mod += 1
-				if self.print_mod > 20:
-					self.log.info("No job responses available.")
-					self.print_mod = 0
-				time.sleep(1)
-				break
-
-	def check_open_rpc_interface(self):
-		if not hasattr(self, "rpc_interface"):
-			self.rpc_interface = get_rpc_interface.RemoteJobInterface("RPC-Fetcher")
-		try:
-			if self.rpc_interface.check_ok():
-				return
-
-
-		except Exception:
-			self.log.error("Failure when probing RPC interface")
-			for line in traceback.format_exc().split("\n"):
-				self.log.error(line)
-			try:
-				self.rpc_interface.close()
-				self.log.info("Closed interface due to connection exception.")
-			except Exception:
-				self.log.error("Failure when closing errored RPC interface")
-				for line in traceback.format_exc().split("\n"):
-					self.log.error(line)
-			self.rpc_interface = get_rpc_interface.RemoteJobInterface("RPC-Fetcher")
