@@ -89,7 +89,7 @@ def release_session(session):
 	print("Returning db handle to pool. Handles available: %s" % (POOL.qsize(), ))
 
 @contextlib.contextmanager
-def context_session():
+def context_sess():
 	sess = checkout_session()
 	try:
 		yield sess

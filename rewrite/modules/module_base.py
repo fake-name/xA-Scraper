@@ -9,13 +9,14 @@ import abc
 
 import rewrite.status_monitor
 import rewrite.database
+import rewrite.status_monitor
 
-class ModuleBase(metaclass=abc.ABCMeta):
+class ModuleBase(rewrite.status_monitor.StatusMixin, metaclass=abc.ABCMeta):
 
 	# Abstract class (must be subclassed)
 	__metaclass__ = abc.ABCMeta
 
-
+	db = rewrite.database
 
 	@abc.abstractmethod
 	def pluginName(self):
@@ -32,10 +33,11 @@ class ModuleBase(metaclass=abc.ABCMeta):
 		self.log = logging.getLogger("Main.%s" % self.pluginName)
 		self.wg = WebGetRobust()
 
-		self.status_mgr = rewrite.status_monitor.StatusResource()
-		self.db = rewrite.database
+
 
 		print("Starting up?")
+
+		super().__init__()
 
 	def __del__(self):
 		self.log.info("Unoading %s" % self.pluginName)
@@ -57,7 +59,6 @@ class ModuleBase(metaclass=abc.ABCMeta):
 
 		else:
 			return object.__getattribute__(self, name)
-
 
 
 	# ---------------------------------------------------------------------------------------------------------------------------------------------------------

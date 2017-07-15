@@ -1,103 +1,54 @@
 
-#pylint: disable-msg=F0401, W0142
-
-from settings import settings
 
 import logging
-import psycopg2
-import traceback
+import rewrite.database
+import abc
+
+class StatusMixin(metaclass=abc.ABCMeta):
+
+	# Abstract class (must be subclassed)
+	__metaclass__ = abc.ABCMeta
 
 
-class DbInterface(object):
+	@abc.abstractmethod
+	def pluginName(self):
+		return None
 
-	def __init__(self):
-
-		self.log = logging.getLogger("Main.DbInterface")
-		self.openDB()
-
-	def __del__(self):
-		self.closeDB()
-
-
-	def openDB(self):
-		self.log.info("StatusManager Opening DB...")
-
-		self.conn = psycopg2.connect(
-			database = settings["postgres"]['database'],
-			user     = settings["postgres"]['username'],
-			password = settings["postgres"]['password'],
-			host     = settings["postgres"]['address']
-			)
-
-
-
-	def closeDB(self):
-		self.log.info("Closing DB...",)
-		try:
-			self.conn.close()
-		except:
-			self.log.error("wat")
-			self.log.error(traceback.format_exc())
-		self.log.info("done")
-
-
-class StatusResource(DbInterface):
+	@abc.abstractmethod
+	def db(self):
+		return None
 
 
 	def __init__(self):
 		super().__init__()
 
-		self.log = logging.getLogger("Main.StatusMgr")
-		self.checkInitStatusDatabase()
-
-	def checkInitStatusDatabase(self):
-
-		cur = self.conn.cursor()
-		ret = cur.execute('''
-				SELECT table_name
-				FROM information_schema.tables
-				WHERE table_schema='public'
-				ORDER BY table_schema,table_name;
-			''')
-
-		rets = cur.fetchall()
-		tables = [item for sublist in rets for item in sublist]
-		print("rets:", rets)
-		print("tables:", tables)
-
-		if not rets or not "statusdb" in tables:   # If the DB doesn't exist, set it up.
-			cur = self.conn.cursor()
-			self.log.info("Need to setup initial suceeded page database....")
-			cur.execute('''CREATE TABLE statusdb (
-												id          serial primary key,
-												siteName    text NOT NULL,
-												sectionName text NOT NULL,
-												statusText  text,
-												UNIQUE(siteName, sectionName))''')
-
-			cur.execute('''CREATE INDEX statusDb_site_section_index ON statusdb (siteName, sectionName)''')
-
-			cur.execute("commit")
-			self.log.info("Status database created")
-
+		self.log = logging.getLogger("Main.%s.StatusMgr" % self.pluginName)
 
 
 	def updateValue(self, sitename, key, value):
-		cur = self.conn.cursor()
-		cur.execute("""SELECT id FROM statusdb WHERE sitename=%s AND sectionName=%s;""", (sitename, key))
-		ret = cur.fetchone()
 
-		# print((sitename, key, value, ret))
-		if ret and len(ret) > 0:
-			dbid = ret[0]
-		else:
-			dbid = None
+		with self.db.context_sess() as sess:
+			row = sess.query(self.db.ScraperStatus)                  \
+				.filter(self.db.ScraperStatus.site_name == sitename) \
+				.scalar()
 
-		if dbid:
-			cur.execute("""UPDATE statusdb SET statusText=%s WHERE id=%s""", (str(value), dbid))
-		else:
-			cur.execute('''INSERT INTO statusdb (siteName, sectionName, statusText) VALUES (%s, %s, %s);''', (sitename, key, value))
-		cur.execute("COMMIT;")
+			if not row:
+				row = self.db.ScraperStatus(site_name=sitename)
+				sess.add(row)
+
+			if key == 'nextRun':
+				row.next_run = value
+			elif key == 'prevRun':
+				row.prev_run = value
+			elif key == 'prevRunTime':
+				row.prev_run_time = value
+			elif key == 'isRunning':
+				row.is_running = value
+			else:
+				self.log.error("Unknown key to update: '%s' -> '%s'", key, value)
+
+			sess.commit()
+
 
 	def updateNextRunTime(self, name, timestamp):
 		self.updateValue(name, "nextRun", timestamp)
@@ -111,45 +62,3 @@ class StatusResource(DbInterface):
 	def updateRunningStatus(self, name, state):
 		self.updateValue(name, "isRunning", state)
 
-
-class DbUpgrader(DbInterface):
-
-
-	def checkUpgradeR1(self):
-		table_info_query = '''
-			SELECT column_name FROM information_schema.columns
-			WHERE table_name = '{table_name}';
-		'''.format(table_name=settings["dbConf"]["namesDb"])
-
-		cur = self.conn.cursor()
-		cur.execute(table_info_query)
-		dat = cur.fetchall()
-		cols = [tmp[0] for tmp in dat]
-		for col in dat:
-			print(col)
-		print(cols)
-
-		if not 'last_fetched' in cols:
-			print("Need to add column!")
-			cur.execute('''
-					ALTER TABLE
-						{table_name}
-					ADD COLUMN last_fetched double precision default 0;
-				'''.format(table_name=settings["dbConf"]["namesDb"]))
-			cur.execute("COMMIT;")
-
-	def go(self):
-		self.checkUpgradeR1()
-
-
-def go():
-	wat = StatusResource()
-	print(wat)
-
-
-def db_upgrade():
-	d = DbUpgrader()
-	d.go()
-
-if __name__ == "__main__":
-	go()
