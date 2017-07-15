@@ -87,7 +87,7 @@ class GetPX(rewrite.modules.scraper_base.ScraperBase):
 
 		scripts = soup.find_all("script", text=re.compile(r"pixiv\.context\.originalImages\["))
 		if not scripts:
-			return "Failed", ""
+			return self.build_page_ret(status="Failed", fqDlPath=None)
 
 		images = []
 		img_idx = 1
@@ -105,7 +105,7 @@ class GetPX(rewrite.modules.scraper_base.ScraperBase):
 		self.log.info("Found %s page manga!" % len(images))
 		if len(images) < 1:
 			self.log.error("No Images on page?")
-			return "Failed", ""
+			return self.build_page_ret(status="Failed", fqDlPath=None)
 
 
 		for indice, link in images:
@@ -155,7 +155,7 @@ class GetPX(rewrite.modules.scraper_base.ScraperBase):
 			return "Ignore", None
 
 		else:
-			return "Failed", ""
+			return self.build_page_ret(status="Failed", fqDlPath=None)
 
 
 	def _getContentUrlFromPage(self, soupIn):
@@ -206,7 +206,7 @@ class GetPX(rewrite.modules.scraper_base.ScraperBase):
 
 			if imgdath == "Failed":
 				self.log.info("cannot get image")
-				return "Failed", ""
+				return self.build_page_ret(status="Failed", fqDlPath=None)
 			self.log.info("Successfully got: " + fname)
 			# print fname
 			try:
@@ -217,14 +217,14 @@ class GetPX(rewrite.modules.scraper_base.ScraperBase):
 				self.log.critical(traceback.print_exc())
 				self.log.critical("cannot save image")
 
-				return "Failed", ""
+				return self.build_page_ret(status="Failed", fqDlPath=None)
 
 			self.log.info("Successfully got: " + imgurl)
 			self.log.info("Saved to path: " + filePath)
-			return "Succeeded", filePath, itemCaption, itemTitle
+			return self.build_page_ret(status="Succeeded", fqDlPath=filePath, pageDesc=itemCaption, pageTitle=itemTitle)
 		else:
 			self.log.info("Exists, skipping... (path = %s)", filePath)
-			return "Exists", filePath, itemCaption, itemTitle
+			return self.build_page_ret(status="Exists", fqDlPath=filePath, pageDesc=itemCaption, pageTitle=itemTitle)
 
 	def _getSinglePageManga(self, dlPathBase, imageTag, baseSoup, artPageUrl):
 		imgurl   = imageTag['href']
@@ -235,7 +235,7 @@ class GetPX(rewrite.modules.scraper_base.ScraperBase):
 		imgpage = self.wg.getSoup(imgurl, addlHeaders={'Referer': artPageUrl})
 
 		if not imgpage.img:
-			return "Failed", ""
+			return self.build_page_ret(status="Failed", fqDlPath=None)
 
 		imgref = imgurl
 		imgurl = imgpage.img['src']
@@ -257,7 +257,7 @@ class GetPX(rewrite.modules.scraper_base.ScraperBase):
 
 			if imgdath == "Failed":
 				self.log.info("cannot get image")
-				return "Failed", ""
+				return self.build_page_ret(status="Failed", fqDlPath=None)
 			self.log.info("Successfully got: " + fname)
 			# print fname
 			try:
@@ -268,21 +268,21 @@ class GetPX(rewrite.modules.scraper_base.ScraperBase):
 				self.log.critical(traceback.print_exc())
 				self.log.critical("cannot save image")
 
-				return "Failed", ""
+				return self.build_page_ret(status="Failed", fqDlPath=None)
 
 			self.log.info("Successfully got: " + imgurl)
 			self.log.info("Saved to path: " + filePath)
-			return "Succeeded", filePath, itemCaption, itemTitle
+			return self.build_page_ret(status="Succeeded", fqDlPath=filePath, pageDesc=itemCaption, pageTitle=itemTitle)
 		else:
 			self.log.info("Exists, skipping... (path = %s)", filePath)
-			return "Exists", filePath, itemCaption, itemTitle
+			return self.build_page_ret(status="Exists", fqDlPath=filePath, pageDesc=itemCaption, pageTitle=itemTitle)
 
 	def _getAnimation(self, dlPathBase, imageTag, soup, artPageUrl):
 		itemTitle, itemCaption = self._extractTitleDescription(soup)
 
 		scripts = soup.find("script", text=re.compile("ugokuIllustFullscreenData"))
 		if not scripts:
-			return "Failed", ""
+			return self.build_page_ret(status="Failed", fqDlPath=None)
 
 		script = scripts.string
 		lines = script.split(";")
@@ -293,13 +293,13 @@ class GetPX(rewrite.modules.scraper_base.ScraperBase):
 				tgtline = line
 
 		if not tgtline:
-			return "Failed", ""
+			return self.build_page_ret(status="Failed", fqDlPath=None)
 
 		dat = json.loads(tgtline.split("=")[-1])
 		itemCaption += "\n\n<pre>" + tgtline + "</pre>"
 
 		if not 'src' in dat:
-			return "Failed", ""
+			return self.build_page_ret(status="Failed", fqDlPath=None)
 
 		ctntsrc = dat['src']
 
@@ -318,7 +318,7 @@ class GetPX(rewrite.modules.scraper_base.ScraperBase):
 
 			if imgdath == "Failed":
 				self.log.info("cannot get image")
-				return "Failed", ""
+				return self.build_page_ret(status="Failed", fqDlPath=None)
 			self.log.info("Successfully got: " + fname)
 			# print fname
 			try:
@@ -329,14 +329,14 @@ class GetPX(rewrite.modules.scraper_base.ScraperBase):
 				self.log.critical(traceback.print_exc())
 				self.log.critical("cannot save image")
 
-				return "Failed", ""
+				return self.build_page_ret(status="Failed", fqDlPath=None)
 
 			self.log.info("Successfully got: " + ctntsrc)
 			self.log.info("Saved to path: " + filePath)
-			return "Succeeded", filePath, itemCaption, itemTitle
+			return self.build_page_ret(status="Succeeded", fqDlPath=filePath, pageDesc=itemCaption, pageTitle=itemTitle)
 		else:
 			self.log.info("Exists, skipping... (path = %s)", filePath)
-			return "Exists", filePath, itemCaption, itemTitle
+			return self.build_page_ret(status="Exists", fqDlPath=filePath, pageDesc=itemCaption, pageTitle=itemTitle)
 
 
 	def _getArtPage(self, dlPathBase, pgurl, artistName):

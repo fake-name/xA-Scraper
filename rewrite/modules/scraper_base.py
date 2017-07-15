@@ -4,11 +4,9 @@ import os.path
 import traceback
 import concurrent.futures
 import datetime
-import threading
-import datetime
-import time
 import urllib.error
 import abc
+import sqlalchemy.exc
 from settings import settings
 
 from rewrite.modules import module_base
@@ -34,8 +32,6 @@ class ScraperBase(module_base.ModuleBase, metaclass=abc.ABCMeta):
 	ovwMode = "Check Files"
 
 	numThreads = 5
-
-
 
 	# ---------------------------------------------------------------------------------------------------------------------------------------------------------
 	# Cookie Management
@@ -77,6 +73,32 @@ class ScraperBase(module_base.ModuleBase, metaclass=abc.ABCMeta):
 		pass
 
 	# ---------------------------------------------------------------------------------------------------------------------------------------------------------
+	# Utility
+	# ---------------------------------------------------------------------------------------------------------------------------------------------------------
+
+
+	def build_page_ret(self, status, fqDlPath, pageDesc=None, pageTitle=None, postTime=None, postTags=None):
+
+		assert isinstance(fqDlPath, (list, type(None))), "Wat? Item: %s, type: %s" % (fqDlPath, type(fqDlPath))
+		assert status in ['Succeeded', 'Exists', 'Ignore', 'Failed']
+
+		if fqDlPath:
+			fqDlPath = [os.path.abspath(tmp) for tmp in fqDlPath if tmp]
+			fqDlPath = [os.path.relpath(tmp, settings["dldCtntPath"]) for tmp in fqDlPath if tmp]
+
+
+		ret = {
+			'status'     : status,
+			'dl_path'    : fqDlPath,
+			'page_desc'  : pageDesc,
+			'page_title' : pageTitle,
+			'post_time'  : postTime,
+			'post_tags'  : set(postTags) if postTags else [],
+		}
+		return ret
+
+
+	# ---------------------------------------------------------------------------------------------------------------------------------------------------------
 	# DB Management
 	# ---------------------------------------------------------------------------------------------------------------------------------------------------------
 
@@ -101,7 +123,7 @@ class ScraperBase(module_base.ModuleBase, metaclass=abc.ABCMeta):
 			return set([item for sublist in res for item in sublist])
 
 	# Insert recently retreived items into the database
-	def _updatePreviouslyRetreived(self, artist, pageUrl, fqDlPath, pageDesc="", pageTitle="", seqNum=0, filename=None):
+	def _updatePreviouslyRetreived(self, artist, pageUrl, fqDlPath, pageDesc, pageTitle, seqNum, filename=None, addTime=None, postTags=[]):
 		# Sqlite requires all arguments be at least tuples containing string.
 		# Respin our list into a list of 1-tuples
 
@@ -116,46 +138,68 @@ class ScraperBase(module_base.ModuleBase, metaclass=abc.ABCMeta):
 
 		aid = self._artist_name_to_rid(artist)
 
-
 		with self.db.context_sess() as sess:
+			for _ in range(5):
+				try:
+					row = sess.query(self.db.ArtItem) \
+						.filter(self.db.ArtItem.artist_id == aid) \
+						.filter(self.db.ArtItem.release_meta == pageUrl) \
+						.scalar()
+					if not row:
+						row = self.db.ArtItem(
+								state        = 'complete',
+								artist_id    = aid,
+								release_meta = pageUrl,
+								fetchtime    = datetime.datetime.now(),
+								addtime      = datetime.datetime.now() if addTime is None else addTime,
+								title        = pageTitle,
+								content      = pageDesc,
+							)
+						sess.add(row)
+						sess.flush()
 
-			row = sess.query(self.db.ArtItem) \
-				.filter(self.db.ArtItem.artist_id == aid) \
-				.filter(self.db.ArtItem.release_meta == pageUrl) \
-				.scalar()
-			if not row:
-				row = self.db.ArtItem(
-						state        = 'complete',
-						artist_id    = aid,
-						release_meta = pageUrl,
-						fetchtime    = datetime.datetime.now(),
-						addtime      = datetime.datetime.now(),
-						title        = pageTitle,
-						content      = pageDesc,
-					)
-				sess.add(row)
-				sess.flush()
+					frow = sess.query(self.db.ArtFile) \
+						.filter(self.db.ArtFile.item_id == row.id) \
+						.filter(self.db.ArtFile.seqnum == seqNum) \
+						.scalar()
 
-			frow = sess.query(self.db.ArtFile) \
-				.filter(self.db.ArtFile.item_id == row.id) \
-				.filter(self.db.ArtFile.seqnum == seqNum) \
-				.scalar()
+					if frow:
+						if frow.fspath != fqDlPath:
+							self.log.error("Item already exists, but download path is changing?")
+							self.log.error("Old path: '%s'", frow.fspath)
+							self.log.error("New path: '%s'", fqDlPath)
+							frow.fspath = fqDlPath
+					else:
+						frow = self.db.ArtFile(
+								item_id  = row.id,
+								seqnum   = seqNum,
+								filename = filename,
+								fspath   = fqDlPath,
+							)
+						sess.add(frow)
 
-			if frow:
-				if frow.fspath != fqDlPath:
-					self.log.error("Item already exists, but download path is changing?")
-					self.log.error("Old path: '%s'", frow.fspath)
-					self.log.error("New path: '%s'", fqDlPath)
-			else:
-				frow = self.db.ArtFile(
-						item_id  = row.id,
-						seqnum   = seqNum,
-						filename = filename,
-						fspath   = fqDlPath,
-					)
-				sess.add(frow)
+					for tag in postTags:
+						trow = sess.query(self.db.ArtTags) \
+							.filter(self.db.ArtTags.item_id == row.id) \
+							.filter(self.db.ArtTags.tag == tag) \
+							.scalar()
+						if not trow:
+							tnew = self.db.ArtTags(item_id=row.id, tag=tag)
+							sess.add(tnew)
 
-			sess.commit()
+					sess.commit()
+
+				except sqlalchemy.exc.InvalidRequestError:
+					print("InvalidRequest error!")
+					sess.rollback()
+					traceback.print_exc()
+				except sqlalchemy.exc.OperationalError:
+					print("InvalidRequest error!")
+					sess.rollback()
+				except sqlalchemy.exc.IntegrityError:
+					print("Integrity error!")
+					traceback.print_exc()
+					sess.rollback()
 
 
 	def _checkHaveUrl(self, artist, url):
@@ -194,23 +238,6 @@ class ScraperBase(module_base.ModuleBase, metaclass=abc.ABCMeta):
 				sess.add(row)
 				sess.commit()
 
-
-
-		# Sqlite requires all arguments be at least tuples containing string.
-		# Respin our list into a list of 1-tuples
-		# self.log.error("Inserting errored page %s for artist %s into %s", errUrl, artist, settings["dbConf"]["erroredPagesDb"])
-
-		# cur = self.conn.cursor()
-
-		# cur.execute("SELECT id FROM %s WHERE sitename=%%s AND artistname=%%s AND pageurl=%%s;" % settings["dbConf"]["erroredPagesDb"], (self.targetShortName, artist, errUrl))
-		# have = cur.fetchone()
-		# if have and have[0]:
-		# 	cur.execute("UPDATE %s SET retreivalTime=%%s WHERE id=%%s;" % settings["dbConf"]["erroredPagesDb"], (time.time(), have[0]))
-		# else:
-		# 	cur.execute("INSERT INTO %s (siteName, artistName, pageUrl, retreivalTime) VALUES (%%s, %%s, %%s, %%s);" % settings["dbConf"]["erroredPagesDb"], (self.targetShortName, artist, errUrl, time.time()))
-		# # dummy_rets = cur.fetchall()
-		# cur.execute("commit")
-		# self.log.info("DB Updated")
 
 	def _updateLastFetched(self, artist):
 
@@ -260,53 +287,77 @@ class ScraperBase(module_base.ModuleBase, metaclass=abc.ABCMeta):
 	# Threading and task management
 	# ---------------------------------------------------------------------------------------------------------------------------------------------------------
 
+	def _load_art(self, artist):
+
+		totalArt = self._getTotalArtCount(artist)
+		artPages = self._getGalleries(artist)
+
+		if totalArt is None:
+			self.log.info("Site does not support total art counts. Found total gallery items %s", len(artPages))
+		elif totalArt > len(artPages):
+			self.log.warning("May be missing art? Total claimed art items from front-page = %s, total gallery items %s", totalArt, len(artPages))
+		elif totalArt < len(artPages):
+			self.log.warning("Too many art pages found? Total claimed art items from front-page = %s, total gallery items %s.", totalArt, len(artPages))
+		else:
+			self.log.info("Total claimed art items from front-page = %s, total gallery items %s", totalArt, len(artPages))
+
+		oldArt = self._getPreviouslyRetreived(artist)
+		newArt = artPages - oldArt
+		self.log.info("Old art items = %s, newItems = %s", len(oldArt), len(newArt))
+
+		force_recheck_all = True
+		if force_recheck_all:
+			newArt = artPages
+
+		return newArt
+
 	def getArtist(self, artist, ctrlNamespace):
-		if ctrlNamespace.run == False:
+		if ctrlNamespace.run is False:
 			self.log.warning("Exiting early from %s due to run flag being unset", artist)
 			return True
 
-		artist = artist.lower() # Fuck you case-sensitive filesystem
+		artist = artist.lower()
 		dlPathBase = self.getDownloadPath(self.dlBasePath, artist)
 
-		# return True
 
 		try:
 			self.log.info("GetArtist - %s", artist)
 			self.setupDir(artist)
 
-			totalArt = self._getTotalArtCount(artist)
-			artPages = self._getGalleries(artist)
-
-			if totalArt is None:
-				self.log.info("Site does not support total art counts. Found total gallery items %s", len(artPages))
-			elif totalArt > len(artPages):
-				self.log.warning("May be missing art? Total claimed art items from front-page = %s, total gallery items %s", totalArt, len(artPages))
-			elif totalArt < len(artPages):
-				self.log.warning("Too many art pages found? Total claimed art items from front-page = %s, total gallery items %s.", totalArt, len(artPages))
-			else:
-				self.log.info("Total claimed art items from front-page = %s, total gallery items %s", totalArt, len(artPages))
-
-			oldArt = self._getPreviouslyRetreived(artist)
-			newArt = artPages - oldArt
-			self.log.info("Old art items = %s, newItems = %s", len(oldArt), len(newArt))
+			newArt = self._load_art(artist)
 
 			while len(newArt) > 0:
 				pageURL = newArt.pop()
-				status = None
 				try:
 					ret = self._getArtPage(dlPathBase, pageURL, artist)
-					if len(ret) == 2:
-						status, fqDlPath = ret
-						pageDesc = ""
-						pageTitle = ""
-					elif len(ret) == 4:
-						status, fqDlPath, pageDesc, pageTitle = ret
+
+					assert isinstance(ret, dict)
+					assert 'status'     in ret
+					assert 'dl_path'    in ret
+					assert 'page_desc'  in ret
+					assert 'page_title' in ret
+					assert 'post_time'  in ret
+
+
+					if ret['status'] == "Succeeded" or ret['status'] == "Exists":
+						assert isinstance(ret['dl_path'], list)
+						seq = 0
+						for item in ret['dl_path']:
+							self._updatePreviouslyRetreived(
+									artist=artist,
+									pageUrl=pageURL,
+									fqDlPath=item,
+									pageDesc=ret['page_desc'],
+									pageTitle=ret['page_title'],
+									seqNum=seq,
+									addTime=ret['post_time'],
+									postTags=ret['post_tags'],
+								)
+							seq += 1
+					elif ret['status'] == "Ignore":  # Used for compound pages (like Pixiv's manga pages), where the page has multiple sub-pages that are managed by the plugin
+						self.log.info("Ignoring root URL, since it has child-pages.")
 					else:
-						raise ValueError("Wat?")
-
-
-
-					# Pull off the absolute path, so the DB is just the relative path within the content dir
+						self._updateUnableToRetrieve(artist, pageURL)
 
 				except urllib.error.URLError:  # WebGetRobust throws urlerrors
 					self.log.error("Page Retrieval failed!")
@@ -316,29 +367,10 @@ class ScraperBase(module_base.ModuleBase, metaclass=abc.ABCMeta):
 					self.log.error("Unknown error in page retrieval!")
 					self.log.error("Source URL = '%s'", pageURL)
 					self.log.error(traceback.format_exc())
-				finally:
-					if status == "Succeeded" or status == "Exists":
-						if isinstance(fqDlPath, list):
-							seq = 0
-							for item in fqDlPath:
-								print(item)
-								fqItem = os.path.relpath(item, settings["dldCtntPath"])
-								self._updatePreviouslyRetreived(artist=artist, pageUrl=pageURL, fqDlPath=fqItem, pageDesc=pageDesc, pageTitle=pageTitle, seqNum=seq)
-								seq += 1
-						elif isinstance(fqDlPath, str):
-							fqDlPath = os.path.relpath(fqDlPath, settings["dldCtntPath"])
-							self._updatePreviouslyRetreived(artist=artist, pageUrl=pageURL, fqDlPath=fqDlPath, pageDesc=pageDesc, pageTitle=pageTitle, seqNum=0)
-						elif fqDlPath == None:
-							self._updatePreviouslyRetreived(artist=artist, pageUrl=pageURL, fqDlPath=None, pageDesc=pageDesc, pageTitle=pageTitle, seqNum=0)
-						else:
-							raise ValueError("Unknown type for received downloadpath")
-					elif status == "Ignore":  # Used for compound pages (like Pixiv's manga pages), where the page has multiple sub-pages that are managed by the plugin
-						self.log.info("Ignoring root URL, since it has child-pages.")
-					else:
-						self._updateUnableToRetrieve(artist, pageURL)
+
 
 				self.log.info("Pages for %s remaining = %s", artist, len(newArt))
-				if ctrlNamespace.run == False:
+				if ctrlNamespace.run is False:
 					break
 
 			self._updateLastFetched(artist)
@@ -352,7 +384,7 @@ class ScraperBase(module_base.ModuleBase, metaclass=abc.ABCMeta):
 
 
 	def go(self, nameList=None, ctrlNamespace=None):
-		if ctrlNamespace == None:
+		if ctrlNamespace is None:
 			raise ValueError("You need to specify a namespace!")
 		self.updateRunningStatus(self.settingsDictKey, True)
 		startTime = datetime.datetime.now()

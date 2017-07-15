@@ -3,7 +3,7 @@ import os
 import os.path
 import traceback
 import re
-import bs4
+import dateparser
 import urllib.request
 import urllib.parse
 from settings import settings
@@ -22,9 +22,7 @@ class GetWy(rewrite.modules.scraper_base.ScraperBase):
 
 	ovwMode = "Check Files"
 
-	numThreads = 1
-
-
+	numThreads = 2
 
 	# # ---------------------------------------------------------------------------------------------------------------------------------------------------------
 	# # Cookie Management
@@ -130,7 +128,11 @@ class GetWy(rewrite.modules.scraper_base.ScraperBase):
 
 		desc.append(tagDiv)
 		desc = str(desc.prettify())
-		return title, desc
+
+		datestr = soup.find("p", class_='date')
+		dstr = datestr.get_text()
+		dval = dateparser.parse(dstr)
+		return title, desc, dval
 
 	def _getArtPage(self, dlPathBase, artPageUrl, artistName):
 
@@ -138,7 +140,7 @@ class GetWy(rewrite.modules.scraper_base.ScraperBase):
 
 
 		imageURL = self._getContentUrlFromPage(soup)
-		itemTitle, itemCaption = self._extractTitleDescription(soup)
+		itemTitle, itemCaption, itemDate = self._extractTitleDescription(soup)
 
 		if not imageURL:
 			self.log.error("OH NOES!!! No image on page = " + artPageUrl)
@@ -161,7 +163,7 @@ class GetWy(rewrite.modules.scraper_base.ScraperBase):
 
 		if self._checkFileExists(filePath):
 			self.log.info("Exists, skipping...")
-			return "Exists", filePath, itemCaption, itemTitle
+			return self.build_page_ret(status="Exists", fqDlPath=[filePath], pageDesc=itemCaption, pageTitle=itemTitle, postTime=itemDate)
 		else:
 			imgdat = self.wg.getpage(imageURL, addlHeaders={'Referer':artPageUrl})
 
@@ -188,12 +190,12 @@ class GetWy(rewrite.modules.scraper_base.ScraperBase):
 					self.log.critical("Error attempting to save image file - %s", filePath)
 					if errs > 3:
 						self.log.critical("Could not open file for writing!")
-						return "Failed", ""
+						return self.build_page_ret(status="Failed", fqDlPath=None)
 
 
 
 			self.log.info("Successfully got: %s" % imageURL)
-			return "Succeeded", filePath, itemCaption, itemTitle
+			return self.build_page_ret(status="Succeeded", fqDlPath=[filePath], pageDesc=itemCaption, pageTitle=itemTitle, postTime=itemDate)
 
 	# 	raise RuntimeError("How did this ever execute?")
 
@@ -230,7 +232,7 @@ class GetWy(rewrite.modules.scraper_base.ScraperBase):
 		links = set()
 		itemUl = inSoup.find("ul", class_='thumbnail-grid')
 		if not itemUl:
-			return [], False
+			return links, False
 		pages = itemUl.find_all("li", class_='item')
 		for page in pages:
 			itemUrl = urllib.parse.urljoin(self.urlBase, page.a['href'])
@@ -297,5 +299,10 @@ class GetWy(rewrite.modules.scraper_base.ScraperBase):
 		self.log.info("Found %s links" % (len(artlinks)))
 		return artlinks
 
+
+
+if __name__ == '__main__':
+	ins = GetWy()
+	print(ins)
 
 

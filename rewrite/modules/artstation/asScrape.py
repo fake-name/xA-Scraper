@@ -11,9 +11,9 @@ import flags
 
 import util.unclassify
 
-import plugins.scrapers.ScraperBase
+import rewrite.modules.scraper_base
 
-class GetAs(plugins.scrapers.ScraperBase.ScraperBase):
+class GetAs(rewrite.modules.scraper_base.ScraperBase):
 
 	settingsDictKey = "as"
 
@@ -143,7 +143,7 @@ class GetAs(plugins.scrapers.ScraperBase.ScraperBase):
 					self.log.critical("Error attempting to save image file - %s", filePath)
 					if errs > 3:
 						self.log.critical("Could not open file for writing!")
-						return "Failed", ""
+						return self.build_page_ret(status="Failed", fqDlPath=None)
 
 
 
@@ -329,7 +329,8 @@ class GetAs(plugins.scrapers.ScraperBase.ScraperBase):
 			recPath = self._fetchImage(image, dlPathBase, itemCaption, itemTitle, artPageUrl)
 			imPaths.append(recPath)
 
-		return "Succeeded", imPaths, itemCaption, itemTitle
+		return plugins.scrapers.ScraperBase.build_page_ret(status="Succeeded", fqDlPath=imPaths, pageDesc=itemCaption, pageTitle=itemTitle)
+
 
 	# ---------------------------------------------------------------------------------------------------------------------------------------------------------
 	# Gallery Scraping

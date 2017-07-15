@@ -3,6 +3,7 @@ import sys
 import multiprocessing
 import contextlib
 import threading
+import sqlalchemy.exc
 
 from settings import settings
 
@@ -93,6 +94,19 @@ def context_sess():
 	sess = checkout_session()
 	try:
 		yield sess
+
+	except sqlalchemy.exc.InvalidRequestError:
+		print("InvalidRequest error!")
+		sess.rollback()
+		traceback.print_exc()
+	except sqlalchemy.exc.OperationalError:
+		print("InvalidRequest error!")
+		sess.rollback()
+	except sqlalchemy.exc.IntegrityError:
+		print("Integrity error!")
+		traceback.print_exc()
+		sess.rollback()
+
 	finally:
 		release_session(sess)
 

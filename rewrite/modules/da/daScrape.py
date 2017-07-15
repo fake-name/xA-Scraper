@@ -4,6 +4,7 @@ import os.path
 import traceback
 import re
 import bs4
+import datetime
 import urllib.request
 import flags
 from settings import settings
@@ -19,7 +20,7 @@ class GetDA(rewrite.modules.scraper_base.ScraperBase):
 
 	ovwMode = "Check Files"
 
-	numThreads = 1
+	numThreads = 4
 
 	# ---------------------------------------------------------------------------------------------------------------------------------------------------------
 	# Cookie Management
@@ -133,8 +134,22 @@ class GetDA(rewrite.modules.scraper_base.ScraperBase):
 			pageTitle = titleCont.find("h1").find("a").text.rstrip().lstrip()
 			pageTitle = str(pageTitle)
 
+		tags = inSoup.find_all("a", class_='discoverytag')
 
-		return pageDesc, pageTitle
+		postTags = [
+			tag['data-canonical-tag'] for tag in tags
+		]
+
+
+		meta = inSoup.find("div", class_='dev-metainfo-details')
+		postdate = meta.find('span', ts=True)
+		ts = int(postdate['ts'])
+		postTime = datetime.datetime.fromtimestamp(ts)
+
+		self.log.info("Post tags: %s", postTags)
+		self.log.info("Post date: %s", postTime)
+
+		return pageDesc, pageTitle, postTags, postTime
 
 	def _getArtPage(self, dlPathBase, artPageUrl, artistName):
 		self.log.info("Getting page %s", artPageUrl)
@@ -143,12 +158,12 @@ class GetDA(rewrite.modules.scraper_base.ScraperBase):
 
 
 		imgurl = self._getContentUrlFromSoup(pageSoup)
-		pageDesc, pageTitle = self._getContentDescriptionTitleFromSoup(pageSoup)
+		pageDesc, pageTitle, postTags, postTime = self._getContentDescriptionTitleFromSoup(pageSoup)
 
 		if not imgurl:
 			self.log.critical("OH NOES!!! No image on page = %s", artPageUrl)
 			# print mpgctnt
-			return "Failed", ""
+			return self.build_page_ret(status="Failed", fqDlPath=None)
 
 		if imgurl == "Prose":
 			return "Succeeded", None, pageDesc, pageTitle
@@ -167,7 +182,7 @@ class GetDA(rewrite.modules.scraper_base.ScraperBase):
 			filePath = os.path.join(dlPathBase, fname)
 			if self._checkFileExists(filePath):
 				self.log.info("Exists, skipping...")
-				return "Exists", filePath, pageDesc, pageTitle
+				return self.build_page_ret(status="Exists", fqDlPath=[filePath], pageDesc=pageDesc, pageTitle=pageTitle, postTags=postTags, postTime=postTime)
 			else:
 
 				headers = {'Referer': artPageUrl}
@@ -175,7 +190,7 @@ class GetDA(rewrite.modules.scraper_base.ScraperBase):
 				imgdat = self.wg.getpage(imgurl, addlHeaders=headers)							# Request Image
 				if imgdat == "Failed":
 					self.log.error("cannot get image")
-					return "Failed", ""
+					return self.build_page_ret(status="Failed", fqDlPath=None)
 
 				errs = 0
 				fp = None
@@ -200,8 +215,8 @@ class GetDA(rewrite.modules.scraper_base.ScraperBase):
 						self.log.critical("Error attempting to save image file - %s", filePath)
 						if errs > 3:
 							self.log.critical("Could not open file for writing!")
-							return "Failed", ""
-														# Write Image to File
+							return self.build_page_ret(status="Failed", fqDlPath=None)
+
 
 					except Exception:
 						self.log.error("Error saving image - what?")
@@ -212,7 +227,9 @@ class GetDA(rewrite.modules.scraper_base.ScraperBase):
 
 
 				self.log.info("Successfully got: " + imgurl)
-				return "Succeeded", filePath, pageDesc, pageTitle									# Return Success
+
+				# return "Succeeded", filePath, pageDesc, pageTitle									# Return Success
+				return self.build_page_ret(status="Succeeded", fqDlPath=[filePath], pageDesc=pageDesc, pageTitle=pageTitle, postTags=postTags, postTime=postTime)
 
 
 
@@ -260,3 +277,17 @@ class GetDA(rewrite.modules.scraper_base.ScraperBase):
 
 		return ret
 
+
+
+
+if __name__ == '__main__':
+
+	import logSetup
+	logSetup.initLogging()
+
+	ins = GetDA()
+	ins.getCookie()
+	# print(ins)
+	# print("Instance: ", ins)
+	# dlPathBase, artPageUrl, artistName
+	ins._getArtPage("xxxx", 'http://gv-97.deviantart.com/art/Big-Fat-Shark-Tits-686006978', 'testtt')

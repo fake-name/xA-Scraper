@@ -4,6 +4,7 @@ import os.path
 import traceback
 import re
 import bs4
+import dateparser
 import urllib.request
 import urllib.parse
 from settings import settings
@@ -186,7 +187,6 @@ class GetHF(rewrite.modules.scraper_base.ScraperBase):
 		tags = soup.find('div', id='submission_tags')
 		tags = [tag.get_text().strip() for tag in soup.find_all('a', rel='tag')]
 		tags = set(tags)
-		self.log.info("Image tags: %s", list(tags))
 		for tag in tags:
 			new = soup.new_tag('div', **{'class' : 'tag'})
 			new.append(tag)
@@ -195,7 +195,15 @@ class GetHF(rewrite.modules.scraper_base.ScraperBase):
 		itemCaption.append(tagDiv)
 
 		itemCaption = itemCaption.prettify()
-		return itemTitle, itemCaption
+
+
+		metadiv = soup.find("section", id='yw0')
+		posttime = metadiv.time['datetime']
+		posttime = dateparser.parse(posttime)
+		self.log.info("Image tags: %s", list(tags))
+		self.log.info("Image Posted: %s", posttime)
+
+		return itemTitle, itemCaption, tags, posttime
 
 	def _getArtPage(self, dlPathBase, artPageUrl, artistName):
 
@@ -204,15 +212,15 @@ class GetHF(rewrite.modules.scraper_base.ScraperBase):
 
 		if pgSoup == "Failed":
 			self.log.error("cannot get page")
-			return "Failed", ""
+			return self.build_page_ret(status="Failed", fqDlPath=None)
 
 
 		imageURL = self._getContentUrlFromPage(pgSoup)
-		imgTitle, itemCaption = self._extractTitleDescription(pgSoup)
+		imgTitle, itemCaption, postTags, postTime = self._extractTitleDescription(pgSoup)
 
 		if not imageURL:
 			self.log.error("OH NOES!!! No image on page = " + artPageUrl)
-			return "Failed", ""										# Return Fail
+			return self.build_page_ret(status="Failed", fqDlPath=None)										# Return Fail
 
 
 
@@ -233,21 +241,21 @@ class GetHF(rewrite.modules.scraper_base.ScraperBase):
 
 		filePath = os.path.join(dlPathBase, fname)
 
-		self.log.info("			Filename			= %s" % fname)
-		self.log.info("			Page Image Title		= %s" % imgTitle)
-		self.log.info("			FileURL				= %s" % imageURL)
-		self.log.info("			FileType			= %s" % ftype)
-		self.log.info("			dlPath				= %s" % filePath)
+		self.log.info("			Filename			= %s", fname)
+		self.log.info("			Page Image Title		= %s", imgTitle)
+		self.log.info("			FileURL				= %s", imageURL)
+		self.log.info("			FileType			= %s", ftype)
+		self.log.info("			dlPath				= %s", filePath)
 
 		if self._checkFileExists(filePath):
 			self.log.info("Exists, skipping...")
-			return "Exists", filePath, itemCaption, imgTitle
+			return self.build_page_ret(status="Exists", fqDlPath=[filePath], pageDesc=itemCaption, pageTitle=imgTitle, postTags=postTags, postTime=postTime)
 		else:
 			imgdat = self.wg.getpage(imageURL)							# Request Image
 
 			if imgdat == "Failed":
 				self.log.error("cannot get image")
-				return "Failed", ""
+				return self.build_page_ret(status="Failed", fqDlPath=None)
 
 
 
@@ -271,15 +279,15 @@ class GetHF(rewrite.modules.scraper_base.ScraperBase):
 					except:
 						pass
 					errs += 1
-					self.log.critical("Error attempting to save image file - %s" % filePath)
+					self.log.critical("Error attempting to save image file - %s", filePath)
 					if errs > 3:
 						self.log.critical("Could not open file for writing!")
-						return "Failed", ""
+						return self.build_page_ret(status="Failed", fqDlPath=None)
 
 
 
-			self.log.info("Successfully got: %s" % imageURL)
-			return "Succeeded", filePath, itemCaption, imgTitle
+			self.log.info("Successfully got: %s", imageURL)
+			return self.build_page_ret(status="Succeeded", fqDlPath=[filePath], pageDesc=itemCaption, pageTitle=imgTitle, postTags=postTags, postTime=postTime)
 
 		raise RuntimeError("How did this ever execute?")
 
@@ -364,9 +372,9 @@ if __name__ == '__main__':
 	logSetup.initLogging()
 
 	ins = GetHF()
-	ins.getCookie()
-	print(ins)
-	print("Instance: ", ins)
+	# ins.getCookie()
+	# print(ins)
+	# print("Instance: ", ins)
 	# dlPathBase, artPageUrl, artistName
 	ins._getArtPage("xxxx", 'xxxx', 'testtt')
 

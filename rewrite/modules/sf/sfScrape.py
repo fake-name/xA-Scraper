@@ -60,11 +60,9 @@ class GetSf(rewrite.modules.scraper_base.ScraperBase):
 
 	urlBase = "https://www.sofurry.com/"
 
-
 	ovwMode = "Check Files"
 
 	numThreads = 2
-
 
 
 	# # ---------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -210,7 +208,7 @@ class GetSf(rewrite.modules.scraper_base.ScraperBase):
 
 			if self._checkFileExists(filePath):
 				self.log.info("Exists, skipping...")
-				return "Exists", filePath, itemCaption, itemTitle
+				return self.build_page_ret(status="Exists", fqDlPath=[filePath], pageDesc=itemCaption, pageTitle=itemTitle)
 			else:
 				imgdat, imName = self.wg.getFileAndName(imageURL, addlHeaders={'Referer':artPageUrl})
 
@@ -219,55 +217,46 @@ class GetSf(rewrite.modules.scraper_base.ScraperBase):
 
 				while not fp:
 					try:
+						fname = os.path.join(filePath, imName)
 						# For text, the URL fetcher returns decoded strings, rather then bytes.
 						# Therefore, if the file is a string type, we encode it with utf-8
 						# so we can write it to a file.
 						if isinstance(imgdat, str):
 							imgdat = imgdat.encode(encoding='UTF-8')
 
-						fp = open(filePath+imName, "wb")								# Open file for saving image (Binary)
+						fp = open(fname, "wb")								# Open file for saving image (Binary)
 						fp.write(imgdat)						# Write Image to File
 						fp.close()
+
+
+						self.log.info("Successfully got: %s", imageURL)
+						return self.build_page_ret(status="Succeeded", fqDlPath=[fname], pageDesc=itemCaption, pageTitle=itemTitle)
+
 					except IOError:
 						try:
 							fp.close()
 						except:
 							pass
 						errs += 1
-						self.log.critical("Error attempting to save image file - %s", filePath+imName)
+						self.log.critical("Error attempting to save image file - %s", fname)
 						if errs > 3:
 							self.log.critical("Could not open file for writing!")
-							return "Failed", ""
+							break
 
+		return self.build_page_ret(status="Failed", fqDlPath=None)
 
-
-		self.log.info("Successfully got: %s", imageURL)
-		return "Succeeded", filePath+imName, itemCaption, itemTitle
-
-	# 	raise RuntimeError("How did this ever execute?")
 
 	# ---------------------------------------------------------------------------------------------------------------------------------------------------------
 	# Gallery Scraping
 	# ---------------------------------------------------------------------------------------------------------------------------------------------------------
 
 	def _getTotalArtCount(self, artist):
-		self.log.warn("Fix art count extraction!")
-		return -1
+		soup = self.wg.getSoup("https://%s.sofurry.com/" % artist)
 
-		# basePage = "https://www.weasyl.com/~{user}".format(user=artist)
-
-		# page = self.wg.getSoup(basePage)
-		# stats = page.find('div', id='user-stats')
-
-		# item = stats.find("dd", text='Submissions')
-		# if item:
-		# 	# This feels a bit brittle, but I can't see how else to get the row
-		# 	# I want.
-		# 	items = item.previous_sibling.previous_sibling.get_text()
-		# 	return int(items)
-
-		# raise LookupError("Could not retreive artist item quantity!")
-
+		# This is probably stupidly brittle
+		subdiv = soup.find("span", class_='sfTextMedLight', text=re.compile('submissions', flags=re.IGNORECASE))
+		tgt = subdiv.parent.span.get_text()
+		return (int(tgt))
 
 
 	def _getItemsOnPage(self, inSoup):

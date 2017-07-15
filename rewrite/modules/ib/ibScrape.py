@@ -2,6 +2,7 @@
 import os
 import os.path
 import traceback
+import dateparser
 import re
 import bs4
 import urllib.request
@@ -143,9 +144,7 @@ class GetIb(rewrite.modules.scraper_base.ScraperBase):
 					self.log.critical("Error attempting to save image file - %s", filePath)
 					if errs > 3:
 						self.log.critical("Could not open file for writing!")
-						return "Failed", ""
-
-
+						return None
 
 			self.log.info("Successfully got: %s", imageURL)
 
@@ -263,6 +262,18 @@ class GetIb(rewrite.modules.scraper_base.ScraperBase):
 		desc = str(desc.prettify())
 		return desc
 
+	def _extractPostTimestamp(self, soup):
+		datespan = soup.find('span', id='submittime_exact')
+		datetxt = datespan.get_text()
+		postts = dateparser.parse(datetxt)
+		return postts
+
+	def _extractPostTags(self, soup):
+		tagdiv = soup.find('div', id='kw_scroll')
+		taglinks = tagdiv.parent.find_all("a", href=re.compile(r"search_process\.php\?keyword_id"))
+		tags = [tag.span.get_text().strip() for tag in taglinks]
+		return tags
+
 	def _getSeqImageDivs(self, seqDiv):
 		ret = set()
 
@@ -278,6 +289,9 @@ class GetIb(rewrite.modules.scraper_base.ScraperBase):
 	def _getArtPage(self, dlPathBase, artPageUrl, artistName):
 
 		soup = self.wg.getSoup(artPageUrl)
+
+		postTime    = self._extractPostTimestamp(soup)
+		postTags    = self._extractPostTags(soup)
 
 		titleBar, dummy_stats, dummy_footer = soup.body.find_all('div', class_='elephant_555753', recursive=False)
 
@@ -313,12 +327,6 @@ class GetIb(rewrite.modules.scraper_base.ScraperBase):
 		itemTitle   = self._extractTitle(titleBar)
 		itemCaption = self._extractDescription(desc_div, footer)
 
-		# print("Title:")
-		# print(itemTitle)
-		# print("Caption:")
-		# print(itemCaption)
-
-
 		if not imageURL:
 			self.log.error("OH NOES!!! No image on page = " + artPageUrl)
 			raise ValueError("No image found!")
@@ -329,7 +337,7 @@ class GetIb(rewrite.modules.scraper_base.ScraperBase):
 			recPath = self._fetchImage(image, dlPathBase, itemCaption, itemTitle, artPageUrl)
 			imPaths.append(recPath)
 
-		return "Succeeded", imPaths, itemCaption, itemTitle
+		return self.build_page_ret(status="Succeeded", fqDlPath=imPaths, pageDesc=itemCaption, pageTitle=itemTitle, postTags=postTags, postTime=postTime)
 
 	# ---------------------------------------------------------------------------------------------------------------------------------------------------------
 	# Gallery Scraping
@@ -418,4 +426,18 @@ class GetIb(rewrite.modules.scraper_base.ScraperBase):
 		return artlinks
 
 
+
+
+
+if __name__ == '__main__':
+
+	import logSetup
+	logSetup.initLogging()
+
+	ins = GetIb()
+	# ins.getCookie()
+	print(ins)
+	print("Instance: ", ins)
+	# dlPathBase, artPageUrl, artistName
+	ins._getArtPage("xxxx", 'https://inkbunny.net/submissionview.php?id=xxx', 'testtt')
 
