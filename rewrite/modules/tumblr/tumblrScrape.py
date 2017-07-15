@@ -135,12 +135,7 @@ class GetTumblr(rewrite.modules.scraper_base.ScraperBase):
 			with open(filePath, "wb") as fp:								# Open file for saving image (Binary)
 				fp.write(content)						# Write Image to File
 
-			try:
-				self._updatePreviouslyRetreived(artist=orga, pageUrl=pgurl, fqDlPath=filePath, pageDesc=desc+tags, pageTitle=title, seqNum=seq)
-			except psycopg2.IntegrityError as e:
-				cur = self.conn.cursor()
-				cur.execute("ROLLBACK")
-				raise e
+			self._updatePreviouslyRetreived(artist=orga, pageUrl=pgurl, fqDlPath=filePath, pageDesc=desc+tags, pageTitle=title, seqNum=seq)
 			seq += 1
 
 

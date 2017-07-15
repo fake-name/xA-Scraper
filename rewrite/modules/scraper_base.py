@@ -3,9 +3,7 @@ import os
 import os.path
 import traceback
 import concurrent.futures
-import logging
-import sqlite3
-from settings import settings
+import datetime
 import threading
 import datetime
 import time
@@ -350,22 +348,15 @@ class ScraperBase(module_base.ModuleBase, metaclass=abc.ABCMeta):
 		except:
 			self.log.error("Exception when retreiving artist %s", artist)
 			self.log.error("%s", traceback.format_exc())
-			try:
-				cur = self.conn.cursor()
-				cur.execute("rollback;")
-			except:
-				print("Failed to roll-back")
-				print(traceback.print_exc())
 			return True
 
 
 	def go(self, nameList=None, ctrlNamespace=None):
 		if ctrlNamespace == None:
 			raise ValueError("You need to specify a namespace!")
-		self.statusMgr.updateRunningStatus(self.settingsDictKey, True)
-		startTime = time.time()
-		self.statusMgr.updateLastRunStartTime(self.settingsDictKey, startTime)
-		self.checkInitPrimaryDb()
+		self.updateRunningStatus(self.settingsDictKey, True)
+		startTime = datetime.datetime.now()
+		self.updateLastRunStartTime(self.settingsDictKey, startTime)
 
 		if not nameList:
 			nameList = self.getNameList()
@@ -400,9 +391,9 @@ class ScraperBase(module_base.ModuleBase, metaclass=abc.ABCMeta):
 		if errored:
 			self.log.warn("Had errors!")
 
-		self.statusMgr.updateRunningStatus(self.settingsDictKey, False)
-		runTime = time.time()-startTime
-		self.statusMgr.updateLastRunDuration(self.settingsDictKey, runTime)
+		self.updateRunningStatus(self.settingsDictKey, False)
+		runTime = datetime.datetime.now()-startTime
+		self.updateLastRunDuration(self.settingsDictKey, runTime)
 
 
 

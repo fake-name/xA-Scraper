@@ -19,7 +19,7 @@ class GetDA(rewrite.modules.scraper_base.ScraperBase):
 
 	ovwMode = "Check Files"
 
-	numThreads = 4
+	numThreads = 1
 
 	# ---------------------------------------------------------------------------------------------------------------------------------------------------------
 	# Cookie Management

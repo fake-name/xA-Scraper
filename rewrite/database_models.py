@@ -114,7 +114,7 @@ class ScraperStatus(Base):
 
 	next_run          = Column(DateTime, nullable=False, default=datetime.datetime.min)
 	prev_run          = Column(DateTime, nullable=False, default=datetime.datetime.min)
-	prev_run_time     = Column(Interval, nullable=False, default=0)
+	prev_run_time     = Column(Interval, nullable=False, default=datetime.timedelta(0))
 	is_running        = Column(Boolean,  nullable=False, default=False)
 
 	status_text       = Column(Text)

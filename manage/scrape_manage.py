@@ -1,15 +1,14 @@
 
-from plugins.scrapers.da.daScrape import GetDA
-from plugins.scrapers.px.pxScrape import GetPX
-from plugins.scrapers.hf.hfScrape import GetHF
-from plugins.scrapers.fa.faScrape import GetFA
-from plugins.scrapers.sf.sfScrape import GetSf
-from plugins.scrapers.ib.ibScrape import GetIb
-from plugins.scrapers.wy.wyScrape import GetWy
-from plugins.scrapers.tumblr.tumblrScrape import GetTumblr
+from rewrite.modules.da.daScrape import GetDA
+from rewrite.modules.px.pxScrape import GetPX
+from rewrite.modules.hf.hfScrape import GetHF
+from rewrite.modules.fa.faScrape import GetFA
+from rewrite.modules.sf.sfScrape import GetSf
+from rewrite.modules.ib.ibScrape import GetIb
+from rewrite.modules.wy.wyScrape import GetWy
+from rewrite.modules.tumblr.tumblrScrape import GetTumblr
 
 import flags
-import psycopg2
 import os.path
 
 import logSetup
@@ -61,29 +60,6 @@ def do_fetch(args):
 			plg, dummy_name = PLUGINS[plgname]
 			do_plugin(plg)
 
-
-def get_db_conn():
-
-	conn = psycopg2.connect(
-		database = settings["postgres"]['database'],
-		user     = settings["postgres"]['username'],
-		password = settings["postgres"]['password'],
-		host     = settings["postgres"]['address']
-		)
-	return conn
-
-def add_name(cur, site, name):
-	pass
-
-	ret = cur.execute("SELECT * FROM %s WHERE siteName=%%s AND artistName=%%s;" % settings["dbConf"]["namesDb"], (site, name))
-	have = cur.fetchall()
-	if have:
-		return
-	else:
-		print("New name:", name)
-		cur.execute("INSERT INTO %s (siteName, artistName) VALUES (%%s, %%s);" % settings["dbConf"]["namesDb"], (site, name))
-
-	# self.conn.commit()
 
 def do_import(sitename, filename):
 	if not sitename in PLUGINS:
