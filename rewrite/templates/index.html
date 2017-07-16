@@ -1,0 +1,109 @@
+<!-- extend base layout -->
+{% extends "__base.html" %}
+{% import "_block_paginate.html" as paginator %}
+
+
+
+
+
+<%def name="genSourceTable(niceName, siteName, lim=100)">
+	<div>
+		<div style="margin-top: 10px;">
+			<h2>${niceName}</h2>
+		</div>
+		<table border="1px">
+			<tr>
+				<th class="padded" width="100px">Artist</th>
+				<th class="padded" width="30px">Src</th>
+				<th class="padded" width="600px">Image Source Page URL</th>
+				<th class="padded" width="150px">Download Time</th>
+			</tr>
+			<%
+				if not lim:
+					lim = -1 # Get all the rows
+				# artistName, pageUrl, retreivalTime
+				cur.execute('SELECT id, siteName, artistName, pageUrl, retreivalTime FROM retrieved_pages WHERE siteName=%s ORDER BY retreivalTime DESC LIMIT %s;', (siteName, lim))
+				pageLinks = cur.fetchall()
+
+				# 	"da" : "http://%s.deviantart.com/",
+				# 	"fa" : "http://www.furaffinity.net/user/%s/",
+				# 	"hf" : "http://www.hentai-foundry.com/user/%s/profile",
+				# 	"px" : "http://www.pixiv.net/member.php?id=%s"
+				# }
+			%>
+
+			% for uid, siteName, aName, url, timestamp in pageLinks:
+				<tr>
+					<td class="padded" style=" overflow: hidden;">
+						<div style="width: 100px;">
+							<a href="/source/byartist/${siteName}/${aName}/1">${aName.title()}</a>
+						</div>
+					</td>
+					<td class="padded"><a href="${urlLut[siteName] % aName}">[src]</a></td>
+					<td class="padded showTT" imageID="${uid}"><a href='${url}'>${url}</a></td>
+					<td class="padded">${str(datetime.datetime.fromtimestamp(timestamp)).split(".")[0]}</td>
+				</tr>
+			% endfor
+
+		</table>
+	</div>
+</%def>
+
+
+
+{% macro render_releases(nicename, release_data) %}
+	<div>
+		<div style="margin-top: 10px;">
+			<h2>{{nicename}}</h2>
+		</div>
+		<table border="1px">
+			<tr>
+				<th class="padded" width="30px">Site</th>
+				<th class="padded" width="100px">Artist</th>
+				<th class="padded" width="30px">Src</th>
+				<th class="padded" width="600px">Image Source Page URL</th>
+				<th class="padded" width="80px">Download Time</th>
+			</tr>
+
+			{% for row in release_data %}
+				<tr>
+					<td class="padded"><a href="/source/by-site/{{row.artist.site_name}}">{{row.artist.site_name}}</a></td>
+					<td class="padded" style=" overflow: hidden;">
+						<div style="width: 100px;">
+							<a href="/source/by-artist/{{row.artist.id}}">{{row.artist.artist_name | title}}</a>
+						</div>
+					</td>
+					<td class="padded"><a href="{{source_list[row.artist.site_name]['user-url'] % row.artist.artist_name}}">[src]</a></td>
+					{% if row.files%}
+						<td class="padded">
+							{% for img_file in row.files %}
+									<span class="padded showTT" imageID="{{img_file.id}}"><a href='{{row.release_meta}}'>{{row.release_meta}}</a></span>
+							{% endfor %}
+						</td>
+					{% else %}
+						<td class="padded"><a href='{{row.release_meta}}'>{{row.release_meta}}</a></td>
+					{% endif %}
+					<td class="padded">{{terse_ago(row.addtime)}}</td>
+				</tr>
+			{% endfor %}
+
+		</table>
+	</div>
+{% endmacro %}
+
+
+
+
+
+
+
+{% block content %}
+	{% include '_block_flash.html' %}
+		{{ render_releases("Aggregate Releases", data.items)}}
+		{{ paginator.render_pagination(data) }}
+	</div>
+
+{% endblock %}
+
+
+

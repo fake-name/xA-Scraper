@@ -2,11 +2,6 @@
 import os
 import os.path
 import traceback
-import re
-import bs4
-import psycopg2
-import pprint
-import urllib.request
 import urllib.parse
 from settings import settings
 from tumblpy import Tumblpy
@@ -130,6 +125,10 @@ class GetTumblr(rewrite.modules.scraper_base.ScraperBase):
 			content, fName = self.wg.getFileAndName(url, addlHeaders={'Referer' : pgurl})
 			filePath = os.path.join(dlPathBase, fName)
 
+			# NFI how this was happening.
+			if filePath.startswith("{"):
+				filePath = filePath[1:]
+
 			if isinstance(content, str):
 				content = content.encode(encoding='UTF-8')
 
@@ -234,11 +233,6 @@ class GetTumblr(rewrite.modules.scraper_base.ScraperBase):
 
 			try:
 				self._getArtPage(post_struct, artist)
-				# return
-
-			except psycopg2.IntegrityError as e:
-				import sys
-				sys.exit()
 			except urllib.error.URLError:  # WebGetRobust throws urlerrors
 				self.log.error("Page Retrieval failed!")
 				self.log.error("Source URL = '%s'", post_struct)

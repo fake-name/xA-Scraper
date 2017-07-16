@@ -55,6 +55,7 @@ Markdown(app, safe_mode='escape', extensions=[URLifyExtension()])
 # ========================================================
 
 
+from . import views
 from . import database
 
 CACHE_SIZE = 5000

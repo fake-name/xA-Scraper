@@ -1,0 +1,330 @@
+* {
+	font-family: Tahoma, Geneva, sans-serif;
+	font-size:0.985em;
+}
+table, td
+{
+	border-color: #006;
+	border-style: solid;
+}
+
+table
+{
+	margin-top: 5px;
+	border-width: 0 0 1px 1px;
+	border-spacing: 0;
+	border-collapse: collapse;
+}
+td
+{
+	margin: 0;
+	padding: 1px;
+	border-width: 1px 1px 0 0;
+}
+
+td.legend
+{
+	 text-align: center;
+}
+
+
+
+*.inlineRight
+{
+	 display: inline-block;
+/*	 float: right;
+	 display: inline-block;*/
+}
+*.inlineLeft
+{
+	 display: inline-block;
+/*	 float: left;
+	 display: inline;*/
+}
+
+*.uncoloured
+{
+	background-color: #ffffff
+}
+td.padded
+{
+	padding: 3px;
+}
+
+li  /* Space out list items */
+{
+	margin: 0 0 3px 0;
+}
+
+div
+{
+
+	border-color:#555577;
+}
+
+div.statusdiv
+{
+	margin: 0 auto;
+	width: 120px;
+	display: inline-block;
+	vertical-align:top;
+}
+div.maindiv
+{
+	margin: 0 auto;
+	width: 882px;
+	display: inline-block;
+	overflow:hidden;
+}
+
+div.subdiv
+{
+	border:2px solid;
+	/*border-radius:25px;*/
+}
+div.statediv
+{
+	border:2px solid;
+	/*border-radius:25px;*/
+	padding:10px
+}
+div.contentdiv
+{
+	padding-top:    0px;
+	padding-right:  5px;
+	padding-bottom: 20px;
+	padding-left:   5px;
+}
+
+div.legend
+{
+	margin: 0 auto;
+	padding-top:    5px;
+	padding-right:  5px;
+	padding-bottom: 0px;
+	padding-left:   5px;
+}
+
+div.mtMainId
+{
+	background-color:#FFF79A;
+}
+div.daId
+{
+	background-color:#BBBBFF;
+}
+div.faId
+{
+	background-color:#BBFFBB;
+}
+div.hfId
+{
+	background-color:#EE99EE;
+}
+div.pxId
+{
+	background-color:#FFBBBB;
+}
+div.buMonId
+{
+	background-color:#BBFFBB;
+}
+div.navId
+{
+	background-color:#EEEEEE;
+}
+
+div.tag
+{
+	border: 1px solid #CCCCCC;
+	border-radius: 4px;
+	margin: 0px 0.3em 0.3em 0px;
+	padding: 0px 1em;
+	display: inline-block;
+
+}
+
+h3
+{
+	margin: 5 auto;
+	text-align: center;
+}
+
+ul
+{
+	list-style-type: square;
+	margin-left: 5px;
+	margin-top: 0px;
+	margin-right: 0px;
+	padding-left: 10px;
+	padding-top: 5px;
+	padding-right: 0px;
+}
+
+
+tr:nth-child(even)
+{
+	background: #f0f0ff
+}
+tr:nth-child(odd)
+{
+	background: #FFF
+}
+input[type="text"]
+{
+	background: transparent;
+	border: 1px solid;
+	/*outline: none;*/
+}
+
+form {
+margin-bottom: 0em;
+}
+
+.tooltip {
+	position:absolute;
+	border:1px solid #333;
+	background-color:#161616;
+	border-radius:5px;
+	padding:10px;
+	color:#fff;
+	font-size:10px Arial;
+}
+
+
+
+
+.pagination {
+  display: inline-block;
+  padding-left: 0;
+  margin: 20px 0;
+  border-radius: 4px;
+}
+.pagination > li {
+  display: inline;
+}
+.pagination > li > a,
+.pagination > li > span {
+  position: relative;
+  float: left;
+  padding: 8px 12px;
+  line-height: 1.42857143;
+  text-decoration: none;
+  color: #ffffff;
+  background-color: #222222;
+  border: 1px solid #282828;
+  margin-left: -1px;
+}
+.pagination > li:first-child > a,
+.pagination > li:first-child > span {
+  margin-left: 0;
+  border-bottom-left-radius: 4px;
+  border-top-left-radius: 4px;
+}
+.pagination > li:last-child > a,
+.pagination > li:last-child > span {
+  border-bottom-right-radius: 4px;
+  border-top-right-radius: 4px;
+}
+.pagination > li > a:hover,
+.pagination > li > span:hover,
+.pagination > li > a:focus,
+.pagination > li > span:focus {
+  z-index: 2;
+  color: #ffffff;
+  background-color: #2a9fd6;
+  border-color: transparent;
+}
+.pagination > .active > a,
+.pagination > .active > span,
+.pagination > .active > a:hover,
+.pagination > .active > span:hover,
+.pagination > .active > a:focus,
+.pagination > .active > span:focus {
+  z-index: 3;
+  color: #ffffff;
+  background-color: #2a9fd6;
+  border-color: transparent;
+  cursor: default;
+}
+.pagination > .disabled > span,
+.pagination > .disabled > span:hover,
+.pagination > .disabled > span:focus,
+.pagination > .disabled > a,
+.pagination > .disabled > a:hover,
+.pagination > .disabled > a:focus {
+  color: #888888;
+  background-color: #222222;
+  border-color: #282828;
+  cursor: not-allowed;
+}
+.pagination-lg > li > a,
+.pagination-lg > li > span {
+  padding: 14px 16px;
+  font-size: 18px;
+  line-height: 1.3333333;
+}
+.pagination-lg > li:first-child > a,
+.pagination-lg > li:first-child > span {
+  border-bottom-left-radius: 6px;
+  border-top-left-radius: 6px;
+}
+.pagination-lg > li:last-child > a,
+.pagination-lg > li:last-child > span {
+  border-bottom-right-radius: 6px;
+  border-top-right-radius: 6px;
+}
+.pagination-sm > li > a,
+.pagination-sm > li > span {
+  padding: 5px 10px;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.pagination-sm > li:first-child > a,
+.pagination-sm > li:first-child > span {
+  border-bottom-left-radius: 3px;
+  border-top-left-radius: 3px;
+}
+.pagination-sm > li:last-child > a,
+.pagination-sm > li:last-child > span {
+  border-bottom-right-radius: 3px;
+  border-top-right-radius: 3px;
+}
+.pager {
+  padding-left: 0;
+  margin: 20px 0;
+  list-style: none;
+  text-align: center;
+}
+.pager li {
+  display: inline;
+}
+.pager li > a,
+.pager li > span {
+  display: inline-block;
+  padding: 5px 14px;
+  background-color: #222222;
+  border: 1px solid #282828;
+  border-radius: 15px;
+}
+.pager li > a:hover,
+.pager li > a:focus {
+  text-decoration: none;
+  background-color: #2a9fd6;
+}
+.pager .next > a,
+.pager .next > span {
+  float: right;
+}
+.pager .previous > a,
+.pager .previous > span {
+  float: left;
+}
+.pager .disabled > a,
+.pager .disabled > a:hover,
+.pager .disabled > a:focus,
+.pager .disabled > span {
+  color: #888888;
+  background-color: #222222;
+  cursor: not-allowed;
+}

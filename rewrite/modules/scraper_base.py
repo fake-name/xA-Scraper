@@ -32,7 +32,7 @@ class ScraperBase(module_base.ModuleBase, metaclass=abc.ABCMeta):
 
 	ovwMode = "Check Files"
 
-	numThreads = 5
+	numThreads = 2
 
 	# ---------------------------------------------------------------------------------------------------------------------------------------------------------
 	# Cookie Management
@@ -130,8 +130,19 @@ class ScraperBase(module_base.ModuleBase, metaclass=abc.ABCMeta):
 
 			return set([item for sublist in res for item in sublist])
 
+	# Fetch the previously retrieved item URLs from the database.
+	def _getNewToRetreive(self, artist):
+		aid = self._artist_name_to_rid(artist)
+		with self.db.context_sess() as sess:
+			res = sess.query(self.db.ArtItem.release_meta) \
+				.filter(self.db.ArtItem.artist_id == aid) \
+				.filter(self.db.ArtItem.state == 'new') \
+				.all()
+
+			return set([item for sublist in res for item in sublist])
+
 	# Insert recently retreived items into the database
-	def _updatePreviouslyRetreived(self, artist, pageUrl, fqDlPath=None, pageDesc=None, pageTitle=None, seqNum=None, filename=None, addTime=None, postTags=[]):
+	def _updatePreviouslyRetreived(self, artist, pageUrl, state='new', fqDlPath=None, pageDesc=None, pageTitle=None, seqNum=None, filename=None, addTime=None, postTags=[]):
 		# Sqlite requires all arguments be at least tuples containing string.
 		# Respin our list into a list of 1-tuples
 
@@ -155,7 +166,7 @@ class ScraperBase(module_base.ModuleBase, metaclass=abc.ABCMeta):
 						.scalar()
 					if not row:
 						row = self.db.ArtItem(
-								state        = 'complete',
+								state        = 'new',
 								artist_id    = aid,
 								release_meta = pageUrl,
 								fetchtime    = datetime.datetime.now(),
@@ -172,6 +183,8 @@ class ScraperBase(module_base.ModuleBase, metaclass=abc.ABCMeta):
 						row.title = pageTitle
 					if addTime and addTime != row.addtime:
 						row.addtime = addTime
+					if state and state != row.state:
+						row.state = state
 
 					if fqDlPath:
 						frow = sess.query(self.db.ArtFile) \
@@ -240,6 +253,24 @@ class ScraperBase(module_base.ModuleBase, metaclass=abc.ABCMeta):
 				.count()
 			print("Res:", res)
 			return res
+
+	def _upsert_if_new(self, sess, aid, url):
+
+		res = sess.query(self.db.ArtItem) \
+			.filter(self.db.ArtItem.artist_id == aid) \
+			.filter(self.db.ArtItem.release_meta == url) \
+			.count()
+		if not res:
+			row = self.db.ArtItem(
+					state        = 'new',
+					artist_id    = aid,
+					release_meta = url,
+				)
+			sess.add(row)
+			sess.commit()
+			return 1
+		else:
+			return 0
 
 
 
@@ -320,6 +351,7 @@ class ScraperBase(module_base.ModuleBase, metaclass=abc.ABCMeta):
 
 		totalArt = self._getTotalArtCount(artist)
 		artPages = self._getGalleries(artist)
+		aid = self._artist_name_to_rid(artist)
 
 		if totalArt is None:
 			self.log.info("Site does not support total art counts. Found total gallery items %s", len(artPages))
@@ -330,15 +362,19 @@ class ScraperBase(module_base.ModuleBase, metaclass=abc.ABCMeta):
 		else:
 			self.log.info("Total claimed art items from front-page = %s, total gallery items %s", totalArt, len(artPages))
 
-		oldArt = self._getPreviouslyRetreived(artist)
-		newArt = artPages - oldArt
-		self.log.info("Old art items = %s, newItems = %s", len(oldArt), len(newArt))
+		new = 0
+		with self.db.context_sess() as sess:
+			for item in artPages:
+				new += self._upsert_if_new(sess, aid, item)
 
-		force_recheck_all = True
-		if force_recheck_all:
-			newArt = artPages
+		self.log.info("%s new art pages, %s total", new, len(artPages))
 
-		return newArt
+		# oldArt = self._getPreviouslyRetreived(artist)
+		# newArt = artPages - oldArt
+		# self.log.info("Old art items = %s, newItems = %s", len(oldArt), len(newArt))
+
+
+		return self._getNewToRetreive(artist)
 
 	def __fetch_retrier(self, dlPathBase, pageURL, artist):
 		for _ in range(3):
@@ -387,6 +423,7 @@ class ScraperBase(module_base.ModuleBase, metaclass=abc.ABCMeta):
 						for item in ret['dl_path']:
 							self._updatePreviouslyRetreived(
 									artist=artist,
+									state='complete',
 									pageUrl=pageURL,
 									fqDlPath=item,
 									pageDesc=ret['page_desc'],

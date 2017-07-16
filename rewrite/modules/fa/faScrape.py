@@ -184,8 +184,8 @@ class GetFA(rewrite.modules.scraper_base.ScraperBase, util.captcha2upload.Captch
 		try:
 			filePath = os.path.join(dlPathBase, fname)
 			pageDesc, pageTitle, postTags, postTime = self._getContentDescriptionTitleFromSoup(bs4.BeautifulSoup(pageCtnt, "lxml"))
-			self.log.info("			postTags  = " + postTags)
-			self.log.info("			postTime  = " + postTime)
+			self.log.info("			postTags  = %s", postTags)
+			self.log.info("			postTime  = %s", postTime)
 
 		except:
 			print("file path issue")
