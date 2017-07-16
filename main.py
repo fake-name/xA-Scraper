@@ -11,10 +11,6 @@ import threading
 import logSetup
 
 from apscheduler.schedulers.background import BackgroundScheduler
-# from apscheduler.jobstores.sqlalchemy_store import SQLAlchemyJobStore
-
-from settings import settings
-
 
 import plugins.scrapers.da.daScrape as das
 import plugins.scrapers.fa.faScrape as fas
@@ -26,8 +22,7 @@ import plugins.scrapers.sf.sfScrape as sfs
 import plugins.scrapers.artstation.asScrape as ass
 import plugins.scrapers.tumblr.tumblrScrape as tus
 
-import wsgi_server
-
+from settings import settings
 import cherrypy
 
 import manage.statusDbManager
@@ -46,9 +41,13 @@ JOBS = [
 ]
 
 
+import rewrite
+
+
+
 def runServer():
 
-	cherrypy.tree.graft(wsgi_server.app, "/")
+	cherrypy.tree.graft(rewrite.app, "/")
 
 	# Unsubscribe the default server
 	cherrypy.server.unsubscribe()
@@ -61,30 +60,7 @@ def runServer():
 	server.socket_port = 6543
 	server.thread_pool = 30
 
-	# For SSL Support
-	# server.ssl_module            = 'pyopenssl'
-	# server.ssl_certificate       = 'ssl/certificate.crt'
-	# server.ssl_private_key       = 'ssl/private.key'
-	# server.ssl_certificate_chain = 'ssl/bundle.crt'
-
-	# Subscribe this server
 	server.subscribe()
-
-	# Example for a 2nd server (same steps as above):
-	# Remember to use a different port
-
-	# server2             = cherrypy._cpserver.Server()
-
-	# server2.socket_host = "0.0.0.0"
-	# server2.socket_port = 8081
-	# server2.thread_pool = 30
-	# server2.subscribe()
-
-	# Start the server engine (Option 1 *and* 2)
-
-	# All the threads confuse the hell out of the autoreloader.
-	# It leaves dangling threads everywhere if I don't disable it.
-	# cherrypy.config.update({'engine.autoreload.on':False})
 
 	cherrypy.engine.start()
 	cherrypy.engine.block()
@@ -114,30 +90,20 @@ def scheduleJobs(sched, managedNamespace):
 	# sched.add_interval_job(printWat, seconds=10, start_date='2014-1-1 01:00')
 
 
-def checkInitDbs():
-
-
-
-	for scraperClass, interval, name in JOBS:
-		print("Setup for ", scraperClass)
-		tmp = scraperClass()
-		tmp.checkInitPrimaryDb()
-
 
 def go(managedNamespace):
 	statusMgr = manage.statusDbManager.StatusResource()
 	managedNamespace.run = True
 	managedNamespace.serverRun = True
 
-	checkInitDbs()
 
 	server_process = multiprocessing.Process(target=serverProcess, args=(managedNamespace,))
 
 	sched = BackgroundScheduler()
 
-	scheduleJobs(sched, managedNamespace)
-	server_process.start()
-	sched.start()
+	# scheduleJobs(sched, managedNamespace)
+	# server_process.start()
+	# sched.start()
 
 	loopCtr = 0
 	while managedNamespace.run:

@@ -317,13 +317,3 @@ class GetFA(rewrite.modules.scraper_base.ScraperBase, util.captcha2upload.Captch
 		return ret
 
 
-
-if __name__ == '__main__':
-
-	import logSetup
-	logSetup.initLogging()
-
-	ins = GetFA()
-	cook = ins.getCookie()
-	# dlPathBase, artPageUrl, artistName
-	ins._getArtPage("xxxx", 'https://www.furaffinity.net/view/9016146', 'testtt')

@@ -303,6 +303,7 @@ class ScraperBase(module_base.ModuleBase, metaclass=abc.ABCMeta):
 		with self.db.context_sess() as sess:
 			res = sess.query(self.db.ScrapeTargets) \
 				.filter(self.db.ScrapeTargets.site_name == self.targetShortName) \
+				.order_by(self.db.ScrapeTargets.last_fetched) \
 				.all()
 
 			ret = [(row.id, row.artist_name) for row in res]

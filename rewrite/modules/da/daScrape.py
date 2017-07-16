@@ -166,7 +166,7 @@ class GetDA(rewrite.modules.scraper_base.ScraperBase):
 			return self.build_page_ret(status="Failed", fqDlPath=None)
 
 		if imgurl == "Prose":
-			return "Succeeded", None, pageDesc, pageTitle
+			return self.build_page_ret(status="Exists", fqDlPath=[], pageDesc=pageDesc, pageTitle=pageTitle, postTags=postTags, postTime=postTime)
 
 		else:
 
@@ -290,4 +290,4 @@ if __name__ == '__main__':
 	# print(ins)
 	# print("Instance: ", ins)
 	# dlPathBase, artPageUrl, artistName
-	ins._getArtPage("xxxx", 'http://gv-97.deviantart.com/art/Big-Fat-Shark-Tits-686006978', 'testtt')
+	ins._getArtPage("xxxx", 'xxx', 'testtt')
