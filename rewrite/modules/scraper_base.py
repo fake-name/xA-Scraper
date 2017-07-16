@@ -130,7 +130,7 @@ class ScraperBase(module_base.ModuleBase, metaclass=abc.ABCMeta):
 			return set([item for sublist in res for item in sublist])
 
 	# Insert recently retreived items into the database
-	def _updatePreviouslyRetreived(self, artist, pageUrl, fqDlPath, pageDesc, pageTitle, seqNum, filename=None, addTime=None, postTags=[]):
+	def _updatePreviouslyRetreived(self, artist, pageUrl, fqDlPath=None, pageDesc=None, pageTitle=None, seqNum=None, filename=None, addTime=None, postTags=[]):
 		# Sqlite requires all arguments be at least tuples containing string.
 		# Respin our list into a list of 1-tuples
 
@@ -164,6 +164,13 @@ class ScraperBase(module_base.ModuleBase, metaclass=abc.ABCMeta):
 							)
 						sess.add(row)
 						sess.flush()
+
+					if pageDesc and pageDesc != row.content:
+						row.content = pageDesc
+					if pageTitle and pageTitle != row.title:
+						row.title = pageTitle
+					if addTime and addTime != row.addtime:
+						row.addtime = addTime
 
 					if fqDlPath:
 						frow = sess.query(self.db.ArtFile) \

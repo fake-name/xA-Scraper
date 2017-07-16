@@ -396,7 +396,7 @@ if __name__ == '__main__':
 	print(ins)
 	print("Instance: ", ins)
 	# dlPathBase, artPageUrl, artistName
-	ins._getArtPage("xxxx", '{"url":"https://www.sofurry.com/view/60802"}', 'testtt')
+	ins._getArtPage("xxxx", '{"url":"https://www.sofurry.com/view/xxxx"}', 'testtt')
 
 
 

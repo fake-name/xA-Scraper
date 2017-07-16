@@ -20,7 +20,7 @@ class GetPX(rewrite.modules.scraper_base.ScraperBase):
 	urlBase         = "http://www.pixiv.net/"
 	ovwMode         = "Check Files"
 
-	numThreads      = 5
+	numThreads      = 1
 
 
 	# ---------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -136,7 +136,7 @@ class GetPX(rewrite.modules.scraper_base.ScraperBase):
 							self.log.critical(traceback.format_exc())
 							writeErrors += 1
 					else:
-						self.log.critical("Could not save file - %s " % filePath)
+						self.log.critical("Could not save file - %s ", filePath)
 						successed = False
 
 					#(self, artist, pageUrl, fqDlPath, seqNum=0):
@@ -146,11 +146,11 @@ class GetPX(rewrite.modules.scraper_base.ScraperBase):
 					self._updatePreviouslyRetreived(artist=artistName, pageUrl=sourceUrl, fqDlPath=filePath, seqNum=indice)
 
 			else:
-				self.log.info("%s Exists, skipping..." % filename)
+				self.log.info("%s Exists, skipping...", filename)
 
 
 
-		self.log.info("Total %s " % len(images))
+		self.log.info("Total %s ", len(images))
 		if successed:
 			return "Ignore", None
 
@@ -191,9 +191,10 @@ class GetPX(rewrite.modules.scraper_base.ScraperBase):
 
 
 
-		regx4 = re.compile("http://.+/")				# FileName RE
+		regx4 = re.compile(r"http://.+/")				# FileName RE
 		fname = regx4.sub("" , imgurl)
 		fname = fname.rsplit("?")[0] 		# Sometimes there is some PHP stuff tacked on the end of the Image URL. Split on the indicator("?"), and throw away everything after it.
+		fname = fname.rsplit("/")[-1]
 
 		self.log.info("			Filename = " + fname)
 		self.log.info("			Page Image Title = " + imgTitle)
@@ -221,10 +222,10 @@ class GetPX(rewrite.modules.scraper_base.ScraperBase):
 
 			self.log.info("Successfully got: " + imgurl)
 			self.log.info("Saved to path: " + filePath)
-			return self.build_page_ret(status="Succeeded", fqDlPath=filePath, pageDesc=itemCaption, pageTitle=itemTitle)
+			return self.build_page_ret(status="Succeeded", fqDlPath=[filePath], pageDesc=itemCaption, pageTitle=itemTitle)
 		else:
 			self.log.info("Exists, skipping... (path = %s)", filePath)
-			return self.build_page_ret(status="Exists", fqDlPath=filePath, pageDesc=itemCaption, pageTitle=itemTitle)
+			return self.build_page_ret(status="Exists", fqDlPath=[filePath], pageDesc=itemCaption, pageTitle=itemTitle)
 
 	def _getSinglePageManga(self, dlPathBase, imageTag, baseSoup, artPageUrl):
 		imgurl   = imageTag['href']
@@ -272,10 +273,10 @@ class GetPX(rewrite.modules.scraper_base.ScraperBase):
 
 			self.log.info("Successfully got: " + imgurl)
 			self.log.info("Saved to path: " + filePath)
-			return self.build_page_ret(status="Succeeded", fqDlPath=filePath, pageDesc=itemCaption, pageTitle=itemTitle)
+			return self.build_page_ret(status="Succeeded", fqDlPath=[filePath], pageDesc=itemCaption, pageTitle=itemTitle)
 		else:
 			self.log.info("Exists, skipping... (path = %s)", filePath)
-			return self.build_page_ret(status="Exists", fqDlPath=filePath, pageDesc=itemCaption, pageTitle=itemTitle)
+			return self.build_page_ret(status="Exists", fqDlPath=[filePath], pageDesc=itemCaption, pageTitle=itemTitle)
 
 	def _getAnimation(self, dlPathBase, imageTag, soup, artPageUrl):
 		itemTitle, itemCaption = self._extractTitleDescription(soup)
@@ -333,10 +334,10 @@ class GetPX(rewrite.modules.scraper_base.ScraperBase):
 
 			self.log.info("Successfully got: " + ctntsrc)
 			self.log.info("Saved to path: " + filePath)
-			return self.build_page_ret(status="Succeeded", fqDlPath=filePath, pageDesc=itemCaption, pageTitle=itemTitle)
+			return self.build_page_ret(status="Succeeded", fqDlPath=[filePath], pageDesc=itemCaption, pageTitle=itemTitle)
 		else:
 			self.log.info("Exists, skipping... (path = %s)", filePath)
-			return self.build_page_ret(status="Exists", fqDlPath=filePath, pageDesc=itemCaption, pageTitle=itemTitle)
+			return self.build_page_ret(status="Exists", fqDlPath=[filePath], pageDesc=itemCaption, pageTitle=itemTitle)
 
 
 	def _getArtPage(self, dlPathBase, pgurl, artistName):
@@ -426,8 +427,8 @@ class GetPX(rewrite.modules.scraper_base.ScraperBase):
 				return set()
 			if suspendedAcctRe.search(mpgctnt):
 				self.log.critical("Account has been suspended. You should probably remove it from your favorites")
-				self.log.critical("Account # %s" % artist)
-				self.log.critical("Gallery URL - %s" % turl)
+				self.log.critical("Account # %s", artist)
+				self.log.critical("Gallery URL - %s", turl)
 				return set()
 
 			soup = bs4.BeautifulSoup(mpgctnt, 'lxml')
@@ -441,19 +442,19 @@ class GetPX(rewrite.modules.scraper_base.ScraperBase):
 
 			if iterCounter > 500:
 				self.log.critical("This account seems to have too many images, or is defunct.")
-				self.log.critical("Account: %s" % artist)
+				self.log.critical("Account: %s", artist)
 
 				artlinks = set()
 				break
 
 			iterCounter += 1
 
-		self.log.info("Found %s links" % (len(artlinks)))
+		self.log.info("Found %s links", (len(artlinks)))
 
 
 		if ((iterCounter * 20) - len(artlinks)) > 20:
 			self.log.warning("We seem to have found less than 20 links per page. are there missing files?")
-			self.log.warning("Found %s links on %s pages. Should have found %s - %s links" % (len(artlinks), iterCounter, (iterCounter - 1) * 20, iterCounter * 20))
+			self.log.warning("Found %s links on %s pages. Should have found %s - %s links", (len(artlinks), iterCounter, (iterCounter - 1) * 20, iterCounter * 20))
 
 		return artlinks
 
@@ -468,14 +469,12 @@ class GetPX(rewrite.modules.scraper_base.ScraperBase):
 
 		self.log.info("Getting list of favourite artists.")
 
-		breakFlag = True
 		counter = 1
 		content = ""
 		resultList = set()
 		nameRE = re.compile(r'<a href="member\.php\?id=(\d*?)"')
 
 		while 1:
-			breakFlag = True
 			pageURL = "http://www.pixiv.net/bookmark.php?type=user&rest=show&p=%d" % (counter)
 			content = self.wg.getpage(pageURL)
 			if content == "Failed":
@@ -496,6 +495,19 @@ class GetPX(rewrite.modules.scraper_base.ScraperBase):
 
 			self.log.info("Names found so far - %s", len(resultList))
 
-		self.log.info("Found %d Names" % len(resultList))
+		self.log.info("Found %d Names", len(resultList))
 
-		return resultList
+		# Push the pixiv name list into the DB
+		with self.db.context_sess() as sess:
+			for name in resultList:
+				res = sess.query(self.db.ScrapeTargets.id)             \
+					.filter(self.db.ScrapeTargets.site_name == self.targetShortName) \
+					.filter(self.db.ScrapeTargets.artist_name == name)              \
+					.scalar()
+				if not res:
+					self.log.info("Need to insert name: %s", name)
+					sess.add(self.db.ScrapeTargets(site_name=self.targetShortName, artist_name=name))
+					sess.commit()
+
+
+		return super().getNameList()

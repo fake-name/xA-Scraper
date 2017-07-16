@@ -4,14 +4,16 @@ import os.path
 import traceback
 import re
 import bs4
+import dateparser
 import urllib.request
 import flags
 from settings import settings
 import urllib.parse
 
+import util.captcha2upload
 import rewrite.modules.scraper_base
 
-class GetFA(rewrite.modules.scraper_base.ScraperBase):
+class GetFA(rewrite.modules.scraper_base.ScraperBase, util.captcha2upload.CaptchaSolverMixin):
 
 	settingsDictKey = "fa"
 	pluginName = "FaGet"
@@ -40,21 +42,41 @@ class GetFA(rewrite.modules.scraper_base.ScraperBase):
 
 
 	def getCookie(self):
-		raise RuntimeError("No automated login at the moment, sorry. Blame FA's captcha")
 
-		# logondict = {"retard_protection" : "1",
-		# 			"action" : "login"}
-
-		# logondict["name"] = settings[self.settingsDictKey]["username"]
-		# logondict["pass"] = settings[self.settingsDictKey]["password"]
-
-		# pagetext = self.wg.getpage('https://www.furaffinity.net/login/?url=/', postData = logondict)
+		if self.checkCookie()[0] is True:
+			self.log.warn("Do not need to log in!")
+			return "Logged In"
 
 
-		# if re.search("You have typed in an erroneous username or password, please try again", pagetext):
-		# 	return "Login Failed"
-		# else:
-		# 	return "Logged In"
+		balance = self.captcha_solver.getbalance()
+		self.log.info("Captcha balance: %s", balance)
+
+		login_pg    = self.wg.getpage('https://www.furaffinity.net/login/')
+		captcha_img = self.wg.getpage('https://www.furaffinity.net/captcha.jpg')
+
+		with open("img.jpg", "wb") as fp:
+			fp.write(captcha_img)
+
+		self.log.info("Solving captcha. Please wait")
+		captcha_result = self.captcha_solver.solve(filedata=captcha_img, filename='captcha.jpg')
+		self.log.info("Captcha solving service result: %s", captcha_result)
+		values = {
+			'action'               : 'login',
+			'name'                 : settings['fa']['username'],
+			'pass'                 : settings['fa']['password'],
+			'g-recaptcha-response' : "",
+			'use_old_captcha'      : 1,
+			'captcha'              : captcha_result,
+			'login'                : 'Login to FurAffinity',
+		}
+
+
+		pagetext = self.wg.getpage('https://www.furaffinity.net/login/?url=/', postData = values)
+
+		if self.checkCookie()[0] is True:
+			return "Logged In"
+		else:
+			return "Login Failed"
 
 
 	# ---------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -96,11 +118,11 @@ class GetFA(rewrite.modules.scraper_base.ScraperBase):
 		return False
 
 
-	def _getContentDescriptionTitleFromSoup(self, inSoup):
+	def _getContentDescriptionTitleFromSoup(self, soup):
 
 		pageDesc = ""
 		pageTitle = ""
-		commentaryTd = inSoup.find("td", attrs={"valign":"top", "align":"left", "class":"alt1", "width":"70%"})
+		commentaryTd = soup.find("td", attrs={"valign":"top", "align":"left", "class":"alt1", "width":"70%"})
 		if commentaryTd:
 
 			# Pull out all the items in the commentary <td>
@@ -111,13 +133,22 @@ class GetFA(rewrite.modules.scraper_base.ScraperBase):
 				pageDesc += content
 
 
-		titleCont = inSoup.find("td", attrs={"valign":"top", "align":"left", "class":"cat", "width":"70%"})
+		titleCont = soup.find("td", attrs={"valign":"top", "align":"left", "class":"cat", "width":"70%"})
 		if titleCont and "- by" in titleCont.text:
 			pageTitle = titleCont.find("b").text.rstrip().lstrip()
 			pageTitle = str(pageTitle)
 
+		datespan = soup.find('span', class_='popup_date')
+		postTime = dateparser.parse(datespan['title'])
 
-		return pageDesc, pageTitle
+		tagdiv = soup.find('div', id='keywords')
+		if tagdiv:
+			tags = tagdiv.find_all("a")
+			tags = [tag.get_text().strip() for tag in tags]
+		else:
+			tags = []
+
+		return pageDesc, pageTitle, tags, postTime
 
 
 	def _getArtPage(self, dlPathBase, artPageUrl, artistName):
@@ -133,7 +164,7 @@ class GetFA(rewrite.modules.scraper_base.ScraperBase):
 		if not imgurl:
 			self.log.error("OH NOES!!! No image on page: %s" % artPageUrl)
 
-			return "Failed", ''								# Return Fail
+			return self.build_page_ret(status="Failed", fqDlPath=None)								# Return Fail
 
 
 		if not "http:" in imgurl:						# Fa is for some bizarre reason, leaving the 'http:' off some of their URLs
@@ -152,7 +183,9 @@ class GetFA(rewrite.modules.scraper_base.ScraperBase):
 
 		try:
 			filePath = os.path.join(dlPathBase, fname)
-			pageDesc, pageTitle = self._getContentDescriptionTitleFromSoup(bs4.BeautifulSoup(pageCtnt, "lxml"))
+			pageDesc, pageTitle, postTags, postTime = self._getContentDescriptionTitleFromSoup(bs4.BeautifulSoup(pageCtnt, "lxml"))
+			self.log.info("			postTags  = " + postTags)
+			self.log.info("			postTime  = " + postTime)
 
 		except:
 			print("file path issue")
@@ -163,12 +196,12 @@ class GetFA(rewrite.modules.scraper_base.ScraperBase):
 			self.log.error("%s", artPageUrl)
 			self.log.error("%s", traceback.format_exc())
 			self.log.exception("Error with path joining")
-			return "Failed", ''
+			return self.build_page_ret(status="Failed", fqDlPath=None)
 
 
 		if self._checkFileExists(filePath):
 			self.log.info("Exists, skipping...")
-			return "Exists", filePath, pageDesc, pageTitle
+			return self.build_page_ret(status="Exists", fqDlPath=[filePath], pageDesc=pageDesc, pageTitle=pageTitle, postTags=postTags, postTime=postTime)
 		else:
 
 			imgdat = self.wg.getpage(imgurl)							# Request Image
@@ -176,7 +209,7 @@ class GetFA(rewrite.modules.scraper_base.ScraperBase):
 			if imgdat == "Failed":
 				self.log.error("cannot get image %s" % imgurl)
 				self.log.error("source gallery page: %s" % artPageUrl)
-				return "Failed", ''
+				return self.build_page_ret(status="Failed", fqDlPath=None)
 
 			errs = 0
 			imgFile = None
@@ -206,8 +239,7 @@ class GetFA(rewrite.modules.scraper_base.ScraperBase):
 
 
 			self.log.info("Successfully got: " + imgurl)
-			return "Succeeded", filePath, pageDesc, pageTitle									# Return Success
-
+			return self.build_page_ret(status="Succeeded", fqDlPath=[filePath], pageDesc=pageDesc, pageTitle=pageTitle, postTags=postTags, postTime=postTime)
 
 		raise RuntimeError("How did this ever execute?")
 
@@ -284,3 +316,14 @@ class GetFA(rewrite.modules.scraper_base.ScraperBase):
 
 		return ret
 
+
+
+if __name__ == '__main__':
+
+	import logSetup
+	logSetup.initLogging()
+
+	ins = GetFA()
+	cook = ins.getCookie()
+	# dlPathBase, artPageUrl, artistName
+	ins._getArtPage("xxxx", 'https://www.furaffinity.net/view/9016146', 'testtt')

@@ -102,11 +102,11 @@ class GetTumblr(rewrite.modules.scraper_base.ScraperBase):
 		title = post_struct['summary']
 		desc  = post_struct['caption']
 		raw_tags  = post_struct['tags']
-		tags = "".join(["<div><ul class='tags'>"] +
+		html_tags = "".join(["<div><ul class='tags'>"] +
 			["<li>{tag}</li>".format(tag=tag) for tag in raw_tags] +
 			["</ul></div>"])
 
-		self._updatePreviouslyRetreived(artist=orga, pageUrl=pgurl, fqDlPath=None, pageDesc=desc+tags, pageTitle=title, seqNum=seq, postTags=raw_tags)
+		self._updatePreviouslyRetreived(artist=orga, pageUrl=pgurl, pageDesc=desc+html_tags, pageTitle=title, postTags=raw_tags)
 
 		if "photos" in post_struct:
 			contenturls = [tmp['original_size']['url'] for tmp in post_struct['photos']]
@@ -136,7 +136,7 @@ class GetTumblr(rewrite.modules.scraper_base.ScraperBase):
 			with open(filePath, "wb") as fp:								# Open file for saving image (Binary)
 				fp.write(content)						# Write Image to File
 
-			self._updatePreviouslyRetreived(artist=orga, pageUrl=pgurl, fqDlPath=filePath, pageDesc=desc+tags, pageTitle=title, seqNum=seq, postTags=raw_tags)
+			self._updatePreviouslyRetreived(artist=orga, pageUrl=pgurl, fqDlPath=filePath, seqNum=seq)
 			seq += 1
 
 
