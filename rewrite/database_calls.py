@@ -95,6 +95,9 @@ def context_sess():
 	try:
 		yield sess
 
+		# Don't ever allow open queries
+		sess.commit()
+
 	except sqlalchemy.exc.InvalidRequestError:
 		print("InvalidRequest error!")
 		sess.rollback()

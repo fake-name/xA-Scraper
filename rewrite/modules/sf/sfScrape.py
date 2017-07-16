@@ -4,6 +4,8 @@ import os.path
 import traceback
 import re
 import bs4
+import dateparser
+import datetime
 import urllib.request
 import urllib.parse
 from settings import settings
@@ -158,24 +160,36 @@ class GetSf(rewrite.modules.scraper_base.ScraperBase):
 		tags = soup.find('div', id='submission_tags')
 
 		# Horrible hack using ** to work around the fact that 'class' is a reserved keyword
-		tagDiv = soup.new_tag('div', **{'class' : 'tags'})
+		tagDiv = soup.new_tag('div', class_='tags')
 
 		tagHeader = soup.new_tag('b')
 		tagHeader.append('Tags:')
 		tagDiv.append(tagHeader)
 
-
+		plain_tags = []
 		for tag_section in tags.find_all("div", class_='section'):
 			type = tag_section.find("div", class_='section-title')
 			typename = type.get_text().strip().split(" ")[0]
 			for tag in tag_section.find_all('a', class_='sf-tag'):
+				plain_tags.append(tag.get_text().strip())
 				new = soup.new_tag('div', **{'class' : 'tag ' + typename.lower()})
 				new.append(tag.get_text())
 				tagDiv.append(new)
 
 		desc_div.append(tagDiv)
 		desc = str(desc_div.prettify())
-		return title, desc
+
+		timestamp = datetime.datetime.min
+		stats_sections = soup.find_all("div", class_='section-content')
+		for section in stats_sections:
+			context = section.get_text()
+			if "Posted" in context:
+				context = context.split("\n")
+				for line in context:
+					if "Posted" in line:
+						timestamp = dateparser.parse(line[7:])
+
+		return title, desc, plain_tags, timestamp
 
 	def _getArtPage(self, dlPathBase, artPageUrl, artistName):
 		print("GetArtPage!")
@@ -184,7 +198,7 @@ class GetSf(rewrite.modules.scraper_base.ScraperBase):
 
 
 		imageURL = self._getContentUrlFromPage(soup)
-		itemTitle, itemCaption = self._extractTitleDescription(soup)
+		itemTitle, itemCaption, itemTags, postTime = self._extractTitleDescription(soup)
 
 
 		if not imageURL:
@@ -208,16 +222,23 @@ class GetSf(rewrite.modules.scraper_base.ScraperBase):
 
 			if self._checkFileExists(filePath):
 				self.log.info("Exists, skipping...")
-				return self.build_page_ret(status="Exists", fqDlPath=[filePath], pageDesc=itemCaption, pageTitle=itemTitle)
+				return self.build_page_ret(status="Exists", fqDlPath=[filePath], pageDesc=itemCaption, pageTitle=itemTitle, postTags=itemTags, postTime=postTime)
 			else:
 				imgdat, imName = self.wg.getFileAndName(imageURL, addlHeaders={'Referer':artPageUrl})
+
+				if (imName.startswith("'") and imName.endswith("'")) or \
+					(imName.startswith('"') and imName.endswith('"')):
+					imName = imName[1:-1]
+
 
 				errs = 0
 				fp = None
 
 				while not fp:
 					try:
-						fname = os.path.join(filePath, imName)
+						print("Filepath:", filePath)
+						print("imName:", imName)
+						fname = filePath + " - " + imName
 						# For text, the URL fetcher returns decoded strings, rather then bytes.
 						# Therefore, if the file is a string type, we encode it with utf-8
 						# so we can write it to a file.
@@ -230,7 +251,7 @@ class GetSf(rewrite.modules.scraper_base.ScraperBase):
 
 
 						self.log.info("Successfully got: %s", imageURL)
-						return self.build_page_ret(status="Succeeded", fqDlPath=[fname], pageDesc=itemCaption, pageTitle=itemTitle)
+						return self.build_page_ret(status="Succeeded", fqDlPath=[fname], pageDesc=itemCaption, pageTitle=itemTitle, postTags=itemTags)
 
 					except IOError:
 						try:
@@ -359,6 +380,25 @@ class GetSf(rewrite.modules.scraper_base.ScraperBase):
 
 		self.log.info("Found %s links", len(items))
 		return items
+
+
+
+
+
+
+if __name__ == '__main__':
+
+	import logSetup
+	logSetup.initLogging()
+
+	ins = GetSf()
+	# ins.getCookie()
+	print(ins)
+	print("Instance: ", ins)
+	# dlPathBase, artPageUrl, artistName
+	ins._getArtPage("xxxx", '{"url":"https://www.sofurry.com/view/60802"}', 'testtt')
+
+
 
 
 

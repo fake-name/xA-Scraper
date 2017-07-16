@@ -222,7 +222,7 @@ class GetIb(rewrite.modules.scraper_base.ScraperBase):
 			return titleTd.get_text()
 		else:
 			title, dummy_by = titleTd.find_all('div')
-			return title.get_text()
+			return title.get_text().strip()
 
 
 	def _extractDescription(self, desc_soup, tag_soup):
@@ -260,7 +260,7 @@ class GetIb(rewrite.modules.scraper_base.ScraperBase):
 
 		desc.append(tagDiv)
 		desc = str(desc.prettify())
-		return desc
+		return desc.strip()
 
 	def _extractPostTimestamp(self, soup):
 		datespan = soup.find('span', id='submittime_exact')

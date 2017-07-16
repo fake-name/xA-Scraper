@@ -81,6 +81,13 @@ class ScraperBase(module_base.ModuleBase, metaclass=abc.ABCMeta):
 
 		assert isinstance(fqDlPath, (list, type(None))), "Wat? Item: %s, type: %s" % (fqDlPath, type(fqDlPath))
 		assert status in ['Succeeded', 'Exists', 'Ignore', 'Failed']
+		assert isinstance(pageDesc,  (str, type(None))), "Wat? Item: %s, type: %s" % (pageDesc,  type(pageDesc))
+		assert isinstance(pageTitle, (str, type(None))), "Wat? Item: %s, type: %s" % (pageTitle, type(pageTitle))
+
+		if pageTitle:
+			pageTitle = pageTitle.strip()
+		if pageDesc:
+			pageDesc = pageDesc.strip()
 
 		if fqDlPath:
 			fqDlPath = [os.path.abspath(tmp) for tmp in fqDlPath if tmp]
@@ -158,25 +165,26 @@ class ScraperBase(module_base.ModuleBase, metaclass=abc.ABCMeta):
 						sess.add(row)
 						sess.flush()
 
-					frow = sess.query(self.db.ArtFile) \
-						.filter(self.db.ArtFile.item_id == row.id) \
-						.filter(self.db.ArtFile.seqnum == seqNum) \
-						.scalar()
+					if fqDlPath:
+						frow = sess.query(self.db.ArtFile) \
+							.filter(self.db.ArtFile.item_id == row.id) \
+							.filter(self.db.ArtFile.seqnum == seqNum) \
+							.scalar()
 
-					if frow:
-						if frow.fspath != fqDlPath:
-							self.log.error("Item already exists, but download path is changing?")
-							self.log.error("Old path: '%s'", frow.fspath)
-							self.log.error("New path: '%s'", fqDlPath)
-							frow.fspath = fqDlPath
-					else:
-						frow = self.db.ArtFile(
-								item_id  = row.id,
-								seqnum   = seqNum,
-								filename = filename,
-								fspath   = fqDlPath,
-							)
-						sess.add(frow)
+						if frow:
+							if frow.fspath != fqDlPath:
+								self.log.error("Item already exists, but download path is changing?")
+								self.log.error("Old path: '%s'", frow.fspath)
+								self.log.error("New path: '%s'", fqDlPath)
+								frow.fspath = fqDlPath
+						else:
+							frow = self.db.ArtFile(
+									item_id  = row.id,
+									seqnum   = seqNum,
+									filename = filename,
+									fspath   = fqDlPath,
+								)
+							sess.add(frow)
 
 					for tag in postTags:
 						trow = sess.query(self.db.ArtTags) \
@@ -198,6 +206,18 @@ class ScraperBase(module_base.ModuleBase, metaclass=abc.ABCMeta):
 					sess.rollback()
 				except sqlalchemy.exc.IntegrityError:
 					print("Integrity error!")
+					print("Args:")
+
+					print("	artist: ", artist)
+					print("	pageUrl: ", pageUrl)
+					print("	fqDlPath: ", fqDlPath)
+					print("	pageDesc: ", pageDesc)
+					print("	pageTitle: ", pageTitle)
+					print("	seqNum: ", seqNum)
+					print("	filename: ", filename)
+					print("	addTime: ", addTime)
+					print("	postTags: ", postTags)
+
 					traceback.print_exc()
 					sess.rollback()
 

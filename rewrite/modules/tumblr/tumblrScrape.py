@@ -25,8 +25,6 @@ class GetTumblr(rewrite.modules.scraper_base.ScraperBase):
 
 	urlBase = "http://{user}.tumblr.com/"
 
-
-
 	ovwMode = "Check Files"
 
 	numThreads = 1
@@ -97,20 +95,23 @@ class GetTumblr(rewrite.modules.scraper_base.ScraperBase):
 
 	def _getArtPage(self, post_struct, artistName):
 
-		if "photos" in post_struct:
-			contenturls = [tmp['original_size']['url'] for tmp in post_struct['photos']]
-		else:
-			raise FetchError("Cannot find content!")
 
 
 		orga  = post_struct['blog_name']
 		pgurl = post_struct['post_url']
 		title = post_struct['summary']
 		desc  = post_struct['caption']
-		tags  = post_struct['tags']
+		raw_tags  = post_struct['tags']
 		tags = "".join(["<div><ul class='tags'>"] +
-			["<li>{tag}</li>".format(tag=tag) for tag in tags] +
+			["<li>{tag}</li>".format(tag=tag) for tag in raw_tags] +
 			["</ul></div>"])
+
+		self._updatePreviouslyRetreived(artist=orga, pageUrl=pgurl, fqDlPath=None, pageDesc=desc+tags, pageTitle=title, seqNum=seq, postTags=raw_tags)
+
+		if "photos" in post_struct:
+			contenturls = [tmp['original_size']['url'] for tmp in post_struct['photos']]
+		else:
+			raise FetchError("Cannot find content!")
 
 		have = self._checkHaveUrl(artistName, pgurl)
 		if have:
@@ -135,7 +136,7 @@ class GetTumblr(rewrite.modules.scraper_base.ScraperBase):
 			with open(filePath, "wb") as fp:								# Open file for saving image (Binary)
 				fp.write(content)						# Write Image to File
 
-			self._updatePreviouslyRetreived(artist=orga, pageUrl=pgurl, fqDlPath=filePath, pageDesc=desc+tags, pageTitle=title, seqNum=seq)
+			self._updatePreviouslyRetreived(artist=orga, pageUrl=pgurl, fqDlPath=filePath, pageDesc=desc+tags, pageTitle=title, seqNum=seq, postTags=raw_tags)
 			seq += 1
 
 
