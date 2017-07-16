@@ -12,15 +12,15 @@ import logSetup
 
 from apscheduler.schedulers.background import BackgroundScheduler
 
-import plugins.scrapers.da.daScrape as das
-import plugins.scrapers.fa.faScrape as fas
-import plugins.scrapers.hf.hfScrape as hfs
-import plugins.scrapers.px.pxScrape as pxs
-import plugins.scrapers.wy.wyScrape as wys
-import plugins.scrapers.ib.ibScrape as ibs
-import plugins.scrapers.sf.sfScrape as sfs
-import plugins.scrapers.artstation.asScrape as ass
-import plugins.scrapers.tumblr.tumblrScrape as tus
+import rewrite.modules.da.daScrape as das
+import rewrite.modules.fa.faScrape as fas
+import rewrite.modules.hf.hfScrape as hfs
+import rewrite.modules.px.pxScrape as pxs
+import rewrite.modules.wy.wyScrape as wys
+import rewrite.modules.ib.ibScrape as ibs
+import rewrite.modules.sf.sfScrape as sfs
+import rewrite.modules.artstation.asScrape as ass
+import rewrite.modules.tumblr.tumblrScrape as tus
 
 from settings import settings
 import cherrypy

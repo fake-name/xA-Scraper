@@ -11,6 +11,7 @@ from settings import settings
 
 
 import rewrite.modules.scraper_base
+import rewrite.modules.exceptions
 
 
 class GetDA(rewrite.modules.scraper_base.ScraperBase):
@@ -20,7 +21,7 @@ class GetDA(rewrite.modules.scraper_base.ScraperBase):
 
 	ovwMode = "Check Files"
 
-	numThreads = 4
+	numThreads = 1
 
 	# ---------------------------------------------------------------------------------------------------------------------------------------------------------
 	# Cookie Management
@@ -162,8 +163,9 @@ class GetDA(rewrite.modules.scraper_base.ScraperBase):
 
 		if not imgurl:
 			self.log.critical("OH NOES!!! No image on page = %s", artPageUrl)
-			# print mpgctnt
-			return self.build_page_ret(status="Failed", fqDlPath=None)
+			self.getCookie()
+			raise rewrite.modules.exceptions.RetryException("Image missing?")
+
 
 		if imgurl == "Prose":
 			return self.build_page_ret(status="Exists", fqDlPath=[], pageDesc=pageDesc, pageTitle=pageTitle, postTags=postTags, postTime=postTime)

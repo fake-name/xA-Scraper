@@ -10,6 +10,7 @@ import sqlalchemy.exc
 from settings import settings
 
 from rewrite.modules import module_base
+from rewrite.modules import exceptions
 
 class ScraperBase(module_base.ModuleBase, metaclass=abc.ABCMeta):
 
@@ -339,6 +340,18 @@ class ScraperBase(module_base.ModuleBase, metaclass=abc.ABCMeta):
 
 		return newArt
 
+	def __fetch_retrier(self, dlPathBase, pageURL, artist):
+		for _ in range(3):
+			try:
+				ret = self._getArtPage(dlPathBase, pageURL, artist)
+				return ret
+			except exceptions.RetryException:
+				pass
+
+		self.log.error("Failed to fetch content at '%s' for artist '%s'", pageURL, artist)
+		return self.build_page_ret(status="Failed", fqDlPath=None)
+
+
 	def getArtist(self, artist, ctrlNamespace):
 		if ctrlNamespace.run is False:
 			self.log.warning("Exiting early from %s due to run flag being unset", artist)
@@ -357,7 +370,8 @@ class ScraperBase(module_base.ModuleBase, metaclass=abc.ABCMeta):
 			while len(newArt) > 0:
 				pageURL = newArt.pop()
 				try:
-					ret = self._getArtPage(dlPathBase, pageURL, artist)
+					ret = self.__fetch_retrier(dlPathBase, pageURL, artist)
+					# ret = self._getArtPage(dlPathBase, pageURL, artist)
 
 					assert isinstance(ret, dict)
 					assert 'status'     in ret
