@@ -28,8 +28,6 @@ import io
 from threading import Lock
 cookieWriteLock = Lock()
 
-
-
 import itertools
 import mimetypes
 import email.generator

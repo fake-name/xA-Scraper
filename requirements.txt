@@ -37,3 +37,9 @@ psycopg2
 flask_csrf
 flask-paginate
 Flask-HTTPAuth
+zerorpc
+
+
+dill
+git+https://github.com/berkerpeksag/astor.git
+git+https://github.com/fake-name/ChromeController.git

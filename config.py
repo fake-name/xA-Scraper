@@ -56,7 +56,7 @@ class BaseConfig(object):
 	MAX_SEARCH_RESULTS = 50
 
 	FEED_ITEMS_PER_PAGE = 150
-
+	SQLALCHEMY_TRACK_MODIFICATIONS = False
 
 	RESOURCE_DIR = settings['webCtntPath']
 
