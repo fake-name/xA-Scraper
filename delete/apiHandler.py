@@ -11,8 +11,7 @@ class ApiInterface(object):
 
 	log = logging.getLogger("Main.API")
 
-	def __init__(self, sqlInterface):
-		self.conn = sqlInterface
+	def __init__(self):
 
 
 	def updateName(self, request):

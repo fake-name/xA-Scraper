@@ -5,6 +5,8 @@ import traceback
 import re
 import bs4
 import json
+import datetime
+import dateparser
 import urllib.request
 import urllib.parse
 from settings import settings
@@ -40,6 +42,8 @@ class GetPX(rewrite.modules.scraper_base.ScraperBase):
 
 		soup = self.wg.getSoup('https://accounts.pixiv.net/login', addlHeaders={'Referer': 'https://www.pixiv.net/'})
 		container = soup.find("div", id='old-login')
+		if not container:
+			return True, "Logged In"
 
 		inputs = container.find_all("input")
 		logondict = {}
@@ -132,7 +136,7 @@ class GetPX(rewrite.modules.scraper_base.ScraperBase):
 							with open(filePath, "wb") as fp:
 								fp.write(imgdath)
 							break
-						except:
+						except Exception:
 							self.log.critical(traceback.format_exc())
 							writeErrors += 1
 					else:
@@ -165,6 +169,11 @@ class GetPX(rewrite.modules.scraper_base.ScraperBase):
 
 	def _extractTitleDescription(self, soupin):
 
+		itemTitle = ""
+		itemCaption = ""
+		postTime = datetime.datetime.min
+		postTags = []
+
 		infoContainer = soupin.find(class_="work-info")
 		if infoContainer:
 			itemTitle = infoContainer.find("h1", class_="title")
@@ -173,21 +182,29 @@ class GetPX(rewrite.modules.scraper_base.ScraperBase):
 			itemCaption = infoContainer.find("p", class_="caption")
 			if itemCaption:
 				itemCaption = itemCaption.get_text()
-			print("title = ", itemTitle)
-			print("caption = ", itemCaption)
-		else:
-			itemTitle = ""
-			itemCaption = ""
+
+			datelist = infoContainer.find('ul', class_='meta')
+
+			# This is probably brittle
+			postTime = dateparser.parse(datelist.li.get_text().strip())
+
+
+		tags = soupin.find_all('li', class_="tag")
+
+		for tag in tags:
+			postTags.append(tag.find("a", class_='text').get_text().strip())
+
 		if itemCaption is None:
 			itemCaption = ""
-		return itemTitle, itemCaption
+
+		return itemTitle, itemCaption, postTime, postTags
 
 
 	def _getSinglePageContent(self, dlPathBase, imageTag, baseSoup, artPageUrl):
 		imgurl   = imageTag['data-src']
 		imgTitle = imageTag['alt']
 
-		itemTitle, itemCaption = self._extractTitleDescription(baseSoup)
+		itemTitle, itemCaption, postTime, postTags = self._extractTitleDescription(baseSoup)
 
 
 
@@ -196,9 +213,11 @@ class GetPX(rewrite.modules.scraper_base.ScraperBase):
 		fname = fname.rsplit("?")[0] 		# Sometimes there is some PHP stuff tacked on the end of the Image URL. Split on the indicator("?"), and throw away everything after it.
 		fname = fname.rsplit("/")[-1]
 
-		self.log.info("			Filename = " + fname)
-		self.log.info("			Page Image Title = " + imgTitle)
-		self.log.info("			FileURL = " + imgurl)
+		self.log.info("			Filename = %s", fname)
+		self.log.info("			Page Image Title = %s", imgTitle)
+		self.log.info("			FileURL = %s", imgurl)
+		self.log.info("			postTime = %s", postTime)
+		self.log.info("			postTags = %s", postTags)
 
 		filePath = os.path.join(dlPathBase, fname)
 		if not self._checkFileExists(filePath):
@@ -208,24 +227,24 @@ class GetPX(rewrite.modules.scraper_base.ScraperBase):
 			if imgdath == "Failed":
 				self.log.info("cannot get image")
 				return self.build_page_ret(status="Failed", fqDlPath=None)
-			self.log.info("Successfully got: " + fname)
+			self.log.info("Successfully got: %s", fname)
 			# print fname
 			try:
 				with open(filePath, "wb") as fp:
 					fp.write(imgdath)
-			except:
+			except Exception:
 				self.log.critical("cannot save image")
 				self.log.critical(traceback.print_exc())
 				self.log.critical("cannot save image")
 
 				return self.build_page_ret(status="Failed", fqDlPath=None)
 
-			self.log.info("Successfully got: " + imgurl)
-			self.log.info("Saved to path: " + filePath)
-			return self.build_page_ret(status="Succeeded", fqDlPath=[filePath], pageDesc=itemCaption, pageTitle=itemTitle)
+			self.log.info("Successfully got: %s", imgurl)
+			self.log.info("Saved to path: %s", filePath)
+			return self.build_page_ret(status="Succeeded", fqDlPath=[filePath], pageDesc=itemCaption, pageTitle=itemTitle, postTags=postTags, postTime=postTime)
 		else:
 			self.log.info("Exists, skipping... (path = %s)", filePath)
-			return self.build_page_ret(status="Exists", fqDlPath=[filePath], pageDesc=itemCaption, pageTitle=itemTitle)
+			return self.build_page_ret(status="Exists", fqDlPath=[filePath], pageDesc=itemCaption, pageTitle=itemTitle, postTags=postTags, postTime=postTime)
 
 	def _getSinglePageManga(self, dlPathBase, imageTag, baseSoup, artPageUrl):
 		imgurl   = imageTag['href']
@@ -241,15 +260,17 @@ class GetPX(rewrite.modules.scraper_base.ScraperBase):
 		imgref = imgurl
 		imgurl = imgpage.img['src']
 
-		itemTitle, itemCaption = self._extractTitleDescription(baseSoup)
+		itemTitle, itemCaption, postTime, postTags = self._extractTitleDescription(baseSoup)
 
 		regx4 = re.compile("https?://.+/")				# FileName RE
 		fname = regx4.sub("" , imgurl)
 		fname = fname.rsplit("?")[0] 		# Sometimes there is some PHP stuff tacked on the end of the Image URL. Split on the indicator("?"), and throw away everything after it.
 
-		self.log.info("			Filename = " + fname)
-		self.log.info("			Page Image Title = " + imgTitle)
-		self.log.info("			FileURL = " + imgurl)
+		self.log.info("			Filename = %s", fname)
+		self.log.info("			Page Image Title = %s", imgTitle)
+		self.log.info("			FileURL = %s", imgurl)
+		self.log.info("			postTime = %s", postTime)
+		self.log.info("			postTags = %s", postTags)
 
 		filePath = os.path.join(dlPathBase, fname)
 		if not self._checkFileExists(filePath):
@@ -259,27 +280,27 @@ class GetPX(rewrite.modules.scraper_base.ScraperBase):
 			if imgdath == "Failed":
 				self.log.info("cannot get image")
 				return self.build_page_ret(status="Failed", fqDlPath=None)
-			self.log.info("Successfully got: " + fname)
+			self.log.info("Successfully got: %s", fname)
 			# print fname
 			try:
 				with open(filePath, "wb") as fp:
 					fp.write(imgdath)
-			except:
+			except Exception:
 				self.log.critical("cannot save image")
 				self.log.critical(traceback.print_exc())
 				self.log.critical("cannot save image")
 
 				return self.build_page_ret(status="Failed", fqDlPath=None)
 
-			self.log.info("Successfully got: " + imgurl)
-			self.log.info("Saved to path: " + filePath)
-			return self.build_page_ret(status="Succeeded", fqDlPath=[filePath], pageDesc=itemCaption, pageTitle=itemTitle)
+			self.log.info("Successfully got: %s", imgurl)
+			self.log.info("Saved to path: %s", filePath)
+			return self.build_page_ret(status="Succeeded", fqDlPath=[filePath], pageDesc=itemCaption, pageTitle=itemTitle, postTags=postTags, postTime=postTime)
 		else:
 			self.log.info("Exists, skipping... (path = %s)", filePath)
-			return self.build_page_ret(status="Exists", fqDlPath=[filePath], pageDesc=itemCaption, pageTitle=itemTitle)
+			return self.build_page_ret(status="Exists", fqDlPath=[filePath], pageDesc=itemCaption, pageTitle=itemTitle, postTags=postTags, postTime=postTime)
 
 	def _getAnimation(self, dlPathBase, imageTag, soup, artPageUrl):
-		itemTitle, itemCaption = self._extractTitleDescription(soup)
+		itemTitle, itemCaption, postTime, postTags = self._extractTitleDescription(soup)
 
 		scripts = soup.find("script", text=re.compile("ugokuIllustFullscreenData"))
 		if not scripts:
@@ -308,9 +329,11 @@ class GetPX(rewrite.modules.scraper_base.ScraperBase):
 		fname = regx4.sub("" , ctntsrc)
 		fname = fname.rsplit("?")[0] 		# Sometimes there is some PHP stuff tacked on the end of the Image URL. Split on the indicator("?"), and throw away everything after it.
 
-		self.log.info("			Filename = " + fname)
-		self.log.info("			Page Image Title = " + itemTitle)
-		self.log.info("			FileURL = " + ctntsrc)
+		self.log.info("			Filename = %s", fname)
+		self.log.info("			Page Image Title = %s", itemTitle)
+		self.log.info("			FileURL = %s", ctntsrc)
+		self.log.info("			postTime = %s", postTime)
+		self.log.info("			postTags = %s", postTags)
 
 		filePath = os.path.join(dlPathBase, fname)
 		if not self._checkFileExists(filePath):
@@ -325,7 +348,7 @@ class GetPX(rewrite.modules.scraper_base.ScraperBase):
 			try:
 				with open(filePath, "wb") as fp:
 					fp.write(imgdath)
-			except:
+			except Exception:
 				self.log.critical("cannot save image")
 				self.log.critical(traceback.print_exc())
 				self.log.critical("cannot save image")
@@ -334,10 +357,10 @@ class GetPX(rewrite.modules.scraper_base.ScraperBase):
 
 			self.log.info("Successfully got: " + ctntsrc)
 			self.log.info("Saved to path: " + filePath)
-			return self.build_page_ret(status="Succeeded", fqDlPath=[filePath], pageDesc=itemCaption, pageTitle=itemTitle)
+			return self.build_page_ret(status="Succeeded", fqDlPath=[filePath], pageDesc=itemCaption, pageTitle=itemTitle, postTags=postTags, postTime=postTime)
 		else:
 			self.log.info("Exists, skipping... (path = %s)", filePath)
-			return self.build_page_ret(status="Exists", fqDlPath=[filePath], pageDesc=itemCaption, pageTitle=itemTitle)
+			return self.build_page_ret(status="Exists", fqDlPath=[filePath], pageDesc=itemCaption, pageTitle=itemTitle, postTags=postTags, postTime=postTime)
 
 
 	def _getArtPage(self, dlPathBase, pgurl, artistName):
@@ -454,7 +477,7 @@ class GetPX(rewrite.modules.scraper_base.ScraperBase):
 
 		if ((iterCounter * 20) - len(artlinks)) > 20:
 			self.log.warning("We seem to have found less than 20 links per page. are there missing files?")
-			self.log.warning("Found %s links on %s pages. Should have found %s - %s links", (len(artlinks), iterCounter, (iterCounter - 1) * 20, iterCounter * 20))
+			self.log.warning("Found %s links on %s pages. Should have found %s - %s links", len(artlinks), iterCounter, (iterCounter - 1) * 20, iterCounter * 20)
 
 		return artlinks
 
@@ -511,3 +534,6 @@ class GetPX(rewrite.modules.scraper_base.ScraperBase):
 
 
 		return super().getNameList()
+
+
+

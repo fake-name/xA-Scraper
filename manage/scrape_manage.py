@@ -15,6 +15,8 @@ import logSetup
 from settings import settings
 
 import signal
+import time
+import multiprocessing
 import multiprocessing.managers
 import sys
 
@@ -59,6 +61,26 @@ def do_fetch(args):
 		for plgname in args:
 			plg, dummy_name = PLUGINS[plgname]
 			do_plugin(plg)
+
+
+
+def do_fetch_all():
+
+	processes = [
+			multiprocessing.Process(target=do_plugin, name='run-'+plg_name, args=(plg, ))
+		for
+			plg, plg_name in PLUGINS.values()
+	]
+
+	# Start all the plugins
+	[tmp.start() for tmp in processes]
+
+	while any([tmp.is_alive() for tmp in processes]):
+		time.sleep(5)
+		status = {tmp.name : tmp.is_alive() for tmp in processes}
+		print("Plugin status: ", status)
+
+
 
 
 def do_import(sitename, filename):

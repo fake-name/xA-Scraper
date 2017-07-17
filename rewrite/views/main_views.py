@@ -21,6 +21,7 @@ from datetime import datetime
 from sqlalchemy import desc
 from sqlalchemy.orm import joinedload
 from rewrite import app
+from rewrite import auth
 from rewrite import db
 from rewrite import database
 
@@ -114,7 +115,7 @@ def internal_error(dummy_error):
 @app.route('/', methods=['GET'])
 @app.route('/<int:pagenum>', methods=['GET'])
 @app.route('/index', methods=['GET'])
-# @login_required
+@auth.login_required
 def index(pagenum=1):
 	source_list = get_source_list()
 
@@ -130,6 +131,7 @@ def index(pagenum=1):
 
 
 @app.route('/images/byid/<int:img_id>', methods=['GET'])
+@auth.login_required
 def fetch_image_fileid(img_id):
 
 

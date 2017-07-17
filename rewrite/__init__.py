@@ -2,6 +2,7 @@ import os
 from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
 from flask_debugtoolbar import DebugToolbarExtension
+from flask_httpauth import HTTPBasicAuth
 import datetime
 
 import urllib.parse
@@ -17,7 +18,19 @@ if "debug" in sys.argv:
 
 app.config.from_object('config.BaseConfig')
 app.jinja_env.add_extension('jinja2.ext.do')
+auth = HTTPBasicAuth()
 db = SQLAlchemy(app)
+
+
+users = {"herp" : "wattttttt"}
+
+@auth.get_password
+def get_pw(username):
+	if username in users:
+		return users.get(username)
+	return None
+
+
 
 if "debug" in sys.argv:
 	print("Installing debug toolbar!")

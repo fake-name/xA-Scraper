@@ -1,28 +1,39 @@
-APScheduler==3.0.5
-Babel==2.2.0
-beautifulsoup4==4.4.1
-CherryPy==5.0.0
-colorama==0.3.6
-future==0.15.2
-httpretty==0.8.14
-lxml==3.5.0
-Mako==1.0.3
-MarkupSafe==0.23
-natsort==4.0.4
-oauthlib==1.0.3
-PasteDeploy==1.5.2
-psycopg2==2.6.1
-pyramid==1.6.1
-python-tumblpy==1.0.5
-pytz==2015.7
-PyYAML==3.11
-repoze.lru==0.6
-requests==2.9.1
-requests-oauthlib==0.6.0
-six==1.10.0
-translationstring==1.3
-tzlocal==1.2
-venusian==1.0
-WebOb==1.5.1
-zope.deprecation==4.1.2
-zope.interface==4.1.3
+APScheduler
+Babel
+beautifulsoup4
+CherryPy
+colorama
+future
+httpretty
+lxml
+Mako
+MarkupSafe
+## natsort
+## oauthlib
+## PasteDeploy
+pyramid
+sqlalchemy
+python-tumblpy
+pytz
+## PyYAML
+## repoze.lru
+requests
+requests-oauthlib
+six
+## translationstring
+tzlocal
+## venusian
+## WebOb
+zope.deprecation
+zope.interface
+flask
+flask-sqlalchemy
+flask-debugtoolbar
+flask-markdown
+dateparser
+markdown
+flask_login
+psycopg2
+flask_csrf
+flask-paginate
+Flask-HTTPAuth

@@ -25,7 +25,6 @@ import rewrite.modules.tumblr.tumblrScrape as tus
 from settings import settings
 import cherrypy
 
-import manage.statusDbManager
 
 
 JOBS = [
@@ -92,7 +91,8 @@ def scheduleJobs(sched, managedNamespace):
 
 
 def go(managedNamespace):
-	statusMgr = manage.statusDbManager.StatusResource()
+	print("Go()")
+	# statusMgr = manage.statusDbManager.StatusResource()
 	managedNamespace.run = True
 	managedNamespace.serverRun = True
 
@@ -100,18 +100,19 @@ def go(managedNamespace):
 	server_process = multiprocessing.Process(target=serverProcess, args=(managedNamespace,))
 
 	sched = BackgroundScheduler()
+	print("Running!")
 
-	# scheduleJobs(sched, managedNamespace)
-	# server_process.start()
-	# sched.start()
+	scheduleJobs(sched, managedNamespace)
+	server_process.start()
+	sched.start()
 
 	loopCtr = 0
 	while managedNamespace.run:
 		time.sleep(0.1)
 
-		if loopCtr % 100 == 0:
-			for job in sched.get_jobs():
-				statusMgr.updateNextRunTime(job.name, job.next_run_time.timestamp())
+		# if loopCtr % 100 == 0:
+		# 	for job in sched.get_jobs():
+		# 		statusMgr.updateNextRunTime(job.name, job.next_run_time.timestamp())
 		loopCtr += 1
 
 	sched.shutdown()

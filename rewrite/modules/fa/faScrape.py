@@ -315,5 +315,3 @@ class GetFA(rewrite.modules.scraper_base.ScraperBase, util.captcha2upload.Captch
 		self.log.info("Found %s links" % (len(ret)))
 
 		return ret
-
-

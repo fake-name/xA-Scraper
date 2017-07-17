@@ -3,8 +3,8 @@ import sys
 
 import logSetup
 
-from . import statusDbManager
 from . import ttrssImport
+from .scrape_manage import do_fetch_all
 from .scrape_manage import do_fetch
 from .scrape_manage import do_import
 from .scrape_manage import PLUGINS
@@ -23,6 +23,8 @@ def print_help():
 	print("	fetch [sitename]")
 	print("		with no sitename, this executes all plugins in sequence.")
 	print("		With a sitename, executes the named plugin.")
+	print("	fetch-all")
+	print("		Executes all plugins in parallel.")
 	print("	import <sitename> <filename>")
 	print("		Open a text file <filename>, and import the names from")
 	print("		it into the monitored names database for site <sitename>.")
@@ -43,8 +45,8 @@ def one_arg_go(command):
 		ttrssImport.go()
 	if command == "fetch":
 		do_fetch([])
-	if command == "upgrade-db":
-		statusDbManager.db_upgrade()
+	if command == "fetch-all":
+		do_fetch_all()
 
 def two_arg_go(command, param):
 

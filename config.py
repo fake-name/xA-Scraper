@@ -52,13 +52,17 @@ class BaseConfig(object):
 	GENRES_PER_PAGE = 50
 	SERIES_PER_PAGE = 50
 
-	POSTS_PER_PAGE = 50
+	POSTS_PER_PAGE = 250
 	MAX_SEARCH_RESULTS = 50
 
 	FEED_ITEMS_PER_PAGE = 150
 
 
 	RESOURCE_DIR = settings['webCtntPath']
+
+	# flask-assets
+	# ------------
+	ASSETS_DEST = 'rewrite/static'
 
 	# The WTF protection doesn't have to persist across
 	# execution sessions, since that'll break any

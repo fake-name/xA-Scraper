@@ -11,19 +11,16 @@ from pyramid.session import SignedCookieSessionFactory
 
 
 import pyramid.security as pys
-import cherrypy
 import apiHandler
 import webFunctions
 
 import mako.exceptions
 from mako.lookup import TemplateLookup
 
-from settings import settings
 
 import os.path
 users = {"herp" : "wattttttt"}
 
-import psycopg2
 
 def userCheck(userid, dummy_request):
 	if userid in users:
@@ -32,8 +29,12 @@ def userCheck(userid, dummy_request):
 		return False
 
 import logging
-import sqlite3
 import traceback
+
+from settings import settings
+import rewrite.database
+
+
 
 
 request_sessions = {}
@@ -42,46 +43,17 @@ request_cookies = {}
 
 class PageResource(object):
 
+
+	db = rewrite.database
+
 	log = logging.getLogger("Main.WebSrv")
 
 	def __init__(self):
 		self.base_directory = settings["webCtntPath"]
 		self.lookupEngine = TemplateLookup(directories=[self.base_directory], module_directory='./ctntCache')
 
-		self.openDB()
-		self.apiInterface = apiHandler.ApiInterface(self.conn)
+		self.apiInterface = apiHandler.ApiInterface()
 
-		cherrypy.engine.subscribe("exit", self.closeDB)
-
-
-
-	def openDB(self):
-		self.log.info("Info Generator Opening DB...")
-		self.conn = psycopg2.connect(
-					database = settings["postgres"]['database'],
-					user     = settings["postgres"]['username'],
-					password = settings["postgres"]['password'],
-					host     = settings["postgres"]['address']
-					)
-		self.log.info("DB opened")
-
-
-		self.log.info("DB opened. Activating 'wal' mode")
-		# rets = self.conn.execute('''PRAGMA journal_mode=wal;''')
-		# rets = self.conn.execute('''PRAGMA locking_mode=EXCLUSIVE;''')
-		# rets = rets.fetchall()
-
-		# self.log.info("PRAGMA return value = %s", rets)
-
-
-	def closeDB(self):
-		self.log.info("Closing DB...",)
-		try:
-			self.conn.close()
-		except:
-			self.log.error("wat")
-			self.log.error(traceback.format_exc())
-		self.log.info("done")
 
 	def getResponse(self, reqPath):
 
@@ -106,7 +78,6 @@ class PageResource(object):
 
 
 	def getPageNoAuth(self, request):
-
 
 		self.log.info("Request from %s for path - %s!", request.remote_addr, request.path)
 
@@ -136,7 +107,8 @@ class PageResource(object):
 			# Conditionally parse and render mako files.
 			if reqPath.endswith(".mako"):
 				pgTemplate = self.lookupEngine.get_template(reqPath)
-				pageContent = pgTemplate.render_unicode(request=request, sqlCon=self.conn, api=self.apiInterface, request_sessions=request_sessions, request_cookies=request_cookies)
+				with self.db.context_sess() as sess:
+					pageContent = pgTemplate.render_unicode(request=request, sess=sess, api=self.apiInterface, request_sessions=request_sessions, request_cookies=request_cookies)
 				return Response(body=pageContent)
 			else:
 				absolute_path = os.path.join(self.base_directory, reqPath)
@@ -146,19 +118,21 @@ class PageResource(object):
 		except mako.exceptions.TopLevelLookupException:
 			self.log.error("404 Request for page at url: %s", reqPath)
 			pgTemplate = self.lookupEngine.get_template("error.mako")
-			pageContent = pgTemplate.render_unicode(request=request, sqlCon=self.conn, tracebackStr=traceback.format_exc(), error_str="NO PAGE! 404")
+			with self.db.context_sess() as sess:
+				pageContent = pgTemplate.render_unicode(request=request, sess=sess, tracebackStr=traceback.format_exc(), error_str="NO PAGE! 404")
 			return Response(body=pageContent)
 		except:
 			self.log.error("Page rendering error! url: %s", reqPath)
 			self.log.error(traceback.format_exc())
 			pgTemplate = self.lookupEngine.get_template("error.mako")
-			pageContent = pgTemplate.render_unicode(request=request, sqlCon=self.conn, tracebackStr=traceback.format_exc(), error_str="EXCEPTION! WAT?")
+			with self.db.context_sess() as sess:
+				pageContent = pgTemplate.render_unicode(request=request, sess=sess, tracebackStr=traceback.format_exc(), error_str="EXCEPTION! WAT?")
 			return Response(body=pageContent)
 
 	def checkAuth(self, request):
 		userid = pys.authenticated_userid(request)
 		if userid is None:
-			self.log.warn("No userID found for request to '%s'. Redirecting to login." % request.path)
+			self.log.warn("No userID found for request to '%s'. Redirecting to login.", request.path)
 			return HTTPFound(location=request.route_url('login'))
 
 	def getImagePathFromID(self, imageID):
@@ -221,7 +195,9 @@ class PageResource(object):
 
 		self.log.info("Request from %s for Site Source %s!", request.remote_addr, request.matchdict)
 		pgTemplate = self.lookupEngine.get_template("genSiteArtistList.mako")
-		pageContent = pgTemplate.render_unicode(request=request, sqlCon=self.conn, siteSource=siteName)
+
+		with self.db.context_sess() as sess:
+			pageContent = pgTemplate.render_unicode(request=request, sess=sess, siteSource=siteName)
 		return Response(body=pageContent)
 
 
@@ -236,7 +212,8 @@ class PageResource(object):
 
 		self.log.info("Request from %s Artist page = %s, %s, %s", request.remote_addr, siteName, sourceName, pageNumber)
 		pgTemplate = self.lookupEngine.get_template("genArtistList.mako")
-		pageContent = pgTemplate.render_unicode(request=request, sqlCon=self.conn, siteSource=siteName, artist=sourceName, pageNumberStr=pageNumber)
+		with self.db.context_sess() as sess:
+			pageContent = pgTemplate.render_unicode(request=request, sess=sess, siteSource=siteName, artist=sourceName, pageNumberStr=pageNumber)
 		return Response(body=pageContent)
 
 
@@ -327,10 +304,10 @@ class PageResource(object):
 				return Response(body=pageContent, headers=headers)
 
 			else:
-				self.log.warn("Invalid user. Deleting cookie.")
+				self.log.warning("Invalid user. Deleting cookie.")
 				headers = pys.forget(request)
 		else:
-			self.log.warn("No user specified - Deleting cookie.")
+			self.log.warning("No user specified - Deleting cookie.")
 			headers = pys.forget(request)
 
 		return HTTPFound(location=request.route_url('login'))
@@ -354,11 +331,11 @@ def buildApp():
 	config.set_authorization_policy(authz_policy)
 	config.set_session_factory(session_factory)
 
-	config.add_route(name='get-fa-captcha-img',          pattern='/faCaptchaImage')
-	config.add_view(resource.getFaCapcha,             http_cache=0, route_name='get-fa-captcha-img')
+	config.add_route(name='get-fa-captcha-img',      pattern='/faCaptchaImage')
+	config.add_view(resource.getFaCapcha,            http_cache=0, route_name='get-fa-captcha-img')
 
-	config.add_route(name='do-fa-captcha-login',          pattern='/doFaCaptchaLogin')
-	config.add_view(resource.doFaCaptchaLogin,             http_cache=0, route_name='do-fa-captcha-login')
+	config.add_route(name='do-fa-captcha-login',     pattern='/doFaCaptchaLogin')
+	config.add_view(resource.doFaCaptchaLogin,       http_cache=0, route_name='do-fa-captcha-login')
 
 	config.add_route(name='login',                   pattern='/login')
 	config.add_route(name='do_login',                pattern='/login-check')
@@ -368,7 +345,7 @@ def buildApp():
 	config.add_route(name='get-image-by-offset',     pattern='/images/byoffset/{artist}/{offset}')
 	config.add_route(name='get-site-source',         pattern='/source/bysite/{siteName}')
 	config.add_route(name='get-artist-source',       pattern='/source/byartist/{siteName}/{sourceName}/{pageNumber}')
-	config.add_route(name='api',                    pattern='/api')
+	config.add_route(name='api',                     pattern='/api')
 	config.add_route(name='leaf',                    pattern='/*page')
 
 	config.add_view(resource.getPageNoAuth,          http_cache=0, route_name='login')
