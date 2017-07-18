@@ -21,46 +21,77 @@ import logging
 
 
 class TestClass(object):
+	# # ---------------------------------------------------------------------------------------------------------------------------------------------------------
+	# Runtime management
+	# # ---------------------------------------------------------------------------------------------------------------------------------------------------------
+
 	def __init__(self, wg=None):
-		self.log = logging.getLogger("Main.RemoteExec.Tester")
+		self.logname = "Main.RemoteExec.Tester"
+		self.out_buffer = []
+
 		self.wg = wg
-		self.log.info("TestClass Instantiated")
+		self.log_info("TestClass Instantiated")
 
-	def test_internal(self):
-		ret = 'wut'
-		ret += "\n" + str(self.wg)
-		ret += "\n" + str(self.log)
+	def log_debug(self, msg, *args):
+		tmp = self.logname + " [DEBUG] ->" + msg % args
+		self.out_buffer.append(tmp)
+	def log_info(self, msg, *args):
+		tmp = self.logname + " [INFO] ->" + msg % args
+		self.out_buffer.append(tmp)
+	def log_error(self, msg, *args):
+		tmp = self.logname + " [ERROR] ->" + msg % args
+		self.out_buffer.append(tmp)
 
-		ret += "\n" + str(dill)
-		ret += "\n" + str(logging)
-		ret += "\n" + str(urllib.parse)
-		ret += "\n" + str(socket)
-		ret += "\n" + str(traceback)
-		ret += "\n" + str(threading)
-		ret += "\n" + str(multiprocessing)
-		ret += "\n" + str(queue)
-		ret += "\n" + str(time)
-		ret += "\n" + str(json)
-		ret += "\n" + str(mimetypes)
-		ret += "\n" + str(re)
-		ret += "\n" + str(bs4)
-		ret += "\n" + str(urllib.request)
-		ret += "\n" + str(urllib.parse)
-		ret += "\n"
-		ret += "\n" + str(locals())
-		ret += "\n" + str(globals())
+	def go(self, *args, **kwargs):
+		return (self.out_buffer, self._go(*args, **kwargs))
 
-		ret += "\n"
-		ret += "\n" + self.wg.getpage("http://example.org/")
-		return ret
+	# # ---------------------------------------------------------------------------------------------------------------------------------------------------------
+	# User-facing type things
+	# # ---------------------------------------------------------------------------------------------------------------------------------------------------------
 
+	def yp_walk_to_entry(self):
+		gateway = 'https://8ch.net/fur/res/22069.html'
+		step1 = self.wg.getpage(gateway)
+		self.log_debug("Step 1: '%s'", step1)
+		extraHeaders = {
+					"Referer"       : gateway,
+		}
 
+		step2 = self.wg.getpage('https://yiff.party/zauth', addlHeaders=extraHeaders)
+		self.log_debug("Step 2: '%s'", step2)
 
-	def go(self):
-		self.log.info("TestClass go() called")
-		self.log.info("WG: %s", self.wg)
+		if 'What is the name of the character pictured above?' in step2:
+			self.log_info("Need to step through confirmation page.")
+			params = {
+				'act'       : 'anon_auth',
+				'challenge' : 'anon_auth_1',
+				'answer'    : 'nate',
+			}
+			step3 = self.wg.getpage('https://yiff.party/intermission', postData=params)
+			self.log_debug("Step 3: '%s'", step3)
+		else:
+			step3 = step2
 
-		return ("Test sez wut?", self.test_internal())
+		if 'You have no favourite creators!' in step3:
+			self.log_info("Reached home page!")
+			return True
+		else:
+			self.log_error("Failed to reach home page!")
+			return False
+
+	def yp_get_names(self):
+		ok = self.yp_walk_to_entry()
+		if ok:
+			return self.wg.getpage('https://yiff.party/creators2.json', addlHeaders={"Referer" : 'https://yiff.party/'})
+		else:
+			return None
+
+	def _go(self, mode, **kwargs):
+		if mode == 'get-names:':
+			return self.yp_get_names()
+		else:
+			return (self.out_buffer, self._go())
+
 
 
 
