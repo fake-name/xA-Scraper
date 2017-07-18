@@ -147,42 +147,6 @@ class GetTumblr(rewrite.modules.scraper_base.ScraperBase):
 
 
 
-	def _getItemsOnPage(self, inSoup):
-
-		links = set()
-		itemUl = inSoup.find("ul", class_='thumbnail-grid')
-		pages = itemUl.find_all("li", class_='item')
-		for page in pages:
-			itemUrl = urllib.parse.urljoin(self.urlBase, page.a['href'])
-			links.add(itemUrl)
-
-		nextPage = False
-		buttons = inSoup.find_all("a", class_='button')
-		for link in buttons:
-			if 'next' in link.get_text().lower():
-				nextPage = urllib.parse.urljoin(self.urlBase, link['href'])
-
-		return links, nextPage
-
-	def _getPosts(self, baseUrl):
-
-		pageSoup = self.wg.getSoup(baseUrl)
-		dirDiv = pageSoup.find('div', class_='sectioned-sidebar')
-		if not dirDiv:
-			return []
-		assert dirDiv.h3.get_text() == 'Folders'
-
-		links = []
-
-		for link in dirDiv('a'):
-			item = urllib.parse.urljoin(self.urlBase, link['href'])
-			links.append(item)
-
-		return links
-
-
-
-
 
 	def _getGalleries(self, artist):
 

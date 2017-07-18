@@ -280,23 +280,6 @@ class GetSf(rewrite.modules.scraper_base.ScraperBase):
 		return (int(tgt))
 
 
-	def _getItemsOnPage(self, inSoup):
-
-		links = set()
-		itemUl = inSoup.find("ul", class_='thumbnail-grid')
-		pages = itemUl.find_all("li", class_='grid-item')
-		for page in pages:
-			itemUrl = urllib.parse.urljoin(self.urlBase, page.a['href'])
-			links.add(itemUrl)
-
-		nextPage = False
-		buttons = inSoup.find_all("a", class_='button')
-		for link in buttons:
-			if 'next' in link.get_text().lower():
-				nextPage = urllib.parse.urljoin(self.urlBase, link['href'])
-
-		return links, nextPage
-
 
 
 	def _dumpUrl(self, url, art_type, directory="/"):

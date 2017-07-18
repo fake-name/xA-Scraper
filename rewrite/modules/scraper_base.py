@@ -66,10 +66,6 @@ class ScraperBase(module_base.ModuleBase, metaclass=abc.ABCMeta):
 		pass
 
 	@abc.abstractmethod
-	def _getItemsOnPage(self, inSoup):
-		pass
-
-	@abc.abstractmethod
 	def _getGalleries(self, artist):
 		pass
 
@@ -393,7 +389,6 @@ class ScraperBase(module_base.ModuleBase, metaclass=abc.ABCMeta):
 			self.log.warning("Exiting early from %s due to run flag being unset", artist)
 			return True
 
-		artist = artist.lower()
 		dlPathBase = self.getDownloadPath(self.dlBasePath, artist)
 
 
