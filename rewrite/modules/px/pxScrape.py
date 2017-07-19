@@ -147,7 +147,7 @@ class GetPX(rewrite.modules.scraper_base.ScraperBase):
 
 					self.log.info("Successfully got: " + link)
 					# def _updatePreviouslyRetreived(self, artist, pageUrl, fqDlPath, pageDesc="", pageTitle="", seqNum=0)
-					self._updatePreviouslyRetreived(artist=artistName, pageUrl=sourceUrl, fqDlPath=filePath, seqNum=indice)
+					self._updatePreviouslyRetreived(artist=artistName, release_meta=sourceUrl, fqDlPath=filePath, seqNum=indice)
 
 			else:
 				self.log.info("%s Exists, skipping...", filename)

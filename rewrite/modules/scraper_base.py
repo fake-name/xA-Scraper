@@ -127,18 +127,20 @@ class ScraperBase(module_base.ModuleBase, metaclass=abc.ABCMeta):
 			return set([item for sublist in res for item in sublist])
 
 	# Fetch the previously retrieved item URLs from the database.
-	def _getNewToRetreive(self, artist):
-		aid = self._artist_name_to_rid(artist)
+	def _getNewToRetreive(self, artist=None, aid=None):
+		if aid is None:
+			aid = self._artist_name_to_rid(artist)
+
 		with self.db.context_sess() as sess:
 			res = sess.query(self.db.ArtItem.release_meta) \
 				.filter(self.db.ArtItem.artist_id == aid) \
 				.filter(self.db.ArtItem.state == 'new') \
 				.all()
 
-			return set([item for sublist in res for item in sublist])
+			return set([self.deserialize_from_db(item) for sublist in res for item in sublist])
 
 	# Insert recently retreived items into the database
-	def _updatePreviouslyRetreived(self, artist, pageUrl, state='new', fqDlPath=None, pageDesc=None, pageTitle=None, seqNum=None, filename=None, addTime=None, postTags=[]):
+	def _updatePreviouslyRetreived(self, artist, release_meta, state='new', fqDlPath=None, pageDesc=None, pageTitle=None, seqNum=None, filename=None, addTime=None, postTags=[]):
 		# Sqlite requires all arguments be at least tuples containing string.
 		# Respin our list into a list of 1-tuples
 
@@ -158,13 +160,13 @@ class ScraperBase(module_base.ModuleBase, metaclass=abc.ABCMeta):
 				try:
 					row = sess.query(self.db.ArtItem) \
 						.filter(self.db.ArtItem.artist_id == aid) \
-						.filter(self.db.ArtItem.release_meta == pageUrl) \
+						.filter(self.db.ArtItem.release_meta == release_meta) \
 						.scalar()
 					if not row:
 						row = self.db.ArtItem(
 								state        = 'new',
 								artist_id    = aid,
-								release_meta = pageUrl,
+								release_meta = release_meta,
 								fetchtime    = datetime.datetime.now(),
 								addtime      = datetime.datetime.now() if addTime is None else addTime,
 								title        = pageTitle,
@@ -419,7 +421,7 @@ class ScraperBase(module_base.ModuleBase, metaclass=abc.ABCMeta):
 							self._updatePreviouslyRetreived(
 									artist=artist,
 									state='complete',
-									pageUrl=pageURL,
+									release_meta=pageURL,
 									fqDlPath=item,
 									pageDesc=ret['page_desc'],
 									pageTitle=ret['page_title'],

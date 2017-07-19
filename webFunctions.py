@@ -566,9 +566,8 @@ class WebGetRobust:
 
 		requestedUrl = iri2uri(requestedUrl)
 
-
 		if not self.testMode:
-			retryCount = 1
+			retryCount = 0
 			while 1:
 
 				pgctnt = None
@@ -579,9 +578,7 @@ class WebGetRobust:
 				errored = False
 				lastErr = ""
 
-				retryCount = retryCount + 1
-
-				if (retryQuantity and retryCount > retryQuantity) or (not retryQuantity and retryCount > self.errorOutCount):
+				if (retryQuantity and retryCount >= retryQuantity) or (not retryQuantity and retryCount > self.errorOutCount):
 					self.log.error("Failed to retrieve Website : %s at %s All Attempts Exhausted", pgreq.get_full_url(), time.ctime(time.time()))
 					pgctnt = None
 					try:
@@ -591,6 +588,8 @@ class WebGetRobust:
 					except:
 						self.log.critical("And the URL could not be printed due to an encoding error")
 					break
+
+				retryCount = retryCount + 1
 
 				#print "execution", retryCount
 				try:

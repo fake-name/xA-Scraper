@@ -2,6 +2,9 @@
 import os
 import os.path
 import traceback
+import datetime
+import pytz
+import dateutil.parser
 import urllib.parse
 import json
 from settings import settings
@@ -44,7 +47,6 @@ class GetPatreon(rewrite.modules.scraper_base.ScraperBase):
 			print("Not logged in!")
 			current = False
 
-
 		if not current or current['data']['id'] == 0:
 			return False, "Not logged in"
 		else:
@@ -60,13 +62,23 @@ class GetPatreon(rewrite.modules.scraper_base.ScraperBase):
 			"email"    : settings[self.settingsDictKey]['username'],
 			"password" : settings[self.settingsDictKey]['password'],
 		}
+
 		current = self.get_json("/login", postData=login_data)
 
-		if not current or current['data']['id'] == 0:
-			return False, "Not logged in"
-		else:
-			return True, "Autheticated OK"
+		self.log.info("Login results: %s", current)
+		self.wg.syncCookiesFromFile()
 
+		return self.checkCookie()
+
+	# # ---------------------------------------------------------------------------------------------------------------------------------------------------------
+	# # Internal utilities stuff
+	# # ---------------------------------------------------------------------------------------------------------------------------------------------------------
+
+	def deserialize_from_db(self, meta_out):
+		return json.loads(meta_out)
+
+	def serialize_to_db(self, meta_in):
+		return json.dumps(meta_in)
 
 	# # ---------------------------------------------------------------------------------------------------------------------------------------------------------
 	# # Internal utilities stuff
@@ -146,7 +158,7 @@ class GetPatreon(rewrite.modules.scraper_base.ScraperBase):
 			["<li>{tag}</li>".format(tag=tag) for tag in raw_tags] +
 			["</ul></div>"])
 
-		self._updatePreviouslyRetreived(artist=orga, pageUrl=pgurl, pageDesc=desc+html_tags, pageTitle=title, postTags=raw_tags)
+		self._updatePreviouslyRetreived(artist=orga, release_meta=pgurl, pageDesc=desc+html_tags, pageTitle=title, postTags=raw_tags)
 
 		if "photos" in post_struct:
 			contenturls = [tmp['original_size']['url'] for tmp in post_struct['photos']]
@@ -180,8 +192,115 @@ class GetPatreon(rewrite.modules.scraper_base.ScraperBase):
 			with open(filePath, "wb") as fp:								# Open file for saving image (Binary)
 				fp.write(content)						# Write Image to File
 
-			self._updatePreviouslyRetreived(artist=orga, pageUrl=pgurl, fqDlPath=filePath, seqNum=seq)
+			self._updatePreviouslyRetreived(artist=orga, release_meta=pgurl, fqDlPath=filePath, seqNum=seq)
 			seq += 1
+
+
+	def _load_art(self, campaign_id, artist_raw):
+
+		artPages = self.get_campaign_posts(campaign_id)
+
+		aid = self._artist_name_to_rid(artist_raw)
+
+		self.log.info("Total gallery items %s", len(artPages))
+
+		new = 0
+		with self.db.context_sess() as sess:
+			for item in artPages:
+				new += self._upsert_if_new(sess, aid, item)
+
+		self.log.info("%s new art pages, %s total", new, len(artPages))
+
+		# oldArt = self._getPreviouslyRetreived(artist)
+		# newArt = artPages - oldArt
+		# self.log.info("Old art items = %s, newItems = %s", len(oldArt), len(newArt))
+
+		return self._getNewToRetreive(aid=aid)
+
+	def getArtist(self, artist_undecoded, ctrlNamespace):
+		artist_decoded = json.loads(artist_undecoded)
+		patreon_aid, artist_meta = artist_decoded
+		artist_name, artist_meta = artist_meta
+
+		if ctrlNamespace.run is False:
+			self.log.warning("Exiting early from %s due to run flag being unset", artist)
+			return True
+
+		dlPathBase = self.getDownloadPath(self.dlBasePath, artist_name)
+
+
+
+		try:
+			self.log.info("GetArtist - %s -> %s", artist_name, artist_undecoded)
+			self.setupDir(artist_name)
+
+			if 'campaign' in artist_meta and artist_meta['campaign']['data']['type'] == 'campaign':
+				campaign_id = artist_meta['campaign']['data']['id']
+
+				newArt = self._load_art(campaign_id, artist_undecoded)
+			else:
+				newArt = []
+
+			print("artist:", (patreon_aid, artist_name, artist_meta, dlPathBase))
+			return
+
+			while len(newArt) > 0:
+				postid = newArt.pop()
+				try:
+					ret = self.__fetch_retrier(dlPathBase, postid, artist_undecoded)
+
+					assert isinstance(ret, dict)
+					assert 'status'     in ret
+					assert 'dl_path'    in ret
+					assert 'page_desc'  in ret
+					assert 'page_title' in ret
+					assert 'post_time'  in ret
+
+
+					if ret['status'] == "Succeeded" or ret['status'] == "Exists":
+						assert isinstance(ret['dl_path'], list)
+						seq = 0
+						for item in ret['dl_path']:
+							self._updatePreviouslyRetreived(
+									artist=artist_decoded,
+									state='complete',
+									release_meta=postid,
+									fqDlPath=item,
+									pageDesc=ret['page_desc'],
+									pageTitle=ret['page_title'],
+									seqNum=seq,
+									addTime=ret['post_time'],
+									postTags=ret['post_tags'],
+								)
+							seq += 1
+					elif ret['status'] == "Ignore":  # Used for compound pages (like Pixiv's manga pages), where the page has multiple sub-pages that are managed by the plugin
+						self.log.info("Ignoring root URL, since it has child-pages.")
+					else:
+						self._updateUnableToRetrieve(artist_undecoded, pageURL)
+
+				except urllib.error.URLError:  # WebGetRobust throws urlerrors
+					self.log.error("Page Retrieval failed!")
+					self.log.error("Source URL = '%s'", pageURL)
+					self.log.error(traceback.format_exc())
+				except:
+					self.log.error("Unknown error in page retrieval!")
+					self.log.error("Source URL = '%s'", pageURL)
+					self.log.error(traceback.format_exc())
+
+
+				self.log.info("Pages for %s remaining = %s", artist_name, len(newArt))
+				if ctrlNamespace.run is False:
+					break
+
+			self._updateLastFetched(artist_undecoded)
+			self.log.info("Successfully retreived content for artist %s", artist_name)
+
+			return False
+		except:
+			self.log.error("Exception when retreiving artist %s", artist_name)
+			self.log.error("%s", traceback.format_exc())
+			return True
+
 
 
 	# 	raise RuntimeError("How did this ever execute?")
@@ -438,15 +557,32 @@ class GetPatreon(rewrite.modules.scraper_base.ScraperBase):
 
 if __name__ == '__main__':
 
+	import multiprocessing.managers
 	import logSetup
 	logSetup.initLogging()
 
+	manager = multiprocessing.managers.SyncManager()
+	manager.start()
+	namespace = manager.Namespace()
+	namespace.run=True
+
+
 	ins = GetPatreon()
-	nl = ins.getNameList()
+	# nl = ins.checkCookie()
+	# nl = ins.getCookie()
+	# nl = ins.getNameList()
 	# print(nl)
 	# print(ins)
 	# print("Instance: ", ins)
 	# dlPathBase, artPageUrl, artistName
-	ins.getArtist('["191466", ["Dan Shive", {"campaign": {"links": {"related": "https://www.patreon.com/api/campaigns/96494"}, "data": {"type": "campaign", "id": "96494"}}}]]', 'testtt')
-	# ins._getArtPage("xxxx", '["191466", ["Dan Shive", {"campaign": {"links": {"related": "https://www.patreon.com/api/campaigns/96494"}, "data": {"type": "campaign", "id": "96494"}}}]]', 'testtt')
+	# ins.getArtist('["191466", ["Dan Shive", {"campaign": {"links": {"related": "https://www.patreon.com/api/campaigns/96494"}, "data": {"type": "campaign", "id": "96494"}}}]]', 'testtt')
+
+	ins.getArtist('["191466", ["Dan Shive", {"campaign": {"links": {"related": "https://www.patreon.com/api/campaigns/96494"}, "data": {"type": "campaign", "id": "96494"}}}]]', namespace)
+
+	# nl = ins.getNameList()
+
+	# for artist in nl:
+	# 	print(artist)
+	# print(nl)
+
 
