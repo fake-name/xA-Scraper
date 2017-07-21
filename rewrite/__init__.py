@@ -1,4 +1,5 @@
 import os
+import json
 from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
 from flask_debugtoolbar import DebugToolbarExtension
@@ -75,63 +76,81 @@ CACHE_SIZE = 5000
 userIdCache = {}
 tlGroupIdCache = {}
 
+
+def format_js_date(din):
+	return din.strftime("%Y/%m/%d %H:%M")
+
+def date_now():
+	return datetime.datetime.today().strftime("%Y/%M/%d %H:%M")
+
+def aentry_to_nice_name(site_name, aname):
+	if site_name == 'pat':
+		meta = json.loads(aname)
+		return meta[1][0].title()
+	else:
+		return aname.title()
+
+def release_entry_to_nice_url(site_name, releasemeta):
+	if site_name == 'sf':
+		meta = json.loads(releasemeta)
+		return meta['url']
+	else:
+		return releasemeta
+
+def ago(then):
+	now = datetime.datetime.now()
+	delta = now - then
+
+	d = delta.days
+	h, s = divmod(delta.seconds, 3600)
+	m, s = divmod(s, 60)
+	labels = ['d', 'h', 'm', 's']
+	dhms = ['%s %s' % (i, lbl) for i, lbl in zip([d, h, m, s], labels)]
+	for start in range(len(dhms)):
+		if not dhms[start].startswith('0'):
+			break
+	for end in range(len(dhms)-1, -1, -1):
+		if not dhms[end].startswith('0'):
+			break
+	return ', '.join(dhms[start:end+1])
+
+def terse_ago(then):
+	print(then)
+	now = datetime.datetime.now()
+	if then > now:
+		return "Wat?"
+	delta = now - then
+
+	d = delta.days
+	h, s = divmod(delta.seconds, 3600)
+	m, s = divmod(s, 60)
+	labels = ['d', 'h', 'm', 's']
+	dhms = ['%s %s' % (i, lbl) for i, lbl in zip([d, h, m, s], labels)]
+	for start in range(len(dhms)):
+		if not dhms[start].startswith('0'):
+			break
+	# for end in range(len(dhms)-1, -1, -1):
+	# 	if not dhms[end].startswith('0'):
+	# 		break
+	if d > 0:
+		dhms = dhms[:2]
+	elif h > 0:
+		dhms = dhms[1:3]
+	else:
+		dhms = dhms[2:]
+	return ', '.join(dhms)
+
 @app.context_processor
 def utility_processor():
-
-	def format_js_date(din):
-		return din.strftime("%Y/%m/%d %H:%M")
-
-	def date_now():
-		return datetime.datetime.today().strftime("%Y/%M/%d %H:%M")
-
-	def ago(then):
-		now = datetime.datetime.now()
-		delta = now - then
-
-		d = delta.days
-		h, s = divmod(delta.seconds, 3600)
-		m, s = divmod(s, 60)
-		labels = ['d', 'h', 'm', 's']
-		dhms = ['%s %s' % (i, lbl) for i, lbl in zip([d, h, m, s], labels)]
-		for start in range(len(dhms)):
-			if not dhms[start].startswith('0'):
-				break
-		for end in range(len(dhms)-1, -1, -1):
-			if not dhms[end].startswith('0'):
-				break
-		return ', '.join(dhms[start:end+1])
-
-	def terse_ago(then):
-		now = datetime.datetime.now()
-		delta = now - then
-
-		d = delta.days
-		h, s = divmod(delta.seconds, 3600)
-		m, s = divmod(s, 60)
-		labels = ['d', 'h', 'm', 's']
-		dhms = ['%s %s' % (i, lbl) for i, lbl in zip([d, h, m, s], labels)]
-		for start in range(len(dhms)):
-			if not dhms[start].startswith('0'):
-				break
-		# for end in range(len(dhms)-1, -1, -1):
-		# 	if not dhms[end].startswith('0'):
-		# 		break
-		if d > 0:
-			dhms = dhms[:2]
-		elif h > 0:
-			dhms = dhms[1:3]
-		else:
-			dhms = dhms[2:]
-		return ', '.join(dhms)
-
-
 	return dict(
-			format_js_date     = format_js_date,
-			date_now           = date_now,
-			terse_ago          = terse_ago,
-			ago                = ago,
-			min                = min,
-			max                = max,
+			release_entry_to_nice_url  = release_entry_to_nice_url,
+			aentry_to_nice_name        = aentry_to_nice_name,
+			format_js_date             = format_js_date,
+			date_now                   = date_now,
+			terse_ago                  = terse_ago,
+			ago                        = ago,
+			min                        = min,
+			max                        = max,
 			)
 
 

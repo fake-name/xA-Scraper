@@ -187,7 +187,9 @@ class GetSf(rewrite.modules.scraper_base.ScraperBase):
 				context = context.split("\n")
 				for line in context:
 					if "Posted" in line:
+						print("Timestamp line:", line)
 						timestamp = dateparser.parse(line[7:])
+						print("Parsed:", timestamp)
 
 		return title, desc, plain_tags, timestamp
 
@@ -251,7 +253,7 @@ class GetSf(rewrite.modules.scraper_base.ScraperBase):
 
 
 						self.log.info("Successfully got: %s", imageURL)
-						return self.build_page_ret(status="Succeeded", fqDlPath=[fname], pageDesc=itemCaption, pageTitle=itemTitle, postTags=itemTags)
+						return self.build_page_ret(status="Succeeded", fqDlPath=[fname], pageDesc=itemCaption, pageTitle=itemTitle, postTags=itemTags, postTime=postTime)
 
 					except IOError:
 						try:

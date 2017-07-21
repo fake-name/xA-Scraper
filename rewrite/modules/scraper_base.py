@@ -81,6 +81,10 @@ class ScraperBase(module_base.ModuleBase, metaclass=abc.ABCMeta):
 		assert isinstance(pageDesc,  (str, type(None))), "Wat? Item: %s, type: %s" % (pageDesc,  type(pageDesc))
 		assert isinstance(pageTitle, (str, type(None))), "Wat? Item: %s, type: %s" % (pageTitle, type(pageTitle))
 
+		if postTime:
+			assert postTime < datetime.datetime.now() + datetime.timedelta(hours=24), "Item too far in the future " \
+				"(%s > %s)!" % (postTime, datetime.datetime.now() + datetime.timedelta(hours=24))
+
 		if pageTitle:
 			pageTitle = pageTitle.strip()
 		if pageDesc:
@@ -141,7 +145,7 @@ class ScraperBase(module_base.ModuleBase, metaclass=abc.ABCMeta):
 
 	# Insert recently retreived items into the database
 	def _updatePreviouslyRetreived(self, artist, release_meta, state='new', fqDlPath=None, pageDesc=None, pageTitle=None, seqNum=None, filename=None, addTime=None, postTags=[]):
-		if addTime > datetime.datetime.now():
+		if addTime and addTime > datetime.datetime.now():
 			addtime = datetime.datetime.now()
 
 		aid = self._artist_name_to_rid(artist)

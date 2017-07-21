@@ -70,7 +70,6 @@ def aggregate_table(page=1, count=app.config['POSTS_PER_PAGE']):
 		.options(joinedload('artist'))     \
 		.options(joinedload('files'))
 
-
 	releases_paginated = releases.paginate(page, count, False)
 
 	return releases_paginated
@@ -125,15 +124,9 @@ def index(pagenum=1):
 						   data = aggregate_table(page=pagenum)
 						   )
 
-
-
-
-
-
 @app.route('/images/byid/<int:img_id>', methods=['GET'])
 @auth.login_required
 def fetch_image_fileid(img_id):
-
 
 	img_row = db.session.query(database.ArtFile) \
 		.filter(database.ArtFile.id == img_id)    \

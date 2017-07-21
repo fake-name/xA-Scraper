@@ -81,13 +81,9 @@ class ArtTags(Base):
 
 	tag               = Column(Text)
 
-
 	__table_args__ = (
 		UniqueConstraint('item_id', 'tag'),
 		)
-
-
-
 
 
 # File table doesn't know anything about URLs, since they're kept in the

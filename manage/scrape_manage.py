@@ -1,12 +1,4 @@
 
-from rewrite.modules.da.daScrape import GetDA
-from rewrite.modules.px.pxScrape import GetPX
-from rewrite.modules.hf.hfScrape import GetHF
-from rewrite.modules.fa.faScrape import GetFA
-from rewrite.modules.sf.sfScrape import GetSf
-from rewrite.modules.ib.ibScrape import GetIb
-from rewrite.modules.wy.wyScrape import GetWy
-from rewrite.modules.tumblr.tumblrScrape import GetTumblr
 
 import flags
 import os.path
@@ -26,19 +18,26 @@ manager.start()
 namespace = manager.Namespace()
 namespace.run = True
 
+from main import JOBS
+print(JOBS)
 
 PLUGINS = {
-
-	'da'     : (GetDA,     "Deviant-Art"),
-	'fa'     : (GetFA,     "Fur-Affinity"),
-	'hf'     : (GetHF,     "Hentai Foundry"),
-	'ib'     : (GetIb,     "Ink Bunny"),
-	'px'     : (GetPX,     "Pixiv"),
-	'sf'     : (GetSf,     "So Furry"),
-	'tum'    : (GetTumblr, "Tumblr"),
-	'wy'     : (GetWy,     "Weasyl"),
-
+		key : (cls_def, cls_def.pluginName)
+	for cls_def, dummy_interval, key in JOBS
 }
+
+# PLUGINS = {
+
+# 	'da'     : (GetDA,     "Deviant-Art"),
+# 	'fa'     : (GetFA,     "Fur-Affinity"),
+# 	'hf'     : (GetHF,     "Hentai Foundry"),
+# 	'ib'     : (GetIb,     "Ink Bunny"),
+# 	'px'     : (GetPX,     "Pixiv"),
+# 	'sf'     : (GetSf,     "So Furry"),
+# 	'tum'    : (GetTumblr, "Tumblr"),
+# 	'wy'     : (GetWy,     "Weasyl"),
+
+# }
 
 def do_plugin(plg):
 	instance = plg()

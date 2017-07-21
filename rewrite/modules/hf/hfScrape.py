@@ -199,7 +199,9 @@ class GetHF(rewrite.modules.scraper_base.ScraperBase):
 
 		metadiv = soup.find("section", id='yw0')
 		posttime = metadiv.time['datetime']
+		print("Unparsed posttime:", posttime)
 		posttime = dateparser.parse(posttime)
+		print("Parsed posttime:", posttime)
 		self.log.info("Image tags: %s", list(tags))
 		self.log.info("Image Posted: %s", posttime)
 
