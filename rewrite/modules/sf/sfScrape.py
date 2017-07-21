@@ -217,10 +217,10 @@ class GetSf(rewrite.modules.scraper_base.ScraperBase):
 
 			filePath = os.path.join(dlPathBase, fName)
 
-			self.log.info("			Filename			= %s", fName)
-			self.log.info("			Page Image Title	= %s", itemTitle)
-			self.log.info("			FileURL				= %s", imageURL)
-			self.log.info("			dlPath				= %s", filePath)
+			self.log.info("	Filename         = %s", fName)
+			self.log.info("	Page Image Title = %s", itemTitle)
+			self.log.info("	FileURL          = %s", imageURL)
+			self.log.info("	dlPath           = %s", filePath)
 
 			if self._checkFileExists(filePath):
 				self.log.info("Exists, skipping...")
@@ -279,6 +279,10 @@ class GetSf(rewrite.modules.scraper_base.ScraperBase):
 		# This is probably stupidly brittle
 		subdiv = soup.find("span", class_='sfTextMedLight', text=re.compile('submissions', flags=re.IGNORECASE))
 		tgt = subdiv.parent.span.get_text()
+
+		# Dump number separators
+		tgt = tgt.replace(",", "")
+
 		return (int(tgt))
 
 
