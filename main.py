@@ -21,6 +21,7 @@ import rewrite.modules.ib.ibScrape as ibs
 import rewrite.modules.sf.sfScrape as sfs
 import rewrite.modules.artstation.asScrape as ass
 import rewrite.modules.tumblr.tumblrScrape as tus
+import rewrite.modules.patreon.patreonScrape as pts
 
 from settings import settings
 import cherrypy
@@ -28,15 +29,16 @@ import cherrypy
 
 
 JOBS = [
-	(das.GetDA,     settings["da"]["runInterval"],   "da"),
-	(fas.GetFA,     settings["fa"]["runInterval"],   "fa"),
-	(hfs.GetHF,     settings["hf"]["runInterval"],   "hf"),
-	(wys.GetWy,     settings["wy"]["runInterval"],   "wy"),
-	(ibs.GetIb,     settings["ib"]["runInterval"],   "ib"),
-	(pxs.GetPX,     settings["px"]["runInterval"],   "px"),
-	(sfs.GetSf,     settings["sf"]["runInterval"],   "sf"),
-	(ass.GetAs,     settings["as"]["runInterval"],   "as"),
-	(tus.GetTumblr, settings["tum"]["runInterval"], "tum"),
+	(das.GetDA,      settings["da"]["runInterval"],   "da"),
+	(fas.GetFA,      settings["fa"]["runInterval"],   "fa"),
+	(hfs.GetHF,      settings["hf"]["runInterval"],   "hf"),
+	(wys.GetWy,      settings["wy"]["runInterval"],   "wy"),
+	(ibs.GetIb,      settings["ib"]["runInterval"],   "ib"),
+	(pxs.GetPX,      settings["px"]["runInterval"],   "px"),
+	(sfs.GetSf,      settings["sf"]["runInterval"],   "sf"),
+	(ass.GetAs,      settings["as"]["runInterval"],   "as"),
+	(tus.GetTumblr,  settings["tum"]["runInterval"], "tum"),
+	(pts.GetPatreon, settings["pat"]["runInterval"], "pat"),
 ]
 
 

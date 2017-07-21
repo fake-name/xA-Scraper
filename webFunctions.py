@@ -682,6 +682,7 @@ class WebGetRobust:
 			self.cj.save("cookietemp.lwp")
 			self.cj.load(self.COOKIEFILE)
 			self.cj.load("cookietemp.lwp")
+			self.cj.save(self.COOKIEFILE)
 		# First, load any changed cookies so we don't overwrite them
 		# However, we want to persist any cookies that we have that are more recent then the saved cookies, so we temporarily save
 		# the cookies in memory to a temp-file, then load the cookiefile, and finally overwrite the loaded cookies with the ones from the

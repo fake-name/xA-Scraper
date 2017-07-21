@@ -137,21 +137,12 @@ class ScraperBase(module_base.ModuleBase, metaclass=abc.ABCMeta):
 				.filter(self.db.ArtItem.state == 'new') \
 				.all()
 
-			return set([self.deserialize_from_db(item) for sublist in res for item in sublist])
+			return set([item for sublist in res for item in sublist])
 
 	# Insert recently retreived items into the database
 	def _updatePreviouslyRetreived(self, artist, release_meta, state='new', fqDlPath=None, pageDesc=None, pageTitle=None, seqNum=None, filename=None, addTime=None, postTags=[]):
-		# Sqlite requires all arguments be at least tuples containing string.
-		# Respin our list into a list of 1-tuples
-
-		# print("DB Arg artist    = ", artist)
-		# print("DB Arg pageUrl   = ", pageUrl)
-		# print("DB Arg fqDlPath  = ", fqDlPath)
-		# print("DB Arg pageDesc  = ", type(pageDesc))
-		# print("DB Arg pageTitle = ", pageTitle)
-		# print("DB Arg seqNum    = ", seqNum)
-
-		# print("Inserting sequence: ", seqNum)
+		if addTime > datetime.datetime.now():
+			addtime = datetime.datetime.now()
 
 		aid = self._artist_name_to_rid(artist)
 
@@ -374,15 +365,15 @@ class ScraperBase(module_base.ModuleBase, metaclass=abc.ABCMeta):
 
 		return self._getNewToRetreive(artist)
 
-	def __fetch_retrier(self, dlPathBase, pageURL, artist):
+	def _fetch_retrier(self, *args, **kwargs):
 		for _ in range(3):
 			try:
-				ret = self._getArtPage(dlPathBase, pageURL, artist)
+				ret = self._getArtPage(*args, **kwargs)
 				return ret
 			except exceptions.RetryException:
 				pass
 
-		self.log.error("Failed to fetch content at '%s' for artist '%s'", pageURL, artist)
+		self.log.error("Failed to fetch content with args: '%s', kwargs: '%s'", args, kwargs)
 		return self.build_page_ret(status="Failed", fqDlPath=None)
 
 
@@ -403,7 +394,7 @@ class ScraperBase(module_base.ModuleBase, metaclass=abc.ABCMeta):
 			while len(newArt) > 0:
 				pageURL = newArt.pop()
 				try:
-					ret = self.__fetch_retrier(dlPathBase, pageURL, artist)
+					ret = self._fetch_retrier(dlPathBase, pageURL, artist)
 					# ret = self._getArtPage(dlPathBase, pageURL, artist)
 
 					assert isinstance(ret, dict)

@@ -7,6 +7,7 @@ import pytz
 import dateutil.parser
 import urllib.parse
 import json
+import pprint
 from settings import settings
 
 import rewrite.modules.scraper_base
@@ -23,12 +24,16 @@ class GetPatreon(rewrite.modules.scraper_base.ScraperBase):
 
 	pluginName = "PatreonGet"
 
-	urlBase = "http://{user}.tumblr.com/"
+	urlBase = None
 
 	ovwMode = "Check Files"
 
 	numThreads = 1
 
+
+	# Stubbed functions
+	_getGalleries = None
+	_getTotalArtCount = None
 
 
 	# # ---------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -74,16 +79,6 @@ class GetPatreon(rewrite.modules.scraper_base.ScraperBase):
 	# # Internal utilities stuff
 	# # ---------------------------------------------------------------------------------------------------------------------------------------------------------
 
-	def deserialize_from_db(self, meta_out):
-		return json.loads(meta_out)
-
-	def serialize_to_db(self, meta_in):
-		return json.dumps(meta_in)
-
-	# # ---------------------------------------------------------------------------------------------------------------------------------------------------------
-	# # Internal utilities stuff
-	# # ---------------------------------------------------------------------------------------------------------------------------------------------------------
-
 	def get_json(self, endpoint, postData = None, apikey = False, retries=3):
 		if postData:
 			postData = {"data" : postData}
@@ -122,14 +117,84 @@ class GetPatreon(rewrite.modules.scraper_base.ScraperBase):
 		current = self.get_json("/current_user?include=pledges&include=follows")
 		return current
 
-	def user_info(self, uid):
-		current = self.get_json("/user/{uid}".format(uid=uid), apikey=True)
-		pprint.pprint(current)
-
 
 	# # ---------------------------------------------------------------------------------------------------------------------------------------------------------
 	# # Individual page scraping
 	# # ---------------------------------------------------------------------------------------------------------------------------------------------------------
+
+
+
+	def get_save_dir(self, aname):
+
+		dirp = self.getDownloadPath(self.dlBasePath, aname)
+		if not os.path.exists(dirp):
+			os.makedirs(dirp)
+		return dirp
+
+	def save_file(self, aname, filename, filecontent):
+		fdir = self.get_save_dir(aname)
+		fqpath = os.path.join(fdir, filename)
+		with open(fqpath, "wb") as fp:
+			fp.write(filecontent)
+
+	def save_json(self, aname, itemid, filecontent):
+		fdir = self.get_save_dir(aname)
+		fqpath = os.path.join(fdir, "pyson-posts")
+		if not os.path.exists(fqpath):
+			os.makedirs(fqpath)
+		fqpath = os.path.join(fqpath, 'itemid-{id}.pyson'.format(id=itemid))
+		with open(fqpath, "wb") as fp:
+			fstr = pprint.pformat(filecontent)
+			fp.write(fstr.encode("utf-8"))
+
+	def save_image(self, aname, pid, fname, furl):
+		print("Saving image: '%s'" % furl)
+		fname = "{pid}-{fname}".format(pid=pid, fname=fname)
+		fdir = self.get_save_dir(aname)
+		fqpath = os.path.join(fdir, fname)
+		if os.path.exists(fqpath):
+			self.log.info("Do not need to download: '%s'", fname)
+		else:
+			content = self.wg.getpage(furl, addlHeaders={"Referer" : "https://www.patreon.com/home"})
+			if content:
+				self.save_file(aname, fname, content)
+			else:
+				self.log.error("Could not retreive content: ")
+				self.log.error("%s", furl)
+				return None
+		return fqpath
+
+	def save_attachment(self, aname, pid, dat_struct):
+		print("Saving attachment: '%s'" % dat_struct['attributes']['url'])
+		if dat_struct['attributes']['url'].startswith("https"):
+			url = dat_struct['attributes']['url']
+		else:
+			url = "https:{url}".format(url=dat_struct['attributes']['url'])
+
+		fname = "{pid}-{aid}-{fname}".format(pid=pid, aid=dat_struct['id'], fname=dat_struct['attributes']['name'])
+
+		fdir = self.get_save_dir(aname)
+		fqpath = os.path.join(fdir, fname)
+
+		if os.path.exists(fqpath):
+			self.log.info("Do not need to download: '%s'", fname)
+		else:
+			content = self.wg.getpage(url, addlHeaders={"Referer" : "https://www.patreon.com/home"})
+			if content:
+				if isinstance(content, str):
+					with open(fqpath, "wb") as fp:
+						fp.write(content.encode("utf-8"))
+				else:
+					with open(fqpath, "wb") as fp:
+						fp.write(content)
+			else:
+				return None
+
+		return fqpath
+
+	# TODO: Implement this
+	def fetch_video_embed(self, post_content):
+		return None
 
 	def _getContentUrlFromPage(self, soup):
 
@@ -145,56 +210,57 @@ class GetPatreon(rewrite.modules.scraper_base.ScraperBase):
 		raise ValueError("Wat?")
 
 
-	def _getArtPage(self, post_struct, artistName):
+	def _getArtPage(self, postId, artistName):
 
 
-
-		orga  = post_struct['blog_name']
-		pgurl = post_struct['post_url']
-		title = post_struct['summary']
-		desc  = post_struct['caption']
-		raw_tags  = post_struct['tags']
-		html_tags = "".join(["<div><ul class='tags'>"] +
-			["<li>{tag}</li>".format(tag=tag) for tag in raw_tags] +
-			["</ul></div>"])
-
-		self._updatePreviouslyRetreived(artist=orga, release_meta=pgurl, pageDesc=desc+html_tags, pageTitle=title, postTags=raw_tags)
-
-		if "photos" in post_struct:
-			contenturls = [tmp['original_size']['url'] for tmp in post_struct['photos']]
-		else:
-			raise FetchError("Cannot find content!")
-
-		have = self._checkHaveUrl(artistName, pgurl)
-		if have:
-			self.log.info("Have content for url! %s, %s", have, pgurl)
-			return
-
-		dlPathBase = self.getDownloadPath(self.dlBasePath, orga)
+		post = self.get_json("/posts/{pid}".format(pid=postId), apikey=True)
 
 
-		if not contenturls:
-			self.log.error("OH NOES!!! No image on page = " + post_struct)
-			raise FetchError("No content found!")
+		attachments = {item['id'] : item for item in post['included'] if item['type'] == 'attachment'}
 
-		seq = 1
-		for url in contenturls:
-			content, fName = self.wg.getFileAndName(url, addlHeaders={'Referer' : pgurl})
-			filePath = os.path.join(dlPathBase, fName)
+		print("Attachments:")
 
-			# NFI how this was happening.
-			if filePath.startswith("{"):
-				filePath = filePath[1:]
+		post_content = post['data']
+		post_info = post_content['attributes']
 
-			if isinstance(content, str):
-				content = content.encode(encoding='UTF-8')
+		tags = []
+		if 'user_defined_tags' in post_content['relationships']:
+			for tagmeta in post_content['relationships']['user_defined_tags']['data']:
+				tags.append(tagmeta['id'].split(";")[-1])
 
-			with open(filePath, "wb") as fp:								# Open file for saving image (Binary)
-				fp.write(content)						# Write Image to File
+		# pprint.pprint(post_content['relationships'])
 
-			self._updatePreviouslyRetreived(artist=orga, release_meta=pgurl, fqDlPath=filePath, seqNum=seq)
-			seq += 1
+		ret = {
+			'page_desc'  : post_info['content'],
+			'page_title' : post_info['title'],
+			'post_time'  : dateutil.parser.parse(post_info['published_at']),
+			'post_tags'  : tags,
+		}
 
+
+		files = []
+		try:
+			if "post_file" in post_content and post_content['post_file']:
+				fpath = self.save_image(artistName, postId, post_content['post_file']['name'], post_content['post_file']['url'])
+				files.append(fpath)
+
+			if 'post_type' in post_content and post_content['post_type'] == 'video_embed':
+				fpath = self.fetch_video_embed(post_content)
+				files.append(fpath)
+
+			for aid, dat_struct in attachments.items():
+				fpath = self.save_attachment(artistName, postId, dat_struct)
+				files.append(fpath)
+
+		except urllib.error.URLError:
+			self.log.error("Failure retreiving content from post: %s", post)
+
+		files = [filen for filen in files if filen]
+		ret['dl_path'] = files
+		ret['status']  = 'Succeeded'
+
+		# pprint.pprint(ret)
+		return ret
 
 	def _load_art(self, campaign_id, artist_raw):
 
@@ -223,12 +289,8 @@ class GetPatreon(rewrite.modules.scraper_base.ScraperBase):
 		artist_name, artist_meta = artist_meta
 
 		if ctrlNamespace.run is False:
-			self.log.warning("Exiting early from %s due to run flag being unset", artist)
+			self.log.warning("Exiting early from %s due to run flag being unset", artist_undecoded)
 			return True
-
-		dlPathBase = self.getDownloadPath(self.dlBasePath, artist_name)
-
-
 
 		try:
 			self.log.info("GetArtist - %s -> %s", artist_name, artist_undecoded)
@@ -241,13 +303,10 @@ class GetPatreon(rewrite.modules.scraper_base.ScraperBase):
 			else:
 				newArt = []
 
-			print("artist:", (patreon_aid, artist_name, artist_meta, dlPathBase))
-			return
-
 			while len(newArt) > 0:
 				postid = newArt.pop()
 				try:
-					ret = self.__fetch_retrier(dlPathBase, postid, artist_undecoded)
+					ret = self._fetch_retrier(postid, artist_name)
 
 					assert isinstance(ret, dict)
 					assert 'status'     in ret
@@ -255,6 +314,7 @@ class GetPatreon(rewrite.modules.scraper_base.ScraperBase):
 					assert 'page_desc'  in ret
 					assert 'page_title' in ret
 					assert 'post_time'  in ret
+					assert 'post_tags'  in ret
 
 
 					if ret['status'] == "Succeeded" or ret['status'] == "Exists":
@@ -262,7 +322,7 @@ class GetPatreon(rewrite.modules.scraper_base.ScraperBase):
 						seq = 0
 						for item in ret['dl_path']:
 							self._updatePreviouslyRetreived(
-									artist=artist_decoded,
+									artist=artist_undecoded,
 									state='complete',
 									release_meta=postid,
 									fqDlPath=item,
@@ -276,15 +336,15 @@ class GetPatreon(rewrite.modules.scraper_base.ScraperBase):
 					elif ret['status'] == "Ignore":  # Used for compound pages (like Pixiv's manga pages), where the page has multiple sub-pages that are managed by the plugin
 						self.log.info("Ignoring root URL, since it has child-pages.")
 					else:
-						self._updateUnableToRetrieve(artist_undecoded, pageURL)
+						self._updateUnableToRetrieve(artist_undecoded, postid)
 
 				except urllib.error.URLError:  # WebGetRobust throws urlerrors
 					self.log.error("Page Retrieval failed!")
-					self.log.error("Source URL = '%s'", pageURL)
+					self.log.error("PostID = '%s'", postid)
 					self.log.error(traceback.format_exc())
 				except:
 					self.log.error("Unknown error in page retrieval!")
-					self.log.error("Source URL = '%s'", pageURL)
+					self.log.error("PostID = '%s'", postid)
 					self.log.error(traceback.format_exc())
 
 
@@ -349,44 +409,11 @@ class GetPatreon(rewrite.modules.scraper_base.ScraperBase):
 
 
 
-
-	def _getGalleries(self, artist):
-
-		posts = self.get_user_posts()
-		# artlinks = set()
-		# artist = artist.strip()
-
-		# baseUrl = self.urlBase.format(user=artist)
-
-		# posts = []
-		# offset = 0
-		# step   = 20
-		# while 1:
-		# 	self.log.info("Fetching posts at offset: %s for user %s", offset, artist)
-		# 	addposts = self.t.get('posts', blog_url=baseUrl, params={"limit" : step, 'offset':offset})
-		# 	offset += step
-		# 	if len(addposts['posts']) == 0:
-		# 		break
-		# 	posts.extend(addposts['posts'])
-
-		# self.log.info("Found %s links" % (len(posts)))
-		# return posts
-
-	def _getTotalArtCount(self):
-		pass
-
-
-
-
 	# ---------------------------------------------------------------------------------------------------------------------------------------------------------
 	# Gallery Scraping
 	# ---------------------------------------------------------------------------------------------------------------------------------------------------------
 
 
-
-	def get_campaign(self, cid):
-		current = self.get_json("/campaigns/{cid}".format(cid=cid), apikey=True)
-		# pprint.pprint(current)
 
 	def get_campaign_posts(self, cid, count=10):
 		now = datetime.datetime.utcnow().replace(tzinfo = pytz.utc).replace(microsecond=0)
@@ -416,137 +443,7 @@ class GetPatreon(rewrite.modules.scraper_base.ScraperBase):
 
 		return postids
 
-	def get_user(self, uid):
-		current = self.get_json("/user/{uid}".format(uid=uid), apikey=True)
-		pprint.pprint(current)
 
-	def get_posts(self):
-		current = self.get_json("/stream?page=2")
-		posts = [item for item in current['data'] if item['type'] == "post"]
-
-		pprint.pprint(current)
-		print("Posts:", len(posts))
-
-
-	# def get_campaign_posts(self, cid):
-	# 	current = self.get_json("/campaigns/{cid}/posts?p=0".format(cid=cid))
-	# 	posts = [item for item in current['data'] if item['type'] == "post"]
-
-		# pprint.pprint(current)
-	# 	print("Posts:", len(posts))
-
-
-	def get_user_posts(self, uid):
-		page = 1
-		addlHeaders={
-			"Referer"          : "https://www.patreon.com/home",
-			"X-Requested-With" : "XMLHttpRequest",
-			}
-		item_count = 0
-		posts = []
-		while 1:
-			container = self.wg.getSoup("https://www.patreon.com/userNext?p={page}&ty=c&u={uid}".format(uid=uid, page=page), addlHeaders=addlHeaders)
-
-			items = container.find_all("div", class_='box')
-			posts += items
-			item_count += len(items)
-			print("Found %s items on page. Total so far: %s " % (len(items), item_count))
-			if len(items) == 0:
-				break
-			page += 1
-		return posts
-
-	def get_save_dir(self, aname):
-		dirp = os.path.join(settings.SAVE_DIR, aname)
-		if not os.path.exists(dirp):
-			os.makedirs(dirp)
-		return dirp
-
-	def save_file(self, aname, filename, filecontent):
-		fdir = self.get_save_dir(aname)
-		fqpath = os.path.join(fdir, filename)
-		with open(fqpath, "wb") as fp:
-			fp.write(filecontent)
-
-	def save_json(self, aname, itemid, filecontent):
-		fdir = self.get_save_dir(aname)
-		fqpath = os.path.join(fdir, "pyson-posts")
-		if not os.path.exists(fqpath):
-			os.makedirs(fqpath)
-		fqpath = os.path.join(fqpath, 'itemid-{id}.pyson'.format(id=itemid))
-		with open(fqpath, "wb") as fp:
-			fstr = pprint.pformat(filecontent)
-			fp.write(fstr.encode("utf-8"))
-
-	def save_image(self, aname, pid, fname, furl):
-		print("Saving image: '%s'" % furl)
-		fname = "{pid}-{fname}".format(pid=pid, fname=fname)
-		fdir = self.get_save_dir(aname)
-		fqpath = os.path.join(fdir, fname)
-		if os.path.exists(fqpath):
-			self.log.info("Do not need to download: '%s'", fname)
-		else:
-			content = self.wg.getpage(furl, addlHeaders={"Referer" : "https://www.patreon.com/home"})
-			if content:
-				self.save_file(aname, fname, content)
-			else:
-				self.log.error("Could not retreive content: ")
-				self.log.error("%s", furl)
-
-
-	def save_attachment(self, aname, pid, dat_struct):
-		print("Saving attachment: '%s'" % dat_struct['attributes']['url'])
-		if dat_struct['attributes']['url'].startswith("https"):
-			url = dat_struct['attributes']['url']
-		else:
-			url = "https:{url}".format(url=dat_struct['attributes']['url'])
-
-		fname = "{pid}-{aid}-{fname}".format(pid=pid, aid=dat_struct['id'], fname=dat_struct['attributes']['name'])
-
-		fdir = self.get_save_dir(aname)
-		fqpath = os.path.join(fdir, fname)
-
-		if os.path.exists(fqpath):
-			self.log.info("Do not need to download: '%s'", fname)
-		else:
-			content = self.wg.getpage(url, addlHeaders={"Referer" : "https://www.patreon.com/home"})
-			if content:
-				if isinstance(content, str):
-					with open(fqpath, "wb") as fp:
-						fp.write(content.encode("utf-8"))
-				else:
-					with open(fqpath, "wb") as fp:
-						fp.write(content)
-
-	# TODO: Implement this
-	def fetch_video_embed(self, post_content):
-		pass
-
-	def fetch_post(self, pid, aname):
-		post = self.get_json("/posts/{pid}".format(pid=pid), apikey=True)
-
-
-		attachments = {item['id'] : item for item in post['included'] if item['type'] == 'attachment'}
-
-
-		post_content = post['data']
-		# pprint.pprint(post_content)
-		try:
-			if "post_file" in post_content and post_content['post_file']:
-				self.save_image(aname, pid, post_content['post_file']['name'], post_content['post_file']['url'])
-
-			if 'post_type' in post_content and post_content['post_type'] == 'video_embed':
-				self.fetch_video_embed(post_content)
-
-			for aid, dat_struct in attachments.items():
-				self.save_attachment(aname, pid, dat_struct)
-		except urllib.error.URLError:
-			self.log.error("Failure retreiving content from post: %s", post)
-
-		self.save_json(aname, pid, post)
-
-
-		# pprint.pprint(includeLut)
 
 	def run_old(self):
 		self.check_login()
@@ -571,13 +468,17 @@ if __name__ == '__main__':
 	# nl = ins.checkCookie()
 	# nl = ins.getCookie()
 	# nl = ins.getNameList()
+
+	ins.go(ctrlNamespace=namespace)
+
 	# print(nl)
 	# print(ins)
 	# print("Instance: ", ins)
 	# dlPathBase, artPageUrl, artistName
 	# ins.getArtist('["191466", ["Dan Shive", {"campaign": {"links": {"related": "https://www.patreon.com/api/campaigns/96494"}, "data": {"type": "campaign", "id": "96494"}}}]]', 'testtt')
 
-	ins.getArtist('["191466", ["Dan Shive", {"campaign": {"links": {"related": "https://www.patreon.com/api/campaigns/96494"}, "data": {"type": "campaign", "id": "96494"}}}]]', namespace)
+	# ins._fetch_retrier(13131994, "Dan Shive")
+	# ins.getArtist('["191466", ["Dan Shive", {"campaign": {"links": {"related": "https://www.patreon.com/api/campaigns/96494"}, "data": {"type": "campaign", "id": "96494"}}}]]', namespace)
 
 	# nl = ins.getNameList()
 
