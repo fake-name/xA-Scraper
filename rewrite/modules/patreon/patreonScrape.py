@@ -28,13 +28,12 @@ class GetPatreon(rewrite.modules.scraper_base.ScraperBase):
 
 	ovwMode = "Check Files"
 
-	numThreads = 1
+	numThreads = 3
 
 
 	# Stubbed functions
 	_getGalleries = None
 	_getTotalArtCount = None
-
 
 	# # ---------------------------------------------------------------------------------------------------------------------------------------------------------
 	# # Cookie Management
@@ -82,7 +81,7 @@ class GetPatreon(rewrite.modules.scraper_base.ScraperBase):
 	def get_json(self, endpoint, postData = None, apikey = False, retries=3):
 		if postData:
 			postData = {"data" : postData}
-			postData = json.dumps(postData)
+			postData = json.dumps(postData, sort_keys=True)
 
 		if apikey:
 			apikey = "?api_key=1745177328c8a1d48100a9b14a1d38c1"
@@ -218,7 +217,10 @@ class GetPatreon(rewrite.modules.scraper_base.ScraperBase):
 
 		attachments = {item['id'] : item for item in post['included'] if item['type'] == 'attachment'}
 
-		print("Attachments:")
+		if len(attachments ):
+			self.log.info("Found %s attachments on post.", len(attachments))
+		else:
+			self.log.warning("No attachments on post %s!", postId)
 
 		post_content = post['data']
 		post_info = post_content['attributes']
@@ -233,7 +235,7 @@ class GetPatreon(rewrite.modules.scraper_base.ScraperBase):
 		ret = {
 			'page_desc'  : post_info['content'],
 			'page_title' : post_info['title'],
-			'post_time'  : dateutil.parser.parse(post_info['published_at']),
+			'post_time'  : dateutil.parser.parse(post_info['published_at']).replace(tzinfo=None),
 			'post_tags'  : tags,
 		}
 
@@ -387,7 +389,7 @@ class GetPatreon(rewrite.modules.scraper_base.ScraperBase):
 		for key, value in artist_lut.items():
 			print((key, value))
 
-		resultList = [json.dumps((key, value)) for key, value in artist_lut.items()]
+		resultList = [json.dumps((key, value), sort_keys=True) for key, value in artist_lut.items()]
 		# Push the pixiv name list into the DB
 		with self.db.context_sess() as sess:
 			for name in resultList:
@@ -420,6 +422,7 @@ class GetPatreon(rewrite.modules.scraper_base.ScraperBase):
 
 		postids = set()
 		while 1:
+			self.log.info("iterating over listing of campaign posts.")
 			current = self.get_json("/campaigns/{cid}/posts?filter[is_by_creator]=true&page[count]={count}&use-defaults-for-included-resources=false".format(cid=cid, count=count) +
 				"&fields[post]=published_at" +
 				"&page[cursor]={now}".format(now=str(now.isoformat())) +

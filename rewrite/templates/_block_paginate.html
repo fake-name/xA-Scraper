@@ -6,7 +6,7 @@
 		{% do view_args.pop('page') %}
 	{% endif %}
 
-	<div class="text-center">
+	<div class="text-center nav">
 		<ul class="pagination pagination-lg">
 
 			{% if pagination.has_prev %}
@@ -33,8 +33,8 @@
 
 			{% if pagination.has_next %}
 				<li>
-					<a href="{{ url_for(request.endpoint, page=pagination.next_num, **view_args) }}">&raquo;</a>
-					</li>
+					<a id="nextPage" href="{{ url_for(request.endpoint, page=pagination.next_num, **view_args) }}">&raquo;</a>
+				</li>
 			{% else %}
 				<li class="disabled"><a href="#">&raquo;</a></li>
 			{% endif %}

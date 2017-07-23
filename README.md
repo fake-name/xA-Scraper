@@ -4,9 +4,11 @@ xA-Scraper
 This is a automated tool for scraping content from a number of art sites:
 
 - DeviantArt
+- Patreon
 - FurAffinity
 - HentaFoundry
 - Pixiv
+- InkBunny
 - Tumblr art blogs
 - SoFurry
 - Weaslyl

@@ -115,10 +115,10 @@ def ago(then):
 	return ', '.join(dhms[start:end+1])
 
 def terse_ago(then):
-	print(then)
 	now = datetime.datetime.now()
 	if then > now:
 		return "Wat?"
+
 	delta = now - then
 
 	d = delta.days
@@ -140,18 +140,18 @@ def terse_ago(then):
 		dhms = dhms[2:]
 	return ', '.join(dhms)
 
-@app.context_processor
-def utility_processor():
-	return dict(
-			release_entry_to_nice_url  = release_entry_to_nice_url,
-			aentry_to_nice_name        = aentry_to_nice_name,
-			format_js_date             = format_js_date,
-			date_now                   = date_now,
-			terse_ago                  = terse_ago,
-			ago                        = ago,
-			min                        = min,
-			max                        = max,
-			)
+EXTRA_FUNCTIONS = {
+			'release_entry_to_nice_url'  : release_entry_to_nice_url,
+			'aentry_to_nice_name'        : aentry_to_nice_name,
+			'format_js_date'             : format_js_date,
+			'date_now'                   : date_now,
+			'terse_ago'                  : terse_ago,
+			'ago'                        : ago,
+			'min'                        : min,
+			'max'                        : max,
+			}
 
 
+
+app.jinja_env.globals.update(**EXTRA_FUNCTIONS)
 

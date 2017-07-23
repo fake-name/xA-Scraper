@@ -25,6 +25,7 @@ from rewrite import auth
 from rewrite import db
 from rewrite import database
 
+import main
 
 
 # from app import lm
@@ -63,12 +64,25 @@ def get_source_list():
 	return contentSources
 
 
-def aggregate_table(page=1, count=app.config['POSTS_PER_PAGE']):
+def aggregate_table(page=1, count=app.config['POSTS_PER_PAGE'], site_filter=None, artist_filter=None):
 	releases = db.session.query(database.ArtItem) \
 		.filter(database.ArtItem.state == "complete") \
 		.order_by(desc(database.ArtItem.addtime)) \
 		.options(joinedload('artist'))     \
-		.options(joinedload('files'))
+		.options(joinedload('files'))      \
+		.options(joinedload('tags'))
+
+	if site_filter:
+		print("Doing site-filter!")
+		subq = db.session.query(database.ArtItem.id) \
+			.filter(database.ScrapeTargets.site_name == site_filter)
+
+		releases = releases.filter(database.ArtItem.artist_id.in_(subq))
+		print("Query:", releases)
+
+	if artist_filter:
+		releases = releases.filter(database.ArtItem.artist_id == artist_filter)
+
 
 	releases_paginated = releases.paginate(page, count, False)
 
@@ -108,6 +122,13 @@ def internal_error(dummy_error):
 	return render_template('500.html'), 500
 
 
+def error_page(error_title, error_message):
+	return render_template('error.html',
+				error_title   = error_title,
+				error_message = error_message,
+		)
+
+
 
 
 
@@ -117,12 +138,68 @@ def internal_error(dummy_error):
 @auth.login_required
 def index(pagenum=1):
 	source_list = get_source_list()
+	release_table = aggregate_table(page=pagenum)
+
+	return render_template('index.html',
+						   source_list  = source_list,
+						   title        = 'Home',
+						   data         = release_table,
+						   )
+
+
+
+
+
+@app.route('/source/by-site/<site_name>/<int:pagenum>', methods=['GET'])
+@app.route('/source/by-site/<site_name>/', methods=['GET'])
+@app.route('/source/by-site/<site_name>', methods=['GET'])
+@auth.login_required
+def view_by_site(site_name, pagenum=1):
+
+	valid_sitenanes = [tmp[-1] for tmp in main.JOBS]
+	if site_name not in valid_sitenanes:
+		return error_page("Invalid site-name!", "The site-name '%s' is not in the "
+			"valid site-name list %s" % (site_name, valid_sitenanes))
+
+	return error_page("Wat!", "Unavailable due to performance issues")
+
+	source_list = get_source_list()
+	release_table = aggregate_table(page=pagenum, site_filter=site_name)
 
 	return render_template('index.html',
 						   source_list = source_list,
-						   title               = 'Home',
-						   data = aggregate_table(page=pagenum)
+						   title       = 'Home',
+						   data        = release_table,
 						   )
+
+
+
+
+@app.route('/source/by-artist/<int:artist_id>/<int:pagenum>', methods=['GET'])
+@app.route('/source/by-artist/<int:artist_id>/', methods=['GET'])
+@app.route('/source/by-artist/<int:artist_id>', methods=['GET'])
+@auth.login_required
+def view_by_artist(artist_id, pagenum=1):
+
+	source_list = get_source_list()
+
+	print(request.args)
+	if 'page' in request.args and pagenum == 1:
+		try:
+			pagenum = int(request.args['page'])
+		except ValueError:
+			return error_page("That's not a number!", "The page number '%s' is not actually a number"
+				% (request.args['page'], ))
+
+	release_table = aggregate_table(page=pagenum, artist_filter=artist_id, count=5)
+
+	return render_template('single_artist_view.html',
+						   source_list = source_list,
+						   data        = release_table,
+						   )
+
+
+
 
 @app.route('/images/byid/<int:img_id>', methods=['GET'])
 @auth.login_required

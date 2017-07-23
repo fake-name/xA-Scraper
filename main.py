@@ -3,6 +3,7 @@
 
 import time
 
+import sys
 import flags
 import signal
 import multiprocessing
@@ -36,7 +37,7 @@ JOBS = [
 	(ibs.GetIb,      settings["ib"]["runInterval"],   "ib"),
 	(pxs.GetPX,      settings["px"]["runInterval"],   "px"),
 	(sfs.GetSf,      settings["sf"]["runInterval"],   "sf"),
-	(ass.GetAs,      settings["as"]["runInterval"],   "as"),
+	# (ass.GetAs,      settings["as"]["runInterval"],   "as"),
 	(tus.GetTumblr,  settings["tum"]["runInterval"], "tum"),
 	(pts.GetPatreon, settings["pat"]["runInterval"], "pat"),
 ]
@@ -100,14 +101,28 @@ def go(managedNamespace):
 
 
 	server_process = multiprocessing.Process(target=serverProcess, args=(managedNamespace,))
+	if "debug" in sys.argv:
+		print("Not starting scheduler due to debug mode!")
+		sched = None
+	else:
 
-	sched = BackgroundScheduler()
-	print("Running!")
+		sched = BackgroundScheduler({
+				'apscheduler.jobstores.default': {
+					'type': 'memory'
+				},
+				'apscheduler.executors.default': {
+					'class': 'apscheduler.executors.pool:ProcessPoolExecutor',
+					'max_workers': '10'
+				},
+				'apscheduler.job_defaults.coalesce': 'true',
+				'apscheduler.job_defaults.max_instances': '5',
+			})
 
-	scheduleJobs(sched, managedNamespace)
+		scheduleJobs(sched, managedNamespace)
+		sched.start()
+		print("Scheduler is running!")
+
 	server_process.start()
-	sched.start()
-
 	loopCtr = 0
 	while managedNamespace.run:
 		time.sleep(0.1)
@@ -117,7 +132,8 @@ def go(managedNamespace):
 		# 		statusMgr.updateNextRunTime(job.name, job.next_run_time.timestamp())
 		loopCtr += 1
 
-	sched.shutdown()
+	if sched:
+		sched.shutdown()
 	server_process.join()
 
 def mgr_init():
