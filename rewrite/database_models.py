@@ -67,7 +67,7 @@ class ArtFile(Base):
 
 	filename     = Column(Text)
 
-	fspath       = Column(Text)
+	fspath       = Column(Text, nullable=False)
 
 	__table_args__ = (
 		UniqueConstraint('item_id', 'seqnum'),

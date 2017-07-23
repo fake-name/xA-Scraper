@@ -9,6 +9,8 @@ from .scrape_manage import do_fetch
 from .scrape_manage import do_import
 from .scrape_manage import PLUGINS
 
+from manage import db_manage
+
 def print_help():
 	print()
 	print("Manager interface")
@@ -20,6 +22,8 @@ def print_help():
 	print("		Import tumblr feeds from a ttrss database instance.")
 	print("	'upgrade-db'")
 	print("		Make any needed schema changes to the database, if needed.")
+	print("	'name-clean'")
+	print("		Checks and does some cleanup of the artist-names in the database.")
 	print("	fetch [sitename]")
 	print("		with no sitename, this executes all plugins in sequence.")
 	print("		With a sitename, executes the named plugin.")
@@ -47,6 +51,8 @@ def one_arg_go(command):
 		do_fetch([])
 	if command == "fetch-all":
 		do_fetch_all()
+	if command == 'name-clean':
+		db_manage.db_name_clean()
 
 def two_arg_go(command, param):
 

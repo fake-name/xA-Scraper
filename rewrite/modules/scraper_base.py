@@ -382,6 +382,10 @@ class ScraperBase(module_base.ModuleBase, metaclass=abc.ABCMeta):
 
 
 	def getArtist(self, artist, ctrlNamespace):
+		if artist != artist.strip():
+			artist = artist.strip()
+			self.log.warning("Artist name seems to have trailing or leading whitespace!")
+
 		if ctrlNamespace.run is False:
 			self.log.warning("Exiting early from %s due to run flag being unset", artist)
 			return True
