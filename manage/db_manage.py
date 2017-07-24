@@ -13,7 +13,10 @@ import multiprocessing.managers
 import sys
 import re
 import sqlalchemy.exc
+
 from sqlalchemy.orm import joinedload
+from sqlalchemy import func
+
 import rewrite.database as db
 
 def move_delete_files(sess, from_p, to_p):
@@ -160,49 +163,55 @@ def _artist_name_to_rid(sess, site_name, aname):
 
 def replace_aid(sess, row, aid):
 	print("replacing AID")
-	try:
-
+	have_other = sess.query(db.ArtItem).filter(db.ArtItem.artist_id == aid) \
+			.filter(db.ArtItem.release_meta == row.release_meta)   \
+			.scalar()
+	if not have_other:
+		print("No other match, simply changing AID")
 		row.artist_id = aid
 		print("committing")
 		sess.commit()
 		print("AID Directly replaced.")
 
-	except sqlalchemy.exc.IntegrityError:
-
-		sess.rollback()
-		print("Direct replacement failed. Moving attachments instead.")
-
-		have = sess.query(db.ArtItem).filter(db.ArtItem.artist_id == aid) \
-			.filter(db.ArtItem.release_meta == row.release_meta)   \
-			.scalar()
-
-		if have:
-
-			print("Cross-links to ", have.artist_id, have.release_meta)
-			merge_releases(sess, row, have)
-
-		else:
-			print("cannot find cross link! Wat?")
+	else:
+		print("Have other target. Moving attachments instead.")
+		print("Cross-links to ", have_other.artist_id, have_other.release_meta)
+		merge_releases(sess, row, have_other)
 
 def try_relink_artist(sess, row):
-	print("Artist ID is null! Wat?", row.release_meta)
+	print("Modifying", row.release_meta)
 
 	wys = re.search(r'https://www\.weasyl\.com/~(.*?)/submissions/', row.release_meta)
 	das = re.search(r'http://(.*?).deviantart.com/art/', row.release_meta)
-	sfs = re.search(r'https://www\.sofurry\.com/view/', row.release_meta)
 
 	if wys:
 		aname = wys.group(1)
 		aid = _artist_name_to_rid(sess, 'wy', aname)
-		replace_aid(sess, row, aid)
+		if aid != row.artist_id:
+			print("Switching AID from %s (%s) to %s (%s)" % (row.artist_id, (row.artist.site_name, row.artist.artist_name), aid, aname))
+			replace_aid(sess, row, aid)
 	if das:
 		aname = das.group(1)
 		aid = _artist_name_to_rid(sess, 'da', aname)
-		replace_aid(sess, row, aid)
-	if sfs:
-		# No artist name embedded in URL
+		if aid != row.artist_id:
+			print("Switching AID from %s (%s) to %s (%s)" % (row.artist_id, (row.artist.site_name, row.artist.artist_name), aid, aname))
+			replace_aid(sess, row, aid)
+
+	if row.tags == [] and row.files == []:
+		print("Could delete!")
+		sess.delete(row)
+		sess.commit()
+
+
+def merge_release_set(sess, release_list):
+
+	if "www.pixiv.net" in release_list[0].release_meta:
 		return
 
+	assert(all([release_list[0].release_meta == tmp.release_meta for tmp in release_list]))
+	assert(all([release_list[0].artist_id == tmp.artist_id for tmp in release_list])), "Mismatched " \
+		"artist IDs: '%s' -> '%s'" % ([(tmp.artist_id, tmp.artist.site_name, tmp.artist.artist_name, tmp.release_meta) for tmp in release_list], [release_list[0].artist_id == tmp.artist_id for tmp in release_list])
+	print(release_list)
 
 def check_item(sess, row):
 	url_expect_map = {
@@ -217,27 +226,42 @@ def check_item(sess, row):
 		"pat"    : None,
 	}
 
-	if not row.artist_id:
-		try_relink_artist(sess, row)
-		return
 
-	if row.artist.site_name in url_expect_map:
-		if url_expect_map[row.artist.site_name] and url_expect_map[row.artist.site_name] in row.release_meta:
-			return
-		elif not url_expect_map[row.artist.site_name]:
-			return
+	try_relink_artist(sess, row)
 
-	print(sess, row.artist.site_name, row.release_meta)
+	# if row.artist.site_name in url_expect_map:
+
+	# 	if url_expect_map[row.artist.site_name] and url_expect_map[row.artist.site_name] in row.release_meta:
+	# 		return
+	# 	elif not url_expect_map[row.artist.site_name]:
+	# 		return
+
+	# print(sess, row.artist.site_name, row.release_meta)
+
+def get_duplicated_attrs(session, cls, attr):
+	return session.query(getattr(cls, attr)).group_by(getattr(cls, attr)) \
+	       .having(func.count(getattr(cls, attr)) > 1).all()
 
 def db_misrelink_clean():
 	print('Misrelink cleaning')
 
 	with db.context_sess() as sess:
-		print("Querying...")
-		releases = sess.query(db.ArtItem).options(joinedload('artist')).all()
-		print("Query complete. Parsing.")
-		for release in releases:
-			check_item(sess, release)
+
+		print("Geting duplicates")
+		dupes = get_duplicated_attrs(sess, db.ArtItem, "release_meta")
+
+		print("Duplicates:")
+		for dupe_url, in dupes:
+			releases = sess.query(db.ArtItem).options(joinedload('artist')) \
+				.filter(db.ArtItem.release_meta == dupe_url).all()
+			for release in releases:
+				check_item(sess, release)
+
+			releases_2 = sess.query(db.ArtItem).options(joinedload('artist')) \
+				.filter(db.ArtItem.release_meta == dupe_url).all()
+			if len(releases_2) > 1:
+				merge_release_set(sess, releases)
+
 
 
 
