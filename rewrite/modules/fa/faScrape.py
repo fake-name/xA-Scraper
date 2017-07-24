@@ -12,6 +12,7 @@ import urllib.parse
 
 import util.captcha2upload
 import rewrite.modules.scraper_base
+from rewrite.modules import exceptions
 
 class GetFA(rewrite.modules.scraper_base.ScraperBase, util.captcha2upload.CaptchaSolverMixin):
 
@@ -250,6 +251,13 @@ class GetFA(rewrite.modules.scraper_base.ScraperBase, util.captcha2upload.Captch
 	def _getTotalArtCount(self, artist):
 		basePage = "http://www.furaffinity.net/user/%s/" % artist
 		page = self.wg.getSoup(basePage)
+		pgstr = str(page)
+		if 'has voluntarily disabled access to their account and all of its contents.' in pgstr:
+			self.log.warning("Disabled account!")
+			return 0
+		if 'This user cannot be found.' in pgstr:
+			self.log.warning("Account not found!")
+			raise exceptions.AccountDisabledException("Could not retreive artist item quantity!")
 
 		tds = page.find("td", align="right", text="Statistics")
 
@@ -261,7 +269,7 @@ class GetFA(rewrite.modules.scraper_base.ScraperBase, util.captcha2upload.Captch
 				num = line.split(":")[-1]
 				return int(num)
 
-		raise LookupError("Could not retreive artist item quantity!")
+		raise exceptions.AccountDisabledException("Could not retreive artist item quantity!")
 
 
 	def _getItemsOnPage(self, inSoup):
@@ -301,6 +309,9 @@ class GetFA(rewrite.modules.scraper_base.ScraperBase, util.captcha2upload.Captch
 					self.log.error("Cannot get Page: %s" % turl)
 					break
 
+				if 'has voluntarily disabled access to their account and all of its contents.' in str(pageSoup):
+					self.log.warning("Disabled account!")
+					return ret
 
 				new = self._getItemsOnPage(pageSoup)
 				if len(new) == 0 or flags.run == False:

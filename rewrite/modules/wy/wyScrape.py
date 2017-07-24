@@ -10,6 +10,7 @@ from settings import settings
 import flags
 
 import rewrite.modules.scraper_base
+from rewrite.modules import exceptions
 
 class GetWy(rewrite.modules.scraper_base.ScraperBase):
 
@@ -223,7 +224,7 @@ class GetWy(rewrite.modules.scraper_base.ScraperBase):
 			items = item.previous_sibling.previous_sibling.get_text()
 			return int(items)
 
-		raise LookupError("Could not retreive artist item quantity!")
+		raise exceptions.AccountDisabledException("Could not retreive artist item quantity!")
 
 
 
@@ -302,7 +303,12 @@ class GetWy(rewrite.modules.scraper_base.ScraperBase):
 
 
 if __name__ == '__main__':
+	import logSetup
+	logSetup.initLogging()
+
 	ins = GetWy()
 	print(ins)
+	print("Getting cookie:")
+	ins.getCookie()
 
 

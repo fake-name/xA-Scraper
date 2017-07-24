@@ -13,13 +13,13 @@
 			{% endfor %}
 			<hr>
 			{% for key in source_list %}
-				<li><a href="/source/bysite/{{key}}">{{key.upper()}} Artists</a>
+				<li><a href="/source/by-site/{{key}}">{{key.upper()}} Artists</a>
 			{% endfor %}
 			<hr>
 			<li><a href='/fa-manual-login'>Manual FA Login</a>
 			<hr>
-			<li><a href="/dbNameListEditor">Monitored Names</a>
-			<li><a href="/uploadEditor">Upload Settings</a>
+			<li><a href="/watched-names">Monitored Names</a>
+			<li><a href="/upload-manager">Upload Settings</a>
 		</ul>
 	</div>
 	<div class="statediv">
@@ -27,7 +27,7 @@
 	</div>
 	<br>
 
-
+	<!--
 	{% for key in source_list %}
 
 		<div class="statediv ${key}Id">
@@ -43,6 +43,6 @@
 		</div>
 	{% endfor %}
 
-
+	-->
 
 </div>

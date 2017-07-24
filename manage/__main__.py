@@ -24,6 +24,8 @@ def print_help():
 	print("		Make any needed schema changes to the database, if needed.")
 	print("	'name-clean'")
 	print("		Checks and does some cleanup of the artist-names in the database.")
+	print("	'db-misrelink-clean'")
+	print("		Does release sanity checks on item URLs")
 	print("	fetch [sitename]")
 	print("		with no sitename, this executes all plugins in sequence.")
 	print("		With a sitename, executes the named plugin.")
@@ -53,6 +55,8 @@ def one_arg_go(command):
 		do_fetch_all()
 	if command == 'name-clean':
 		db_manage.db_name_clean()
+	if command == 'db-misrelink-clean':
+		db_manage.db_misrelink_clean()
 
 def two_arg_go(command, param):
 

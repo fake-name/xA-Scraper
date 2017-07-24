@@ -40,8 +40,8 @@ class ArtItem(Base):
 	state             = Column(dlstate_enum, default='new', index=True, nullable=False)
 	errno             = Column(Integer, default='0')
 
-	artist_id         = Column(BigInteger, ForeignKey('scrape_targets.id'))
-	release_meta      = Column(Text, nullable = False)
+	artist_id         = Column(BigInteger, ForeignKey('scrape_targets.id'), nullable=False)
+	release_meta      = Column(Text, nullable = False, index=True)
 
 	fetchtime         = Column(DateTime, default=datetime.datetime.min)
 	addtime           = Column(DateTime, default=datetime.datetime.utcnow)
@@ -92,7 +92,7 @@ class ScrapeTargets(Base):
 	__tablename__ = 'scrape_targets'
 	id              = Column(BigInteger, primary_key = True)
 	site_name       = Column(Text,     nullable=False)
-	artist_name     = Column(Text,     nullable=False)
+	artist_name     = Column(Text,     nullable=False, index=True)
 	uploadeh        = Column(Boolean,  index = True, default=False, nullable=True)
 	last_fetched    = Column(DateTime, nullable=False, default=datetime.datetime.min)
 

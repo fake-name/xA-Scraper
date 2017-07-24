@@ -140,7 +140,13 @@ def terse_ago(then):
 		dhms = dhms[2:]
 	return ', '.join(dhms)
 
+def show_as_bytes(instr):
+	bytestr = instr.encode('utf-8')
+
+	return repr(bytestr).lstrip("b")
+
 EXTRA_FUNCTIONS = {
+			'show_as_bytes'              : show_as_bytes,
 			'release_entry_to_nice_url'  : release_entry_to_nice_url,
 			'aentry_to_nice_name'        : aentry_to_nice_name,
 			'format_js_date'             : format_js_date,

@@ -46,6 +46,10 @@ JOBS = [
 import rewrite
 
 
+def runScraper(scraper_class, managed_namespace):
+	print("Scheduler executing class: ", scraper_class)
+	instance = scraper_class()
+	instance.go(ctrlNamespace=managed_namespace)
 
 def runServer():
 
@@ -86,9 +90,8 @@ def scheduleJobs(sched, managedNamespace):
 
 
 	for scraperClass, interval, name in JOBS:
-
 		print(scraperClass, interval)
-		sched.add_job(scraperClass.runScraper, trigger='interval', seconds=interval, start_date='2014-1-4 0:00:00', name=name, args=(managedNamespace,))
+		sched.add_job(runScraper, trigger='interval', seconds=interval, start_date='2014-1-4 0:00:00', name=name, args=(scraperClass, managedNamespace,))
 	# sched.add_interval_job(printWat, seconds=10, start_date='2014-1-1 01:00')
 
 
@@ -111,11 +114,11 @@ def go(managedNamespace):
 					'type': 'memory'
 				},
 				'apscheduler.executors.default': {
-					'class': 'apscheduler.executors.pool:ProcessPoolExecutor',
+					'class': 'apscheduler.executors.pool:ThreadPoolExecutor',
 					'max_workers': '10'
 				},
 				'apscheduler.job_defaults.coalesce': 'true',
-				'apscheduler.job_defaults.max_instances': '5',
+				'apscheduler.job_defaults.max_instances': '1',
 			})
 
 		scheduleJobs(sched, managedNamespace)

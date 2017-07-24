@@ -342,8 +342,7 @@ class WebGetRobust:
 			headers = {}
 			if postData != None:
 				self.log.info("Making a post-request! Params: '%s'", postData)
-
-				params['data'] = postData.encode("utf-8")
+				params['data'] = urllib.parse.urlencode(postData).encode("utf-8")
 			if addlHeaders != None:
 				self.log.info("Have additional GET parameters!")
 				headers = addlHeaders

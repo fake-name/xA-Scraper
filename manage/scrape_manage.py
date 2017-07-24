@@ -40,8 +40,8 @@ PLUGINS = {
 # }
 
 def do_plugin(plg):
-	instance = plg()
-	instance.go(ctrlNamespace=namespace)
+	plg.runScraper(namespace)
+	# instance.go(ctrlNamespace=namespace)
 
 def do_fetch(args):
 	print("fetch args", args, type(args))

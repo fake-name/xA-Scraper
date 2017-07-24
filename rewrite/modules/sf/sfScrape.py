@@ -381,7 +381,7 @@ if __name__ == '__main__':
 	logSetup.initLogging()
 
 	ins = GetSf()
-	# ins.getCookie()
+	ins.getCookie()
 	print(ins)
 	print("Instance: ", ins)
 	# dlPathBase, artPageUrl, artistName

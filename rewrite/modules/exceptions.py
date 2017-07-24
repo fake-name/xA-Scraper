@@ -9,3 +9,7 @@ class RetryException(ScraperException):
 class FetchFailedException(ScraperException):
 	pass
 
+
+class AccountDisabledException(ScraperException):
+	pass
+

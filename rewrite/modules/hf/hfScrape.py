@@ -11,6 +11,7 @@ from settings import settings
 import flags
 
 import rewrite.modules.scraper_base
+from rewrite.modules import exceptions
 
 class GetHF(rewrite.modules.scraper_base.ScraperBase):
 
@@ -18,7 +19,7 @@ class GetHF(rewrite.modules.scraper_base.ScraperBase):
 
 	pluginName = "HfGet"
 
-	urlBase = "http://www.example.org/"
+	urlBase = "www.hentai-foundry.com"
 
 
 	ovwMode = "Check Files"
@@ -307,7 +308,7 @@ class GetHF(rewrite.modules.scraper_base.ScraperBase):
 		if stats:
 			return int(stats.text)
 
-		raise LookupError("Could not retreive artist item quantity!")
+		raise exceptions.AccountDisabledException("Could not retreive artist item quantity!")
 
 
 	def _getItemsOnPage(self, inSoup):

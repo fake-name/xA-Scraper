@@ -77,7 +77,7 @@ class ScraperBase(module_base.ModuleBase, metaclass=abc.ABCMeta):
 	def build_page_ret(self, status, fqDlPath, pageDesc=None, pageTitle=None, postTime=None, postTags=None):
 
 		assert isinstance(fqDlPath, (list, type(None))), "Wat? Item: %s, type: %s" % (fqDlPath, type(fqDlPath))
-		assert status in ['Succeeded', 'Exists', 'Ignore', 'Failed']
+		assert status in ['Succeeded', 'Exists', 'Ignore', 'Failed', 'Deleted']
 		assert isinstance(pageDesc,  (str, type(None))), "Wat? Item: %s, type: %s" % (pageDesc,  type(pageDesc))
 		assert isinstance(pageTitle, (str, type(None))), "Wat? Item: %s, type: %s" % (pageTitle, type(pageTitle))
 
@@ -268,7 +268,7 @@ class ScraperBase(module_base.ModuleBase, metaclass=abc.ABCMeta):
 
 
 	# Insert bad item into DB
-	def _updateUnableToRetrieve(self, artist, errUrl):
+	def _updateUnableToRetrieve(self, artist, errUrl, state='error'):
 
 		aid = self._artist_name_to_rid(artist)
 
@@ -281,7 +281,7 @@ class ScraperBase(module_base.ModuleBase, metaclass=abc.ABCMeta):
 				.scalar()
 			if not row:
 				row = self.db.ArtItem(
-						state        = 'error',
+						state        = state,
 						artist_id    = aid,
 						release_meta = errUrl,
 						fetchtime    = datetime.datetime.now(),
@@ -341,8 +341,11 @@ class ScraperBase(module_base.ModuleBase, metaclass=abc.ABCMeta):
 	# ---------------------------------------------------------------------------------------------------------------------------------------------------------
 
 	def _load_art(self, artist):
+		try:
+			totalArt = self._getTotalArtCount(artist)
+		except exceptions.AccountDisabledException:
+			return []
 
-		totalArt = self._getTotalArtCount(artist)
 		artPages = self._getGalleries(artist)
 		aid = self._artist_name_to_rid(artist)
 
@@ -431,6 +434,8 @@ class ScraperBase(module_base.ModuleBase, metaclass=abc.ABCMeta):
 							seq += 1
 					elif ret['status'] == "Ignore":  # Used for compound pages (like Pixiv's manga pages), where the page has multiple sub-pages that are managed by the plugin
 						self.log.info("Ignoring root URL, since it has child-pages.")
+					elif ret['status'] == 'Deleted':
+						self._updateUnableToRetrieve(artist, pageURL, state='removed')
 					else:
 						self._updateUnableToRetrieve(artist, pageURL)
 

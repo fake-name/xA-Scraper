@@ -28,6 +28,18 @@ td.legend
 }
 
 
+code,
+kbd,
+pre,
+samp {
+	font-family: Menlo, Monaco, Consolas, "Courier New", monospace;
+}
+code {
+	padding: 2px 4px;
+	font-size: 90%;
+	background-color: #f9f2f4;
+	border-radius: 4px;
+}
 
 *.inlineRight
 {

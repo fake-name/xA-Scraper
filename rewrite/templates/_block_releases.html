@@ -25,12 +25,20 @@
 						</div>
 					</td>
 					<td class="padded"><a href="{{source_list[row.artist.site_name]['user-url'] % row.artist.artist_name}}">[src]</a></td>
-					{% if row.files%}
-						<td class="padded">
+					{% if row.files %}
+						{% if row.files | length == 1 %}
 							{% for img_file in row.files %}
-									<span class="padded showTT" imageID="{{img_file.id}}"><a href='{{row.release_meta}}'>{{release_entry_to_nice_url(row.artist.site_name, row.release_meta)}}</a></span>
+								<td class="padded showTT" imageID="{{img_file.id}}">
+										<span class="padded"><a href='{{row.release_meta}}'>{{release_entry_to_nice_url(row.artist.site_name, row.release_meta)}}</a></span>
+								</td>
 							{% endfor %}
-						</td>
+						{% else %}
+							<td class="padded">
+								{% for img_file in row.files %}
+										<span class="padded showTT" imageID="{{img_file.id}}" style='height: 100%'><a href='{{row.release_meta}}'>{{release_entry_to_nice_url(row.artist.site_name, row.release_meta)}}</a></span>
+								{% endfor %}
+							</td>
+						{% endif %}
 					{% else %}
 						<td class="padded"><a href='{{row.release_meta}}'>{{row.release_meta}}</a></td>
 					{% endif %}

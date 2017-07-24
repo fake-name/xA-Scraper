@@ -13,6 +13,7 @@ import flags
 import util.unclassify
 
 import rewrite.modules.scraper_base
+from rewrite.modules import exceptions
 
 class GetIb(rewrite.modules.scraper_base.ScraperBase):
 
@@ -265,7 +266,7 @@ class GetIb(rewrite.modules.scraper_base.ScraperBase):
 	def _extractPostTimestamp(self, soup):
 		datespan = soup.find('span', id='submittime_exact')
 		datetxt = datespan.get_text()
-		postts = dateparser.parse(datetxt)
+		postts = dateparser.parse(datetxt).replace(tzinfo=None)
 		return postts
 
 	def _extractPostTags(self, soup):
@@ -289,6 +290,10 @@ class GetIb(rewrite.modules.scraper_base.ScraperBase):
 	def _getArtPage(self, dlPathBase, artPageUrl, artistName):
 
 		soup = self.wg.getSoup(artPageUrl)
+
+		if 'ERROR: That submission has been deleted.' in str(soup):
+			self.log.warning("Item %s has been deleted by the poster!", artPageUrl)
+			return self.build_page_ret(status="Deleted", fqDlPath=None)
 
 		postTime    = self._extractPostTimestamp(soup)
 		postTags    = self._extractPostTags(soup)
@@ -329,7 +334,7 @@ class GetIb(rewrite.modules.scraper_base.ScraperBase):
 
 		if not imageURL:
 			self.log.error("OH NOES!!! No image on page = " + artPageUrl)
-			raise ValueError("No image found!")
+			return self.build_page_ret(status="Failed", fqDlPath=None)
 
 
 		imPaths = []
@@ -352,7 +357,7 @@ class GetIb(rewrite.modules.scraper_base.ScraperBase):
 		if stats and stats.strong:
 			return int(stats.strong.get_text().replace(",", ""))
 
-		raise LookupError("Could not retreive artist item quantity!")
+		raise exceptions.AccountDisabledException("Could not retreive artist item quantity!")
 
 
 

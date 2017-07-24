@@ -12,6 +12,7 @@ import flags
 import util.unclassify
 
 import rewrite.modules.scraper_base
+from rewrite.modules import exceptions
 
 class GetAs(rewrite.modules.scraper_base.ScraperBase):
 
@@ -345,7 +346,7 @@ class GetAs(rewrite.modules.scraper_base.ScraperBase):
 		if stats and stats.strong:
 			return int(stats.strong.get_text().replace(",", ""))
 
-		raise LookupError("Could not retreive artist item quantity!")
+		raise exceptions.AccountDisabledException("Could not retreive artist item quantity!")
 
 
 

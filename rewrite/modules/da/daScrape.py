@@ -13,7 +13,6 @@ from settings import settings
 import rewrite.modules.scraper_base
 import rewrite.modules.exceptions
 
-
 class GetDA(rewrite.modules.scraper_base.ScraperBase):
 
 	settingsDictKey = "da"
@@ -28,9 +27,9 @@ class GetDA(rewrite.modules.scraper_base.ScraperBase):
 	# ---------------------------------------------------------------------------------------------------------------------------------------------------------
 
 	def checkCookie(self):
-		authCookie			=	re.search(r"<Cookie auth=[_%0-9a-z]*? for \.deviantart\.com/>", "%s" % self.wg.cj, re.IGNORECASE)
-		authSecureCookie	=	re.search(r"<Cookie auth_secure=[_%0-9a-z]*? for \.deviantart\.com/>", "%s" % self.wg.cj, re.IGNORECASE)
-		userinfo			=	re.search(r"<Cookie userinfo=[_%0-9a-z]*? for \.deviantart\.com/>", "%s" % self.wg.cj, re.IGNORECASE)
+		authCookie			=	re.search(r"<Cookie auth=[\_\%0-9a-z]*? for \.deviantart\.com/>", "%s" % self.wg.cj, re.IGNORECASE)
+		authSecureCookie	=	re.search(r"<Cookie auth_secure=[\_\%0-9a-z]*? for \.deviantart\.com/>", "%s" % self.wg.cj, re.IGNORECASE)
+		userinfo			=	re.search(r"<Cookie userinfo=[\_\%0-9a-z\-]*? for \.deviantart\.com/>", "%s" % self.wg.cj, re.IGNORECASE)
 
 		if authCookie and authSecureCookie and userinfo:
 			return True, "Have DA Cookies:\n	%s\n	%s\n	%s" % (authCookie.group(0), authSecureCookie.group(0), userinfo.group(0))
@@ -40,10 +39,12 @@ class GetDA(rewrite.modules.scraper_base.ScraperBase):
 
 	def getCookie(self):
 
-		prepage = self.wg.getpage('https://www.deviantart.com/users/login')
+		login_page = 'https://www.deviantart.com/users/login'
+
+		prepage = self.wg.getpage(login_page)
 		# print prepage
 		soup = bs4.BeautifulSoup(prepage, "lxml")
-		form = soup.find("form", action="https://www.deviantart.com/users/login")
+		form = soup.find("form", action=login_page)
 		items = form.find_all("input")
 		logDict = {}
 		for item in items:
@@ -56,14 +57,15 @@ class GetDA(rewrite.modules.scraper_base.ScraperBase):
 			raise ValueError("Login form structure changed! Don't know how to log in correctly!	")
 		logDict["username"] = settings["da"]["username"]
 		logDict["password"] = settings["da"]["password"]
+		# logDict["ref"]      = 'https://www.deviantart.com/users/loggedin'
 
-		pagetext = self.wg.getpage('https://www.deviantart.com/users/login', postData = logDict)
+		pagetext = self.wg.getpage(login_page, postData = logDict, addlHeaders={'Referer':login_page})
 
 		# print pagetext
 		if re.search("The username or password you entered was incorrect", pagetext):
-			return "Login Failed"
+			return False, "Login Failed"
 		else:
-			return "Logged In"
+			return True, "Logged In"
 
 
 	# ---------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -248,7 +250,7 @@ class GetDA(rewrite.modules.scraper_base.ScraperBase):
 		page = self.wg.getSoup(basePage)
 		div = page.find("div", class_="pbox pppbox")
 		if not div:
-			raise LookupError("Could not retreive artist item quantity!")
+			raise rewrite.modules.exceptions.AccountDisabledException("Could not retreive artist item quantity!")
 		return int(div.find("strong").text.replace(',', ''))
 
 	def _getItemsOnPage(self, inSoup):
@@ -288,8 +290,10 @@ if __name__ == '__main__':
 	logSetup.initLogging()
 
 	ins = GetDA()
-	ins.getCookie()
+	have_cookie = ins.checkCookie()
+	print('have_cookie', have_cookie)
+	# ins.getCookie()
 	# print(ins)
 	# print("Instance: ", ins)
 	# dlPathBase, artPageUrl, artistName
-	ins._getArtPage("xxxx", 'xxx', 'testtt')
+	# ins._getArtPage("xxxx", 'http://samus9450.deviantart.com/art/SAMUS-ZERO-SUIT-SEXY-3-603835374', 'testtt')

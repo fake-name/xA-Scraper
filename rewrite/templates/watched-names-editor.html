@@ -1,0 +1,158 @@
+<!-- extend base layout -->
+{% extends "__base.html" %}
+
+{% macro render_artist_list_site(sitename, artistlist) %}
+	<div class="subdiv {{sitename}}Id">
+		<div class="contentdiv">
+
+			<span>
+				<h2 style='display: inline-block' >Artists for site: {{ sitename | upper }}</h2>
+			</span>
+
+			<form>
+				Add new artist:
+				<input type="hidden" name="target" value="addName">
+				<input type="hidden" name="add", value="True">
+				<input type="hidden" name="site", value="{{sitename}}">
+				<div style="display: inline-block;">
+					<td><input type="text" name="artistName", value="" size=50></td>
+				</div>
+				<input type="submit" value="Add">
+			</form>
+			<button style='display: inline-block' class="btn_{{sitename}}">Show List</button>
+			<div class='toggle_{{sitename}}' style='display: none'>
+				<table border="1px" style="width:800px;">
+					<tr>
+							<th class="uncoloured padded" width="670px">Artist Name</th>
+							<th class="uncoloured padded" width="30px">Del</th>
+					</tr>
+
+
+				{% for arow in artistlist %}
+					<tr id='rowid_{{arow.id}}'>
+
+						<td>
+							<span id="view">
+								{{arow.artist_name}}
+								<span style="float:right"><code>{{show_as_bytes(arow.artist_name)}}</code></span>
+							</span>
+							<span id="edit" style="display:none">
+								<input type="text" name="aName" style="box-sizing: border-box; width: 100%; -moz-box-sizing: border-box; -webkit-box-sizing: border-box;" value="{{arow.artist_name}}">
+							</span>
+						</td>
+
+						<td>
+							&nbsp;<a href="#" id='buttonid_{{arow.id}}' onclick="ToggleEdit('{{arow.id}}');return false;">Edit</a>&nbsp;
+						</td>
+					</tr>
+				{% endfor %}
+
+				</table>
+			</div>
+
+			<script>
+			$(".btn_{{sitename}}").click(function() {
+
+				$(".toggle_{{sitename}}").toggle(200);
+
+			});
+			</script>
+
+		</div>
+	</div>
+{% endmacro %}
+
+
+{% block content %}
+	{% include '_block_flash.html' %}
+	<div class="subdiv mtMainId">
+		<div class="contentdiv">
+			<h3>Site Fetched Names</h3>
+
+			<div>
+
+			</div>
+			<hr>
+		</div>
+	</div>
+	{% for sitename in skeys %}
+		{{ render_artist_list_site(sitename, watched_sorted[sitename]) }}
+	{% endfor %}
+
+{% endblock %}
+
+{% block footer %}
+
+	<script type="text/javascript">
+
+		function ajaxSuccess(reqData, statusStr, jqXHR)
+		{
+			console.log("Ajax request succeeded");
+			console.log("Content = ", reqData);
+			console.log("StatusStr - ", statusStr);
+			console.log("jqXHR", jqXHR);
+			ctnt = JSON.parse(reqData);
+			console.log(ctnt);
+			var text = reqData;
+			text = text.replace(/ +/g,' ').replace(/(\r\n|\n|\r)/gm,"");
+			if (ctnt["Status"] == "Error")
+			{
+				window.alert("Error!\n"+ctnt["Message"])
+			}
+			else
+			{
+				window.alert("Succeeded!\n"+ctnt["Message"])
+				// location.reload();
+
+			}
+
+
+		};
+		function ToggleEdit(rowId)
+		{
+			if ($('#rowid_'+rowId+' #view').is(":visible"))
+			{
+				$('#rowid_'+rowId+' #view').each(function(){ $(this).hide(); })
+				$('#rowid_'+rowId+' #edit').each(function(){ $(this).show(); })
+				$('#buttonid_'+rowId).text("Ok")
+
+			}
+			else
+			{
+				$('#rowid_'+rowId+' #view').each(function(){ $(this).show(); })
+				$('#rowid_'+rowId+' #edit').each(function(){ $(this).hide(); })
+				$('#buttonid_'+rowId).text("Edit")
+
+				var ret = ({});
+
+				$('#rowid_'+rowId+' #edit').map(function()
+				{
+					var inputF = $(this).find('input:first');
+
+					ret["id"] = rowId;
+					if (inputF.is(":checkbox"))
+					{
+						ret[""+inputF.attr('name')] = inputF.prop('checked');
+					}
+					else
+					{
+						ret[""+inputF.attr('name')] = inputF.val();
+					}
+
+				});
+				if (!$.isEmptyObject(ret))
+				{
+					ret["change-artist-name"] = true;
+					$.ajax("api", {"data": ret, success: ajaxSuccess})
+				}
+
+
+
+			}
+		};
+
+
+	</script>
+
+{% endblock %}
+

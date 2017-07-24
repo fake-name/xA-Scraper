@@ -13,6 +13,7 @@ from settings import settings
 import flags
 
 import rewrite.modules.scraper_base
+from rewrite.modules import exceptions
 
 class GetPX(rewrite.modules.scraper_base.ScraperBase):
 
@@ -405,10 +406,10 @@ class GetPX(rewrite.modules.scraper_base.ScraperBase):
 
 		mainDiv = page.find("div", class_="layout-a")
 		if not mainDiv:
-			raise LookupError("Could not retreive artist item quantity!")
+			raise exceptions.AccountDisabledException("Could not retreive artist item quantity!")
 		countSpan = mainDiv.find("span", class_="count-badge")
 		if not countSpan:
-			raise LookupError("Could not retreive artist item quantity!")
+			raise exceptions.AccountDisabledException("Could not retreive artist item quantity!")
 
 		text = countSpan.text.split()[0]
 		text = ''.join([char for char in text if char in '0123456789'])
@@ -535,5 +536,19 @@ class GetPX(rewrite.modules.scraper_base.ScraperBase):
 
 		return super().getNameList()
 
+
+
+if __name__ == '__main__':
+
+	import logSetup
+	logSetup.initLogging()
+
+	ins = GetPX()
+	print("Getting cookie:")
+	ins.getCookie()
+	# print(ins)
+	# print("Instance: ", ins)
+	# dlPathBase, artPageUrl, artistName
+	ins._getArtPage("xxxx", 'xxx', 'testtt')
 
 
