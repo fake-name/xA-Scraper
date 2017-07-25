@@ -20,9 +20,8 @@ from sqlalchemy.schema import UniqueConstraint
 
 import datetime
 from sqlalchemy.dialects.postgresql import ENUM
+from sqlalchemy.dialects.postgresql import JSON
 
-
-from sqlalchemy.dialects.postgresql import ENUM
 
 
 dlstate_enum   = ENUM('new', 'fetching', 'processing', 'complete', 'error', 'removed', 'disabled', 'specialty_deferred', 'specialty_ready', name='dlstate_enum')
@@ -95,6 +94,10 @@ class ScrapeTargets(Base):
 	artist_name     = Column(Text,     nullable=False, index=True)
 	uploadeh        = Column(Boolean,  index = True, default=False, nullable=True)
 	last_fetched    = Column(DateTime, nullable=False, default=datetime.datetime.min)
+
+	extra_meta      = Column(JSON)
+
+	release_cnt     = Column(Integer, default='0')
 
 	__table_args__ = (
 		UniqueConstraint('site_name', 'artist_name'),

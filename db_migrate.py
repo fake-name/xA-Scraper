@@ -5,7 +5,6 @@
 # logging.getLogger('sqlalchemy.engine').setLevel(logging.INFO)
 
 from rewrite import app, db
-from citext import CIText
 from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
 from flask_script import Manager

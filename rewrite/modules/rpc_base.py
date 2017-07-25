@@ -5,6 +5,7 @@ import queue
 import datetime
 import zerorpc
 import dill
+import pprint
 
 from settings import settings
 import os
@@ -149,23 +150,23 @@ class RpcMixin():
 			postDelay      = 0
 		)
 
-		print("raw job:", raw_job)
 		self.put_outbound_raw(raw_job)
 
-	def put_outbound_callable(self, jobid, serialized):
+	def put_outbound_callable(self, jobid, serialized, meta={}, call_args=[], call_kwargs={}):
 		self.log.info("Dispatching new job")
+		call_kwargs = {'code_struct' : serialized, **call_kwargs}
+
 		raw_job = buildjob(
 			module         = 'RemoteExec',
 			call           = 'callCode',
 			dispatchKey    = "rpc-system",
 			jobid          = jobid,
-			args           = [],
-			kwargs         = {'code_struct' : serialized},
-			additionalData = {},
+			args           = call_args,
+			kwargs         = call_kwargs,
+			additionalData = meta,
 			postDelay      = 0
 		)
 
-		print("raw job:", raw_job)
 		self.put_outbound_raw(raw_job)
 
 	# Note: The imports in *this* file determine what's available when
@@ -186,7 +187,6 @@ class RpcMixin():
 
 		code = compile(class_blob['source'], "no filename", "exec")
 		exec(code)
-
 		cls_def = locals()[class_blob['callname']]
 		# This call relies on the source that was exec()ed having defined the class
 		# that will now be unserialized.
@@ -233,3 +233,13 @@ class RpcMixin():
 			self.rpc_interface = RemoteJobInterface("XA-RPC-Fetcher", settings['rpc-server']['address'])
 
 
+
+	def __del__(self):
+		try:
+			self.rpc_interface.close()
+		except Exception:
+			pass
+		try:
+			del self.rpc_interface
+		except Exception:
+			pass
