@@ -23,12 +23,16 @@ import logging
 
 class RpcTimeoutError(RuntimeError):
 	pass
+class RpcExceptionError(RuntimeError):
+	pass
 
 
 class RemoteExecClass(object):
 	# # ---------------------------------------------------------------------------------------------------------------------------------------------------------
 	# Runtime management
 	# # ---------------------------------------------------------------------------------------------------------------------------------------------------------
+
+	url_base = 'https://yiff.party/'
 
 	def __init__(self, wg=None):
 		self.logname = "Main.RemoteExec.Tester"
@@ -125,12 +129,107 @@ class RemoteExecClass(object):
 		else:
 			return None
 
+	def get_meta_from_release_soup(self, release_soup):
+		ret = {}
+
+		name = release_soup.find('span', class_='yp-info-name')
+		if name:
+			ret['artist_name'] = name.get_text(strip=True)
+
+		return ret
+
+	def get_posts_from_page(self, soup):
+		posts = []
+		postdivs = soup.find_all("div", class_='yp-post')
+		for postdiv in postdivs:
+			post = {}
+			post['id'] = postdiv['id']
+
+			post['time']  = postdiv.find(True, class_='post-time' ).get_text(strip=True)
+			post['title'] = postdiv.find("span", class_='card-title').get_text(strip=True)
+			post['body']  = postdiv.find("div",   class_='post-body' ).get_text(strip=True)
+
+			attachment_div = postdiv.find("div", class_='card-attachments')
+			attachments = []
+			if attachment_div:
+				for link in attachment_div.find_all("a"):
+					url = urllib.parse.urljoin(self.url_base, link['href'])
+					content = link.get_text(strip=True)
+					attachments.append((url, content))
+			post['attachments'] = attachments
+
+			comments = []
+			for comment_div in postdiv.find_all('div', class_='yp-post-comment'):
+				comment = {}
+				comment['content']  = comment_div.find(True, class_='yp-post-comment-body').get_text(strip=True)
+				comment['time_utc'] = comment_div.find(True, class_='yp-post-comment-time')['data-utc']
+				comment['author']   = comment_div.find(True, class_='yp-post-comment-head').get_text(strip=True)
+
+				comments.append(comment)
+			post['comments'] = comments
+			posts.append(post)
+
+		return posts
+
+	def get_files_from_page(self, soup):
+		files = []
+		file_divs = soup.find_all('div', class_='yp-shared-card')
+		for file_div in file_divs:
+
+			print('content')
+			print(file_div.prettify())
+
+			file = {}
+			file['title'] = file_div.find(True, class_='card-title').get_text(strip=True)
+			file['post_ts'] = file_div.find(True, class_='post-time-unix').get_text(strip=True)
+
+			content = file_div.find('div', class_='card-action')
+
+			file['attachments'] = [
+				(tmp.get_text(strip=True), urllib.parse.urljoin(self.url_base, tmp['href'])) for tmp in content.find_all('a')
+			]
+			files.append(file)
+
+		return files
+
+
+	def get_releases_for_aid(self, aid):
+		soup = self.wg.getSoup('https://yiff.party/{}'.format(aid), addlHeaders={"Referer" : 'https://yiff.party/'})
+
+		# Clear out the material design icons.
+		for baddiv in soup.find_all("i", class_='material-icons'):
+			baddiv.decompose()
+
+		ret = self.get_meta_from_release_soup(soup)
+
+		posts = self.get_posts_from_page(soup)
+		files = self.get_files_from_page(soup)
+
+		return {
+			'ret'   : ret,
+			'posts' : posts,
+			'files' : files,
+		}
+
+	def yp_get_content_for_artist(self, aid):
+		self.log.info("Getting content for artist: %s", aid)
+		ok = self.yp_walk_to_entry()
+		if not ok:
+			return "Error! Failed to access entry!"
+
+		releases = self.get_releases_for_aid(aid)
+
+		# else:
+		return releases
+
 	def _go(self, mode, **kwargs):
 		self.log.info("_go() called with mode: '%s'", mode)
 		self.log.info("_go() kwargs: '%s'", kwargs)
 
 		if mode == 'get-names':
 			return self.yp_get_names()
+		elif mode == "get-art-for-aid":
+			return self.yp_get_content_for_artist(**kwargs)
 		else:
 			self.log.error("Unknown mode: '%s'", mode)
 			return "Unknown mode: '%s' -> Kwargs: '%s'" % (mode, kwargs)
@@ -203,11 +302,15 @@ class GetYp(rewrite.modules.scraper_base.ScraperBase, rewrite.modules.rpc_base.R
 			ret = self.process_responses()
 			# print(ret, _)
 			if ret:
-				# self.pprint_resp(ret)
+				self.pprint_resp(ret)
 				if 'jobid' in ret and ret['jobid'] == jid:
-					if len(ret['ret']) == 2:
-						self.print_remote_log(ret['ret'][0])
-						return ret['ret'][1]
+					if 'ret' in ret:
+						if len(ret['ret']) == 2:
+							self.print_remote_log(ret['ret'][0])
+							return ret['ret'][1]
+					else:
+						raise RpcExceptionError("RPC Call has no ret value. Probably encountered a remote exception: %s" % ret)
+
 			time.sleep(1)
 
 
@@ -255,11 +358,18 @@ class GetYp(rewrite.modules.scraper_base.ScraperBase, rewrite.modules.rpc_base.R
 		return super().getNameList()
 
 
+
+
 	def do_fetch_by_aid(self, aid):
 
 		with self.db.context_sess() as sess:
 			row = sess.query(self.db.ScrapeTargets).filter(self.db.ScrapeTargets.id == aid).one()
 		print(row, row.id, row.site_name, row.artist_name, row.extra_meta)
+
+
+		params = self.blocking_remote_call(RemoteExecClass, {'mode' : 'get-art-for-aid', 'aid' : row.artist_name})
+		with open('rfetch.txt', 'w', encoding='utf-8') as fp:
+			fp.write(json.dumps(params))
 
 
 	def go(self, nameList=None, ctrlNamespace=None):
@@ -273,19 +383,41 @@ class GetYp(rewrite.modules.scraper_base.ScraperBase, rewrite.modules.rpc_base.R
 			self.do_fetch_by_aid(aid)
 
 
+def local_test():
+	import webFunctions
+	import bs4
+	import sys
+	wg = webFunctions.WebGetRobust()
+	t2 = RemoteExecClass(wg=wg)
+	with open(sys.argv[1], "r") as fp:
+		cont=fp.read()
+	soup = bs4.BeautifulSoup(cont, 'lxml')
+
+	r1 = t2.get_meta_from_release_soup(soup)
+	r2 = t2.get_posts_from_page(soup)
+	r3 = t2.get_files_from_page(soup)
+
+	print("R1:", r1)
+	print("R2:", r2)
+	print("R2:", r3)
 
 if __name__ == '__main__':
 
 	import logSetup
 	logSetup.initLogging()
 
-	ins = GetYp()
-	# ins.getCookie()
-	print(ins)
-	print("Instance: ", ins)
-	ins.go("Wat", "Wat")
-	# dlPathBase, artPageUrl, artistName
-
+	if True:
+		ins = GetYp()
+		# ins.getCookie()
+		print(ins)
+		print("Instance: ", ins)
+		# ins.go("Wat", "Wat")
+		ret = ins.do_fetch_by_aid(5688)
+		print(ret)
+		# ins.do_fetch_by_aid(8450)   # z
+		# dlPathBase, artPageUrl, artistName
+	else:
+		local_test()
 
 
 
