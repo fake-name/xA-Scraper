@@ -3,23 +3,24 @@ import os
 import os.path
 import traceback
 import re
-import bs4
-import dateparser
+import logging
 import datetime
 import urllib.request
 import urllib.parse
-from settings import settings
-import flags
 import time
 import json
 import uuid
 import pprint
 
+import bs4
+import dateparser
+
 import rewrite.modules.scraper_base
 import rewrite.modules.rpc_base
 
+import flags
 
-import logging
+from settings import settings
 
 class RpcTimeoutError(RuntimeError):
 	pass
@@ -146,7 +147,7 @@ class RemoteExecClass(object):
 			post['id'] = postdiv['id']
 
 			post['time']  = postdiv.find(True, class_='post-time' ).get_text(strip=True)
-			post['title'] = postdiv.find("span", class_='card-title').get_text(strip=True)
+			post['title'] = list(postdiv.find("span", class_='card-title').stripped_strings)[0]
 			post['body']  = postdiv.find("div",   class_='post-body' ).get_text(strip=True)
 
 			attachment_div = postdiv.find("div", class_='card-attachments')
@@ -163,7 +164,7 @@ class RemoteExecClass(object):
 				comment = {}
 				comment['content']  = comment_div.find(True, class_='yp-post-comment-body').get_text(strip=True)
 				comment['time_utc'] = comment_div.find(True, class_='yp-post-comment-time')['data-utc']
-				comment['author']   = comment_div.find(True, class_='yp-post-comment-head').get_text(strip=True)
+				comment['author']   = list(comment_div.find(True, class_='yp-post-comment-head').stripped_strings)[0]
 
 				comments.append(comment)
 			post['comments'] = comments
@@ -206,7 +207,7 @@ class RemoteExecClass(object):
 		files = self.get_files_from_page(soup)
 
 		return {
-			'ret'   : ret,
+			'meta'   : meta,
 			'posts' : posts,
 			'files' : files,
 		}
@@ -300,8 +301,8 @@ class GetYp(rewrite.modules.scraper_base.ScraperBase, rewrite.modules.rpc_base.R
 		self.log.info("Waiting for remote response")
 		for _ in range(self.rpc_timeout_s):
 			ret = self.process_responses()
-			# print(ret, _)
 			if ret:
+
 				self.pprint_resp(ret)
 				if 'jobid' in ret and ret['jobid'] == jid:
 					if 'ret' in ret:
@@ -313,7 +314,6 @@ class GetYp(rewrite.modules.scraper_base.ScraperBase, rewrite.modules.rpc_base.R
 
 			time.sleep(1)
 
-
 		raise RpcTimeoutError("No RPC Response within timeout period (%s sec)" % self.rpc_timeout_s)
 
 
@@ -322,7 +322,8 @@ class GetYp(rewrite.modules.scraper_base.ScraperBase, rewrite.modules.rpc_base.R
 		namelist = json.loads(name_json)
 		new     = 0
 		updated = 0
-		# Push the pixiv name list into the DB
+
+		# Push the name list into the DB
 		with self.db.context_sess() as sess:
 			for adict in namelist['creators']:
 				name = str(adict['id'])
@@ -353,29 +354,73 @@ class GetYp(rewrite.modules.scraper_base.ScraperBase, rewrite.modules.rpc_base.R
 		self.log.info("Had %s new names, %s with changes since last update.", new, updated)
 
 	def getNameList(self):
-
-		# self.fetch_update_names()
+		self.fetch_update_names()
 		return super().getNameList()
 
 
+	def _process_response_post(self, arow, post_struct):
+		with self.db.context_sess() as sess:
+			have = sess.query(self.db.ArtItem)                             \
+				.filter(self.db.ArtItem.artist_id    == arow.id)           \
+				.filter(self.db.ArtItem.release_meta == post_struct['id']) \
+				.scalar()
+			if not have:
+				have = self.db.ArtItem(
+						state              = 'new',
+						artist_id          = arow.id,
+						release_meta       = post_struct['id'],
+						addtime            = dateparser.parse(post_struct['time']),
+						title              = post_struct['title'],
+						content            = post_struct['body'],
+						content_structured = post_struct,
+					)
+				sess.add(have)
+
+
+	def _process_response_file(self, arow, post_struct):
+		with self.db.context_sess() as sess:
+			have = sess.query(self.db.ArtItem)                             \
+				.filter(self.db.ArtItem.artist_id    == arow.id)           \
+				.filter(self.db.ArtItem.release_meta == post_struct['title']) \
+				.scalar()
+			if not have:
+				have = self.db.ArtItem(
+						state              = 'new',
+						artist_id          = arow.id,
+						release_meta       = post_struct['title'],
+						addtime            = datetime.datetime.fromtimestamp(post_struct['post_ts']),
+						title              = post_struct['title'],
+					)
+				sess.add(have)
 
 
 	def do_fetch_by_aid(self, aid):
 
 		with self.db.context_sess() as sess:
-			row = sess.query(self.db.ScrapeTargets).filter(self.db.ScrapeTargets.id == aid).one()
-		print(row, row.id, row.site_name, row.artist_name, row.extra_meta)
+			arow = sess.query(self.db.ScrapeTargets).filter(self.db.ScrapeTargets.id == aid).one()
 
+		print(arow, arow.id, arow.site_name, arow.artist_name, arow.extra_meta)
 
-		params = self.blocking_remote_call(RemoteExecClass, {'mode' : 'get-art-for-aid', 'aid' : row.artist_name})
+		resp = self.blocking_remote_call(RemoteExecClass, {'mode' : 'get-art-for-aid', 'aid' : arow.artist_name})
+
 		with open('rfetch.txt', 'w', encoding='utf-8') as fp:
-			fp.write(json.dumps(params))
+			fp.write(json.dumps(resp))
 
+		if resp['meta']['artist_name'].lower() != arow.extra_meta['name'].lower():
+			self.log.error("Artist name mismatch! '%s' -> '%s'", resp['meta']['artist_name'], arow.extra_meta['name'])
+			return
+
+		for post in resp['posts']:
+			self._process_response_post(arow, post)
+		for file in resp['files']:
+			self._process_response_file(arow, file)
+
+		with self.db.context_sess() as sess:
+			arow.last_fetched = datetime.datetime.now()
 
 	def go(self, nameList=None, ctrlNamespace=None):
 		if ctrlNamespace is None:
 			raise ValueError("You need to specify a namespace!")
-
 
 		nl = self.getNameList()
 
@@ -397,22 +442,23 @@ def local_test():
 	r2 = t2.get_posts_from_page(soup)
 	r3 = t2.get_files_from_page(soup)
 
-	print("R1:", r1)
-	print("R2:", r2)
-	print("R2:", r3)
+	pprint.pprint(("R1:", r1))
+	pprint.pprint(("R2:", r2))
+	pprint.pprint(("R2:", r3))
 
 if __name__ == '__main__':
 
 	import logSetup
 	logSetup.initLogging()
 
-	if True:
+	if False:
 		ins = GetYp()
 		# ins.getCookie()
 		print(ins)
 		print("Instance: ", ins)
 		# ins.go("Wat", "Wat")
-		ret = ins.do_fetch_by_aid(5688)
+		ret = ins.do_fetch_by_aid(3745)
+		# ret = ins.do_fetch_by_aid(5688)
 		print(ret)
 		# ins.do_fetch_by_aid(8450)   # z
 		# dlPathBase, artPageUrl, artistName

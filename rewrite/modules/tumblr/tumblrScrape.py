@@ -95,8 +95,8 @@ class GetTumblr(rewrite.modules.scraper_base.ScraperBase):
 		orga  = post_struct['blog_name']
 		pgurl = post_struct['post_url']
 		title = post_struct['summary']
-		desc  = post_struct['caption']
-		raw_tags  = post_struct['tags']
+		desc  = post_struct['caption'] if 'caption' in post_struct else ""
+		raw_tags  = post_struct['tags'] if 'tags' in post_struct else []
 		html_tags = "".join(["<div><ul class='tags'>"] +
 			["<li>{tag}</li>".format(tag=tag) for tag in raw_tags] +
 			["</ul></div>"])

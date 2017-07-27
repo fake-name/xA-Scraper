@@ -24,7 +24,7 @@ from sqlalchemy.dialects.postgresql import JSON
 
 
 
-dlstate_enum   = ENUM('new', 'fetching', 'processing', 'complete', 'error', 'removed', 'disabled', 'specialty_deferred', 'specialty_ready', name='dlstate_enum')
+dlstate_enum   = ENUM('new', 'fetching', 'processing', 'complete', 'error', 'removed', 'disabled', 'specialty_deferred', 'specialty_ready', 'not_set', name='dlstate_enum')
 
 from sqlalchemy.ext.declarative import declarative_base
 Base = declarative_base()
@@ -33,20 +33,21 @@ Base = declarative_base()
 class ArtItem(Base):
 	__versioned__ = {}
 
-	__tablename__     = 'art_item'
+	__tablename__       = 'art_item'
 
-	id                = Column(BigInteger, primary_key = True, index = True)
-	state             = Column(dlstate_enum, default='new', index=True, nullable=False)
-	errno             = Column(Integer, default='0')
+	id                  = Column(BigInteger, primary_key = True, index = True)
+	state               = Column(dlstate_enum, default='new', index=True, nullable=False)
+	errno               = Column(Integer, default='0')
 
-	artist_id         = Column(BigInteger, ForeignKey('scrape_targets.id'), nullable=False)
-	release_meta      = Column(Text, nullable = False, index=True)
+	artist_id           = Column(BigInteger, ForeignKey('scrape_targets.id'), nullable=False)
+	release_meta        = Column(Text, nullable = False, index=True)
 
-	fetchtime         = Column(DateTime, default=datetime.datetime.min)
-	addtime           = Column(DateTime, default=datetime.datetime.utcnow)
+	fetchtime           = Column(DateTime, default=datetime.datetime.min)
+	addtime             = Column(DateTime, default=datetime.datetime.utcnow)
 
-	title             = Column(Text)
-	content           = Column(Text)
+	title               = Column(Text)
+	content             = Column(Text)
+	content_structured  = Column(JSON)
 
 	artist         = relationship("ScrapeTargets")
 	files          = relationship("ArtFile")
@@ -62,11 +63,14 @@ class ArtFile(Base):
 	id                = Column(BigInteger, primary_key = True, index = True)
 
 	item_id           = Column(BigInteger, ForeignKey('art_item.id'), nullable=False)
-	seqnum       = Column(Integer, default='0', nullable=False)
+	seqnum            = Column(Integer, default='0', nullable=False)
 
-	filename     = Column(Text)
+	state             = Column(dlstate_enum, default='not_set')
 
-	fspath       = Column(Text, nullable=False)
+	fqurl             = Column(Text)
+	filename          = Column(Text)
+
+	fspath            = Column(Text, nullable=False)
 
 	__table_args__ = (
 		UniqueConstraint('item_id', 'seqnum'),
@@ -98,6 +102,9 @@ class ScrapeTargets(Base):
 	extra_meta      = Column(JSON)
 
 	release_cnt     = Column(Integer, default='0')
+
+	posts           = relationship("ArtItem")
+
 
 	__table_args__ = (
 		UniqueConstraint('site_name', 'artist_name'),
