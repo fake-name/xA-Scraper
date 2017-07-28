@@ -64,6 +64,7 @@ class ArtFile(Base):
 
 	item_id           = Column(BigInteger, ForeignKey('art_item.id'), nullable=False)
 	seqnum            = Column(Integer, default='0', nullable=False)
+	file_meta         = Column(Text, default='')
 
 	state             = Column(dlstate_enum, default='not_set')
 
@@ -73,7 +74,7 @@ class ArtFile(Base):
 	fspath            = Column(Text, nullable=False)
 
 	__table_args__ = (
-		UniqueConstraint('item_id', 'seqnum'),
+		UniqueConstraint('item_id', 'seqnum', 'file_meta'),
 		)
 
 class ArtTags(Base):
