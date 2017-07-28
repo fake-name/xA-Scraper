@@ -257,12 +257,22 @@ class RemoteExecClass(object):
 	def fetch_files(self, aid, releases, have_posts, file_limit):
 		self.log.info("Have posts: %s", have_posts)
 		fetched = 0
+
+		releases['posts'].reverse()
+		releases['files'].reverse()
+
+		skipped = 0
+
 		for post in releases['posts']:
 			key = ['post', post['id']]
 			if key in have_posts:
 				self.log.info("Have post %s, nothing to do", key)
+				post['skipped'] = True
+				skipped += 1
 			elif fetched > file_limit:
 				self.log.info("Skipping %s due to fetch limit %s.", key, file_limit)
+				post['skipped'] = True
+				skipped += 1
 			else:
 				self.log.info("Item %s not present in already-fetched items.", key)
 				post['files'] = self.fetch_post_content(aid, post)
@@ -273,17 +283,23 @@ class RemoteExecClass(object):
 			key = ['post', file['title']]
 			if key in have_posts:
 				self.log.info("Have file %s, nothing to do", key)
+				file['skipped'] = True
+				skipped += 1
 			elif fetched > file_limit:
 				self.log.info("Skipping %s due to fetch limit %s.", key, file_limit)
+				file['skipped'] = True
+				skipped += 1
 			else:
 				self.log.info("File %s not present in already-fetched items.", key)
 				file['files'] = self.fetch_file_content(aid, file)
 				fetched += 1
 
+		self.log.info("Skipped %s files", skipped)
+
 		return releases
 
 
-	def yp_get_content_for_artist(self, aid, have_posts, file_limit=100):
+	def yp_get_content_for_artist(self, aid, have_posts, file_limit=25):
 		self.log.info("Getting content for artist: %s", aid)
 		ok = self.yp_walk_to_entry()
 		if not ok:
@@ -299,9 +315,9 @@ class RemoteExecClass(object):
 		self.log.info("_go() called with mode: '%s'", mode)
 		self.log.info("_go() kwargs: '%s'", kwargs)
 
-		if mode == 'get-names':
+		if mode == 'yp_get_names':
 			return self.yp_get_names()
-		elif mode == "get-art-for-aid":
+		elif mode == "yp_get_content_for_artist":
 			return self.yp_get_content_for_artist(**kwargs)
 		else:
 			self.log.error("Unknown mode: '%s'", mode)
@@ -317,7 +333,7 @@ class GetYp(rewrite.modules.scraper_base.ScraperBase, rewrite.modules.rpc_base.R
 
 	pluginName = "YpGet"
 
-	rpc_timeout_s = 600
+	rpc_timeout_s = 60 * 15
 
 	remote_log = logging.getLogger("Main.RPC.Remote")
 
@@ -343,15 +359,18 @@ class GetYp(rewrite.modules.scraper_base.ScraperBase, rewrite.modules.rpc_base.R
 	# # ---------------------------------------------------------------------------------------------------------------------------------------------------------
 
 	def pprint_resp(self, resp):
+		if len(resp) == 2:
+			logmsg, response_data = resp
+			self.print_remote_log(logmsg)
 		for line in pprint.pformat(resp).split("\n"):
 			self.log.info(line)
 		if 'traceback' in resp:
 			for line in resp['traceback'].split("\n"):
 				self.log.error(line)
 
-	def print_remote_log(self, log_lines):
+	def print_remote_log(self, log_lines, debug=False):
 		calls = {
-				"[DEBUG] ->"    : self.remote_log.debug,
+				"[DEBUG] ->"    : self.remote_log.debug if debug else None,
 				"[INFO] ->"     : self.remote_log.info,
 				"[ERROR] ->"    : self.remote_log.error,
 				"[CRITICAL] ->" : self.remote_log.critical,
@@ -360,7 +379,7 @@ class GetYp(rewrite.modules.scraper_base.ScraperBase, rewrite.modules.rpc_base.R
 
 		for line in log_lines:
 			for key, log_call in calls.items():
-				if key in line:
+				if key in line and log_call:
 					log_call(line)
 
 
@@ -374,15 +393,18 @@ class GetYp(rewrite.modules.scraper_base.ScraperBase, rewrite.modules.rpc_base.R
 		for _ in range(self.rpc_timeout_s):
 			ret = self.process_responses()
 			if ret:
-				# self.pprint_resp(ret)
 				if 'jobid' in ret and ret['jobid'] == jid:
 					if 'ret' in ret:
 						if len(ret['ret']) == 2:
 							self.print_remote_log(ret['ret'][0])
 							return ret['ret'][1]
+						else:
+							self.pprint_resp(ret)
+							raise RuntimeError("Response not of length 2!")
 					else:
 						with open('rerr-{}.json'.format(time.time()), 'w', encoding='utf-8') as fp:
 							fp.write(json.dumps(ret, indent=4, sort_keys=True))
+						self.pprint_resp(ret)
 						raise RpcExceptionError("RPC Call has no ret value. Probably encountered a remote exception: %s" % ret)
 
 			time.sleep(1)
@@ -391,7 +413,7 @@ class GetYp(rewrite.modules.scraper_base.ScraperBase, rewrite.modules.rpc_base.R
 
 
 	def fetch_update_names(self):
-		name_json = self.blocking_remote_call(RemoteExecClass, {'mode' : 'get-names'})
+		name_json = self.blocking_remote_call(RemoteExecClass, {'mode' : 'yp_get_names'})
 		namelist = json.loads(name_json)
 		new     = 0
 		updated = 0
@@ -491,94 +513,88 @@ class GetYp(rewrite.modules.scraper_base.ScraperBase, rewrite.modules.rpc_base.R
 						)
 					sess.add(frow)
 				sess.commit()
-
 			else:
+				print("File missing 'fdata': %s", file)
 				have_all = False
 
-		return 'complete' if have_all else 'error'
+		ret = 'complete' if have_all else 'error'
+		self.log.info("Save files state: %s", ret)
+		return ret
 
-	def _process_response_post(self, arow, post_struct):
-		with self.db.context_sess() as sess:
-			have = sess.query(self.db.ArtItem)                             \
-				.filter(self.db.ArtItem.artist_id    == arow.id)           \
-				.filter(self.db.ArtItem.release_meta == post_struct['id']) \
-				.scalar()
-			if have:
-				self.log.info("Have post: '%s'", post_struct['title'])
-				if post_struct['attachments']:
-					result = self.save_files(sess, arow, have, post_struct['attachments'])
-					self.log.info("Saved attachment result: %s", result)
-					have.state = result
-				else:
-					have.state = 'complete'
-					self.log.info("Post '%s' has no attachments?", post_struct['title'])
+	def _process_response_post(self, sess, arow, post_struct):
+		have = sess.query(self.db.ArtItem)                             \
+			.filter(self.db.ArtItem.artist_id    == arow.id)           \
+			.filter(self.db.ArtItem.release_meta == post_struct['id']) \
+			.scalar()
+		if have:
+			self.log.info("Have post: '%s'", post_struct['title'])
+		else:
+			self.log.info("New post: '%s'", post_struct['title'])
+			post_struct['type'] = 'post'
+			have = self.db.ArtItem(
+					state              = 'new',
+					artist_id          = arow.id,
+					release_meta       = post_struct['id'],
+					addtime            = dateparser.parse(post_struct['time']),
+					title              = post_struct['title'],
+					content            = post_struct['body'],
+					content_structured = {i:post_struct[i] for i in post_struct if i!='attachments'},
+				)
+			sess.add(have)
+			sess.flush()
 
-
+		if post_struct['attachments']:
+			if 'skipped' in post_struct and post_struct['skipped'] == True:
+				self.log.info("Attachment skipped due to fetch limit.")
+				have.state = "new"
 			else:
-				self.log.info("New post: '%s'", post_struct['title'])
-				post_struct['type'] = 'post'
-				have = self.db.ArtItem(
-						state              = 'new',
-						artist_id          = arow.id,
-						release_meta       = post_struct['id'],
-						addtime            = dateparser.parse(post_struct['time']),
-						title              = post_struct['title'],
-						content            = post_struct['body'],
-						content_structured = post_struct,
-					)
-				sess.add(have)
-				sess.flush()
+				result = self.save_files(sess, arow, have, post_struct['attachments'])
+				self.log.info("Saved attachment result: %s", result)
+				have.state = result
+		else:
+			have.state = 'complete'
+			self.log.info("Post '%s' has no attachments?", post_struct['title'])
 
-				if post_struct['attachments']:
-					result = self.save_files(sess, arow, have, post_struct['attachments'])
-					self.log.info("Saved attachment result: %s", result)
-					have.state = result
-				else:
-					have.state = 'complete'
-					self.log.info("Post '%s' has no attachments?", post_struct['title'])
+		sess.commit()
 
 
+	def _process_response_file(self, sess, arow, post_struct):
 
+		have = sess.query(self.db.ArtItem)                             \
+			.filter(self.db.ArtItem.artist_id    == arow.id)           \
+			.filter(self.db.ArtItem.release_meta == post_struct['title']) \
+			.scalar()
 
+		if have:
+			self.log.info("Have attachment: '%s'", post_struct['title'])
+		else:
+			self.log.info("New attachment: '%s'", post_struct['title'])
+			post_struct['type'] = 'file'
+			have = self.db.ArtItem(
+					state              = 'new',
+					artist_id          = arow.id,
+					release_meta       = post_struct['title'],
+					addtime            = datetime.datetime.fromtimestamp(float(post_struct['post_ts'])),
+					title              = post_struct['title'],
+					content_structured = post_struct,
+				)
+			sess.add(have)
+			sess.flush()
 
-	def _process_response_file(self, arow, post_struct):
-		with self.db.context_sess() as sess:
-			have = sess.query(self.db.ArtItem)                             \
-				.filter(self.db.ArtItem.artist_id    == arow.id)           \
-				.filter(self.db.ArtItem.release_meta == post_struct['title']) \
-				.scalar()
-			if have:
-				self.log.info("Have attachment: '%s'", post_struct['title'])
-				if post_struct['attachments']:
-					result = self.save_files(sess, arow, have, post_struct['attachments'])
-					self.log.info("Saved file result: %s", result)
-					have.state = result
-				if not post_struct['attachments']:
-					self.log.info("File post '%s' is missing the actual file?", post_struct['title'])
-					have.state = 'complete'
+		print("File struct: ", post_struct)
 
-			else:
-				self.log.info("New attachment: '%s'", post_struct['title'])
-				post_struct['type'] = 'file'
-				have = self.db.ArtItem(
-						state              = 'new',
-						artist_id          = arow.id,
-						release_meta       = post_struct['title'],
-						addtime            = datetime.datetime.fromtimestamp(float(post_struct['post_ts'])),
-						title              = post_struct['title'],
-						content_structured = post_struct,
-					)
+		if 'skipped' in post_struct and post_struct['skipped'] == True:
+			self.log.info("File skipped due to fetch limit.")
+			have.state = "new"
+		else:
+			result = self.save_files(sess, arow, have, post_struct['attachments'])
+			self.log.info("Saved file result: %s", result)
+			have.state = result
+		if not post_struct['attachments']:
+			self.log.info("File post '%s' is missing the actual file?", post_struct['title'])
+			have.state = 'complete'
 
-				if post_struct['attachments']:
-					result = self.save_files(sess, arow, have, post_struct['attachments'])
-					self.log.info("Saved file result: %s", result)
-					have.state = result
-				if not post_struct['attachments']:
-					self.log.info("File post '%s' is missing the actual file?", post_struct['title'])
-					have.state = 'complete'
-
-				sess.add(have)
-
+		sess.commit()
 
 	def do_fetch_by_aid(self, aid):
 
@@ -591,20 +607,47 @@ class GetYp(rewrite.modules.scraper_base.ScraperBase, rewrite.modules.rpc_base.R
 				for
 					post in arow.posts
 				if
-					post.state != 'new'
+						post.state != 'new'
+					and
+						(
+							(
+								post.files
+							and
+								all([os.path.exists(file.fspath) for file in post.files])
+							)
+							or not post.files
+						)
+
+
+			]
+
+		nofile = [
+					post
+				for
+					post in arow.posts
+				if
+						post.state != 'new'
+					and not post.files
+					# and
+					# 	all([os.path.exists(file.fspath) for file in post.files])
 			]
 		print()
 		print(have)
 		print()
 		for item in have:
-			print(item)
+			print("have", item)
 
 		print()
+		for item in nofile:
+			print(item, len(item.files), item.title, item.release_meta)
+
 		print()
 
+		assert len(have) > 15
 
-		resp = self.blocking_remote_call(RemoteExecClass, {'mode' : 'get-art-for-aid', 'aid' : arow.artist_name, 'have_posts' : have })
-		# resp = self.blocking_remote_call(RemoteExecClass, {'mode' : 'get-art-for-aid', 'aid' : arow.artist_name })
+
+		resp = self.blocking_remote_call(RemoteExecClass, {'mode' : 'yp_get_content_for_artist', 'aid' : arow.artist_name, 'have_posts' : have, 'file_limit' : 10})
+		# resp = self.blocking_remote_call(RemoteExecClass, {'mode' : 'yp_get_content_for_artist', 'aid' : arow.artist_name })
 
 		with open('rfetch-{}.json'.format(time.time()), 'w', encoding='utf-8') as fp:
 			fp.write(pprint.pformat(resp))
@@ -612,11 +655,11 @@ class GetYp(rewrite.modules.scraper_base.ScraperBase, rewrite.modules.rpc_base.R
 		if resp['meta']['artist_name'].lower() != arow.extra_meta['name'].lower():
 			self.log.error("Artist name mismatch! '%s' -> '%s'", resp['meta']['artist_name'], arow.extra_meta['name'])
 			return
-
-		for post in resp['posts']:
-			self._process_response_post(arow, post)
-		for file in resp['files']:
-			self._process_response_file(arow, file)
+		with self.db.context_sess() as sess:
+			for post in resp['posts']:
+				self._process_response_post(sess, arow, post)
+			for file in resp['files']:
+				self._process_response_file(sess, arow, file)
 
 		with self.db.context_sess() as sess:
 			arow.last_fetched = datetime.datetime.now()
