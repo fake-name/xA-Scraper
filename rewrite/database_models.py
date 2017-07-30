@@ -68,7 +68,6 @@ class ArtFile(Base):
 
 	state             = Column(dlstate_enum, default='not_set')
 
-	fqurl             = Column(Text)
 	filename          = Column(Text)
 
 	fspath            = Column(Text, nullable=False)

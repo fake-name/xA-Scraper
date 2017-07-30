@@ -2,6 +2,7 @@
 import os
 import os.path
 import traceback
+import random
 import re
 import logging
 import datetime
@@ -38,7 +39,7 @@ class GetYp(rewrite.modules.scraper_base.ScraperBase, rewrite.modules.rpc_base.R
 
 	pluginName = "YpGet"
 
-	rpc_timeout_s = 60 * 15
+	rpc_timeout_s = 60 * 30
 
 	remote_log = logging.getLogger("Main.RPC.Remote")
 
@@ -95,7 +96,7 @@ class GetYp(rewrite.modules.scraper_base.ScraperBase, rewrite.modules.rpc_base.R
 		self.put_outbound_callable(jid, scls, call_kwargs=call_kwargs)
 
 		self.log.info("Waiting for remote response")
-		for _ in range(self.rpc_timeout_s):
+		for step in range(self.rpc_timeout_s):
 			ret = self.process_responses()
 			if ret:
 				if 'jobid' in ret and ret['jobid'] == jid:
@@ -113,6 +114,7 @@ class GetYp(rewrite.modules.scraper_base.ScraperBase, rewrite.modules.rpc_base.R
 						raise RpcExceptionError("RPC Call has no ret value. Probably encountered a remote exception: %s" % ret)
 
 			time.sleep(1)
+			print("\r`fetch_and_flush` sleeping for {}\r".format(str((self.rpc_timeout_s - step)).rjust(4)), end='')
 
 		raise RpcTimeoutError("No RPC Response within timeout period (%s sec)" % self.rpc_timeout_s)
 
@@ -127,21 +129,20 @@ class GetYp(rewrite.modules.scraper_base.ScraperBase, rewrite.modules.rpc_base.R
 		with self.db.context_sess() as sess:
 			for adict in namelist['creators']:
 				name = str(adict['id'])
-				res = sess.query(self.db.ScrapeTargets.id)             \
+				res = sess.query(self.db.ScrapeTargets)             \
 					.filter(self.db.ScrapeTargets.site_name == self.targetShortName) \
 					.filter(self.db.ScrapeTargets.artist_name == name)              \
 					.scalar()
 
 				if not res:
 					new += 1
-					self.log.info("Need to insert name: %s", name)
+					self.log.info("Need to insert name: %s -> %s", name, adict['name'])
 					row = self.db.ScrapeTargets(
 							site_name   = self.targetShortName,
 							artist_name = name,
 							extra_meta  = adict,
 							release_cnt = adict['post_count']
 							)
-
 
 					sess.add(row)
 
@@ -188,6 +189,7 @@ class GetYp(rewrite.modules.scraper_base.ScraperBase, rewrite.modules.rpc_base.R
 
 	def save_files(self, sess, arow, prow, attachments):
 		have_all = True
+		update = False
 		for file in attachments:
 			if 'fdata' in file:
 				urlname = urllib.parse.urlsplit(file['url']).path
@@ -200,7 +202,7 @@ class GetYp(rewrite.modules.scraper_base.ScraperBase, rewrite.modules.rpc_base.R
 
 				frow = sess.query(self.db.ArtFile) \
 					.filter(self.db.ArtFile.item_id == prow.id) \
-					.filter(self.db.ArtFile.file_meta == resname) \
+					.filter(self.db.ArtFile.file_meta == file['url']) \
 					.scalar()
 
 				if frow:
@@ -212,19 +214,26 @@ class GetYp(rewrite.modules.scraper_base.ScraperBase, rewrite.modules.rpc_base.R
 				else:
 					frow = self.db.ArtFile(
 							item_id   = prow.id,
-							file_meta = resname,
+							file_meta = file['url'],
 							filename  = resname,
 							fspath    = fqDlPath,
 						)
 					sess.add(frow)
 				sess.commit()
+				update = True
+			elif 'error' in file and file['error']:
+				pass
+			elif 'skipped' in file and file['skipped']:
+				pass
+				# self.log.info("Skipped file: %s", file['url'])
 			else:
-				print("File missing 'fdata': %s", file)
+				print("File missing 'fdata': %s", len(file))
 				have_all = False
+				update = True
 
 		ret = 'complete' if have_all else 'error'
-		self.log.info("Save files state: %s", ret)
-		return ret
+		# self.log.info("Save files state: %s", ret)
+		return ret, update
 
 	def _process_response_post(self, sess, arow, post_struct):
 		have = sess.query(self.db.ArtItem)                             \
@@ -232,7 +241,8 @@ class GetYp(rewrite.modules.scraper_base.ScraperBase, rewrite.modules.rpc_base.R
 			.filter(self.db.ArtItem.release_meta == post_struct['id']) \
 			.scalar()
 		if have:
-			self.log.info("Have post: '%s'", post_struct['title'])
+			pass
+			# self.log.info("Have post: '%s'", post_struct['title'])
 		else:
 			self.log.info("New post: '%s'", post_struct['title'])
 			post_struct['type'] = 'post'
@@ -249,16 +259,19 @@ class GetYp(rewrite.modules.scraper_base.ScraperBase, rewrite.modules.rpc_base.R
 			sess.flush()
 
 		if post_struct['attachments']:
-			if 'skipped' in post_struct and post_struct['skipped'] == True:
-				self.log.info("Attachment skipped due to fetch limit.")
-				have.state = "new"
+			if all(['skipped' in file and file['skipped'] == True for file in post_struct['attachments']]):
+				pass
 			else:
-				result = self.save_files(sess, arow, have, post_struct['attachments'])
-				self.log.info("Saved attachment result: %s", result)
-				have.state = result
+				result, update = self.save_files(sess, arow, have, post_struct['attachments'])
+				if update:
+					self.log.info("Saved attachment result: %s", result)
+					have.state = result
+				else:
+					self.log.info("Item skipped, not changing row.")
 		else:
-			have.state = 'complete'
-			self.log.info("Post '%s' has no attachments?", post_struct['title'])
+			if have.state != 'complete':
+				have.state = 'complete'
+				self.log.info("Post '%s' has no attachments?", post_struct['title'])
 
 		sess.commit()
 
@@ -271,7 +284,8 @@ class GetYp(rewrite.modules.scraper_base.ScraperBase, rewrite.modules.rpc_base.R
 			.scalar()
 
 		if have:
-			self.log.info("Have attachment: '%s'", post_struct['title'])
+			pass
+			# self.log.info("Have attachment: '%s'", post_struct['title'])
 		else:
 			self.log.info("New attachment: '%s'", post_struct['title'])
 			post_struct['type'] = 'file'
@@ -286,18 +300,20 @@ class GetYp(rewrite.modules.scraper_base.ScraperBase, rewrite.modules.rpc_base.R
 			sess.add(have)
 			sess.flush()
 
-		print("File struct: ", post_struct)
+		# print("File struct: ", post_struct)
 
 		if 'skipped' in post_struct and post_struct['skipped'] == True:
-			self.log.info("File skipped due to fetch limit.")
-			have.state = "new"
+			pass
 		else:
-			result = self.save_files(sess, arow, have, post_struct['attachments'])
-			self.log.info("Saved file result: %s", result)
-			have.state = result
+				result, update = self.save_files(sess, arow, have, post_struct['attachments'])
+				if update:
+					self.log.info("Saved file result: %s", result)
+					have.state = result
+
 		if not post_struct['attachments']:
 			self.log.info("File post '%s' is missing the actual file?", post_struct['title'])
-			have.state = 'complete'
+			if have.state != 'complete':
+				have.state = 'complete'
 
 		sess.commit()
 
@@ -307,35 +323,14 @@ class GetYp(rewrite.modules.scraper_base.ScraperBase, rewrite.modules.rpc_base.R
 			arow = sess.query(self.db.ScrapeTargets).filter(self.db.ScrapeTargets.id == aid).one()
 
 		print(arow, arow.id, arow.site_name, arow.artist_name, arow.extra_meta)
-		have = [
-					(post.content_structured['type'], post.content_structured['id'] if 'id' in post.content_structured else post.content_structured['title'])
-				for
-					post in arow.posts
-				if
-						post.state != 'new'
-					and
-						(
-							(
-								post.files
-							and
-								all([os.path.exists(file.fspath) for file in post.files])
-							)
-							or not post.files
-						)
+		have = []
 
+		for post in arow.posts:
+			if post.state == 'complete':
+				for file in post.files:
+					if file.file_meta:
+						have.append(file.file_meta)
 
-			]
-
-		nofile = [
-					post
-				for
-					post in arow.posts
-				if
-						post.state != 'new'
-					and not post.files
-					# and
-					# 	all([os.path.exists(file.fspath) for file in post.files])
-			]
 		print()
 		print(have)
 		print()
@@ -343,19 +338,15 @@ class GetYp(rewrite.modules.scraper_base.ScraperBase, rewrite.modules.rpc_base.R
 			print("have", item)
 
 		print()
-		for item in nofile:
-			print(item, len(item.files), item.title, item.release_meta)
 
-		print()
+		# assert len(have) > 15
+		# return
 
-		assert len(have) > 15
+		resp = self.blocking_remote_call(yiff_remote.RemoteExecClass, {'mode' : 'yp_get_content_for_artist', 'aid' : arow.artist_name, 'have_urls' : have, 'fetch_limit_bytes' : 1024 * 1024 * 128})
+		# resp = self.blocking_remote_call(yiff_remote.RemoteExecClass, {'mode' : 'yp_get_content_for_artist', 'aid' : arow.artist_name })
 
-
-		resp = self.blocking_remote_call(RemoteExecClass, {'mode' : 'yp_get_content_for_artist', 'aid' : arow.artist_name, 'have_posts' : have, 'file_limit' : 10})
-		# resp = self.blocking_remote_call(RemoteExecClass, {'mode' : 'yp_get_content_for_artist', 'aid' : arow.artist_name })
-
-		with open('rfetch-{}.json'.format(time.time()), 'w', encoding='utf-8') as fp:
-			fp.write(pprint.pformat(resp))
+		# with open('rfetch-{}.json'.format(time.time()), 'w', encoding='utf-8') as fp:
+		# 	fp.write(pprint.pformat(resp))
 
 		if resp['meta']['artist_name'].lower() != arow.extra_meta['name'].lower():
 			self.log.error("Artist name mismatch! '%s' -> '%s'", resp['meta']['artist_name'], arow.extra_meta['name'])
@@ -367,14 +358,15 @@ class GetYp(rewrite.modules.scraper_base.ScraperBase, rewrite.modules.rpc_base.R
 				self._process_response_file(sess, arow, file)
 
 		with self.db.context_sess() as sess:
-			arow.last_fetched = datetime.datetime.now()
+			if all([post.state != 'new' for post in arow.posts]):
+				arow.last_fetched = datetime.datetime.now()
 
 	def go(self, nameList=None, ctrlNamespace=None):
 		if ctrlNamespace is None:
 			raise ValueError("You need to specify a namespace!")
 
 		nl = self.getNameList()
-
+		nl = random.sample(nl, k=25)
 		for aid, _ in nl:
 			self.do_fetch_by_aid(aid)
 
@@ -383,11 +375,15 @@ def local_test():
 	import webFunctions
 	import bs4
 	import sys
+	print("Setup")
 	wg = webFunctions.WebGetRobust()
-	t2 = RemoteExecClass(wg=wg)
+	t2 = yiff_remote.RemoteExecClass(wg=wg)
+	print("Loading file")
 	with open(sys.argv[1], "r") as fp:
 		cont=fp.read()
+	print("Parsing file")
 	soup = bs4.BeautifulSoup(cont, 'lxml')
+	print("Extracting")
 
 	r1 = t2.get_meta_from_release_soup(soup)
 	r2 = t2.get_posts_from_page(soup)
@@ -399,18 +395,27 @@ def local_test():
 
 if __name__ == '__main__':
 
+	import multiprocessing
 	import logSetup
+	import sys
 	logSetup.initLogging()
 
-	if True:
+	manager = multiprocessing.managers.SyncManager()
+	manager.start()
+	namespace = manager.Namespace()
+	namespace.run = True
+
+	print(sys.argv)
+	if len(sys.argv) == 1:
 		ins = GetYp()
 		# ins.getCookie()
 		print(ins)
 		print("Instance: ", ins)
-		# ins.go("Wat", "Wat")
+		ins.go(ctrlNamespace=namespace)
 		# ret = ins.do_fetch_by_aid(3745)
-		ret = ins.do_fetch_by_aid(5688)
-		print(ret)
+		# ret = ins.do_fetch_by_aid(5688)
+		# ret = ins.do_fetch_by_aid(5071)
+		# print(ret)
 		# ins.do_fetch_by_aid(8450)   # z
 		# dlPathBase, artPageUrl, artistName
 	else:

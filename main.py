@@ -23,6 +23,7 @@ import rewrite.modules.sf.sfScrape as sfs
 import rewrite.modules.artstation.asScrape as ass
 import rewrite.modules.tumblr.tumblrScrape as tus
 import rewrite.modules.patreon.patreonScrape as pts
+import rewrite.modules.yiff_party.yiff_scrape as yps
 
 from settings import settings
 import cherrypy
@@ -40,6 +41,7 @@ JOBS = [
 	# (ass.GetAs,      settings["as"]["runInterval"],   "as"),
 	(tus.GetTumblr,  settings["tum"]["runInterval"], "tum"),
 	(pts.GetPatreon, settings["pat"]["runInterval"], "pat"),
+	(yps.GetYp,      settings["yp"]["runInterval"],  "yp"),
 ]
 
 

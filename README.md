@@ -12,6 +12,7 @@ This is a automated tool for scraping content from a number of art sites:
 - Tumblr art blogs
 - SoFurry
 - Weaslyl
+- Yiff Party (Requires additional RPC infrastructure)
 
 To Add:
 
@@ -56,6 +57,10 @@ virtualenv. Additonally, it checks if the virtualenv is present, so once it's cr
 Currently, there are some aspects that need work. The artist selection system is currently a bit broken, as I was
 in the process of converting it from being based on text-files to being stored in the database. Currently, there isn't a clean way to remove artists from the scrape list, though you can add or modify them.
 
+The Yiff-Party scraper requires significant external infrastructure, as it currently depends on
+threading it's fetch requests through my [autotriever](https://github.com/fake-name/AutoTriever)
+project. This depends on having both a publically available RabbitMQ instance, and 
+an executing instance of the FetchAgent components of the [ReadableWebProxy](https://github.com/fake-name/ReadableWebProxy) fetch-agent RPC service on your local LAN.
 
 ## Note:  
 

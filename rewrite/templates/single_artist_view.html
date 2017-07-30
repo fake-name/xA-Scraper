@@ -45,16 +45,27 @@
 {% block content %}
 	{% include '_block_flash.html' %}
 
-	<div>
-		<div style="margin-top: 10px;">
-			<h2>
-			Releases for {{data.items[0].artist.artist_name | title}} from {{data.items[0].artist.site_name | title}}</h2>
+	{% if data.items %}
+		<div>
+			<div style="margin-top: 10px;">
+				<h2>
+				Releases for {{data.items[0].artist.artist_name | title}} from {{data.items[0].artist.site_name | title}}</h2>
+			</div>
+
+			{{ render_artist_items(data.items, source_list)}}
 		</div>
 
-		{{ render_artist_items(data.items, source_list)}}
-	</div>
+		{{ paginator.render_pagination(data) }}
+	{% else %}
+		<div>
+			<div style="margin-top: 10px;">
+				<h2>
+				No releases!</h2>
+			</div>
 
-	{{ paginator.render_pagination(data) }}
+		</div>
+
+	{% endif %}
 
 {% endblock %}
 

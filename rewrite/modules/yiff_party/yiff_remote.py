@@ -172,17 +172,29 @@ class RemoteExecClass(object):
 			if attachment_div:
 				for link in attachment_div.find_all("a"):
 					url = urllib.parse.urljoin(self.url_base, link['href'])
-					content = link.get_text(strip=True)
-					attachments.append({'url' : url,  'fname' : content})
+					filename = link.get_text(strip=True)
+					new = {'url' : url,  'fname' : filename}
+					if new not in attachments:
+						attachments.append(new)
 
 			# Somehow, some of the files don't show up
 			# as attachments. Dunno why.
 			action_div = postdiv.find("div", class_='card-action')
 			if action_div:
 				for link in action_div.find_all("a"):
-					url = urllib.parse.urljoin(self.url_base, link['href'])
-					content = link.get_text(strip=True)
-					attachments.append({'url' : url,  'fname' : content})
+					url = link.get("href", None)
+					if url:
+						print()
+						print(link)
+						url = urllib.parse.urljoin(self.url_base, link['href'])
+						filename = link.get_text(strip=True)
+
+						new = {'url' : url,  'fname' : filename}
+						if new not in attachments:
+							attachments.append(new)
+					else:
+						# Happens for large attachments?
+						self.log.error("No link: %s", link)
 
 			post['attachments'] = attachments
 
@@ -210,9 +222,16 @@ class RemoteExecClass(object):
 
 			content = file_div.find('div', class_='card-action')
 
-			file['attachments'] = [
-				(tmp.get_text(strip=True), urllib.parse.urljoin(self.url_base, tmp['href'])) for tmp in content.find_all('a')
-			]
+			attachments = []
+			for link in content.find_all('a'):
+				url = urllib.parse.urljoin(self.url_base, link['href'])
+				filename = link.get_text(strip=True)
+				new = {'url' : url,  'fname' : filename}
+				if new not in attachments:
+					attachments.append(new)
+
+
+			file['attachments'] = attachments
 			files.append(file)
 
 		return files
@@ -227,8 +246,15 @@ class RemoteExecClass(object):
 
 		meta = self.get_meta_from_release_soup(soup)
 
-		posts = self.get_posts_from_page(soup)
-		files = self.get_files_from_page(soup)
+		try:
+			posts = self.get_posts_from_page(soup)
+			files = self.get_files_from_page(soup)
+		except Exception as e:
+			import sys
+			html_txt = '\n\n' + soup.prettify() + "\n\n"
+			exc_message = '{}\nFailing HTML:\n{}'.format(str(e), html_txt)
+			rebuilt = type(e)(exc_message).with_traceback(sys.exc_info()[2])
+			raise rebuilt
 
 		return {
 			'meta'   : meta,
@@ -236,77 +262,60 @@ class RemoteExecClass(object):
 			'files' : files,
 		}
 
-	def fetch_post_content(self, aid, post):
-
-		for attachment in post['attachments']:
-			self.log.info("Fetching post file: %s -> %s", aid, attachment['url'])
-			filectnt, fname         = self.wg.getFileAndName(attachment['url'], addlHeaders={"Referer" : 'https://yiff.party/{}'.format(aid)})
+	def fetch_file(self, aid, file):
+		self.log.info("Fetching attachment: %s -> %s", aid, file['url'])
+		try:
+			filectnt, fname         = self.wg.getFileAndName(file['url'], addlHeaders={"Referer" : 'https://yiff.party/{}'.format(aid)})
 			self.log.info("Filename from request: %s", fname)
-			attachment['header_fn'] = fname
-			attachment['fdata']     = filectnt
+			file['header_fn'] = fname
+			file['fdata']     = filectnt
+			file['skipped']   = False
+			return len(filectnt)
 
-	def fetch_file_content(self, aid, post):
+		# So urllib.error.URLError is also available within urllib.request.
+		except urllib.request.URLError:
+			file['error']   = False
+			return 0
 
-		for attachment in post['attachments']:
-			self.log.info("Fetching attachment file: %s -> %s", aid, attachment['url'])
-			filectnt, fname         = self.wg.getFileAndName(attachment['url'], addlHeaders={"Referer" : 'https://yiff.party/{}'.format(aid)})
-			self.log.info("Filename from request: %s", fname)
-			attachment['header_fn'] = fname
-			attachment['fdata']     = filectnt
-
-	def fetch_files(self, aid, releases, have_posts, file_limit):
-		self.log.info("Have posts: %s", have_posts)
-		fetched = 0
-
+	def fetch_files(self, aid, releases, have_urls, fetch_limit_bytes):
+		self.log.info("Have posts: %s", have_urls)
 		releases['posts'].reverse()
 		releases['files'].reverse()
 
-		skipped = 0
+		fetched       = 0
+		skipped       = 0
+		total         = 0
+		fetched_bytes = 0
 
-		for post in releases['posts']:
-			key = ['post', post['id']]
-			if key in have_posts:
-				self.log.info("Have post %s, nothing to do", key)
-				post['skipped'] = True
-				skipped += 1
-			elif fetched > file_limit:
-				self.log.info("Skipping %s due to fetch limit %s.", key, file_limit)
-				post['skipped'] = True
-				skipped += 1
-			else:
-				self.log.info("Item %s not present in already-fetched items.", key)
-				post['files'] = self.fetch_post_content(aid, post)
-				fetched += 1
-
-
-		for file in releases['files']:
-			key = ['post', file['title']]
-			if key in have_posts:
-				self.log.info("Have file %s, nothing to do", key)
-				file['skipped'] = True
-				skipped += 1
-			elif fetched > file_limit:
-				self.log.info("Skipping %s due to fetch limit %s.", key, file_limit)
-				file['skipped'] = True
-				skipped += 1
-			else:
-				self.log.info("File %s not present in already-fetched items.", key)
-				file['files'] = self.fetch_file_content(aid, file)
-				fetched += 1
-
-		self.log.info("Skipped %s files", skipped)
+		for post in releases['files'] + releases['posts']:
+			for file in post['attachments']:
+				total += 1
+				if file['url'] in have_urls:
+					self.log.info("Have file from URL %s, nothing to do", file['url'])
+					file['skipped'] = True
+					skipped += 1
+				elif fetched_bytes < fetch_limit_bytes:
+					filesize = self.fetch_file(aid, file)
+					fetched       += 1
+					fetched_bytes += filesize
+				else:
+					self.log.info("Skipping file from URL %s due to fetch limit (%s ->%s)", file['url'], fetch_limit_bytes, fetched_bytes)
+					file['skipped'] = True
+					skipped += 1
+		self.log.info("Finished fetch_files step.")
+		self.log.info("Skipped %s files, fetched %s files. %s files total (%s bytes).", skipped, fetched, total, fetched_bytes)
 
 		return releases
 
 
-	def yp_get_content_for_artist(self, aid, have_posts, file_limit=25):
+	def yp_get_content_for_artist(self, aid, have_urls, fetch_limit_bytes=16777216):
 		self.log.info("Getting content for artist: %s", aid)
 		ok = self.yp_walk_to_entry()
 		if not ok:
 			return "Error! Failed to access entry!"
 
 		releases = self.get_releases_for_aid(aid)
-		releases = self.fetch_files(aid, releases, have_posts, file_limit)
+		releases = self.fetch_files(aid, releases, have_urls, fetch_limit_bytes)
 		# else:
 		self.log.info("Content retreival finished.")
 		return releases
