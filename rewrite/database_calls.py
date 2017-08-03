@@ -102,13 +102,19 @@ def context_sess():
 		print("InvalidRequest error!")
 		sess.rollback()
 		traceback.print_exc()
+		raise
+
 	except sqlalchemy.exc.OperationalError:
 		print("InvalidRequest error!")
 		sess.rollback()
+		raise
+
 	except sqlalchemy.exc.IntegrityError:
 		print("Integrity error!")
 		traceback.print_exc()
 		sess.rollback()
+		raise
+
 
 	finally:
 		release_session(sess)

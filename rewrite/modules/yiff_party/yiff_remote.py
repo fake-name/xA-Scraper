@@ -171,21 +171,22 @@ class RemoteExecClass(object):
 			attachments = []
 			if attachment_div:
 				for link in attachment_div.find_all("a"):
-					url = urllib.parse.urljoin(self.url_base, link['href'])
-					filename = link.get_text(strip=True)
-					new = {'url' : url,  'fname' : filename}
-					if new not in attachments:
-						attachments.append(new)
+					if link.get("href", None):
+						url = urllib.parse.urljoin(self.url_base, link['href'])
+						filename = link.get_text(strip=True)
+						new = {'url' : url,  'fname' : filename}
+						if new not in attachments:
+							attachments.append(new)
+					else:
+						self.log.error("Missing content link from attachment card: '%s'", str(attachment_div))
+						self.log.error("Relevant subsection: '%s'", str(link))
 
 			# Somehow, some of the files don't show up
 			# as attachments. Dunno why.
 			action_div = postdiv.find("div", class_='card-action')
 			if action_div:
 				for link in action_div.find_all("a"):
-					url = link.get("href", None)
-					if url:
-						print()
-						print(link)
+					if link.get("href", None):
 						url = urllib.parse.urljoin(self.url_base, link['href'])
 						filename = link.get_text(strip=True)
 
@@ -193,8 +194,9 @@ class RemoteExecClass(object):
 						if new not in attachments:
 							attachments.append(new)
 					else:
-						# Happens for large attachments?
-						self.log.error("No link: %s", link)
+
+						self.log.error("Missing content link from action_div card: '%s'", str(action_div))
+						self.log.error("Relevant subsection: '%s'", str(link))
 
 			post['attachments'] = attachments
 
@@ -224,11 +226,15 @@ class RemoteExecClass(object):
 
 			attachments = []
 			for link in content.find_all('a'):
-				url = urllib.parse.urljoin(self.url_base, link['href'])
-				filename = link.get_text(strip=True)
-				new = {'url' : url,  'fname' : filename}
-				if new not in attachments:
-					attachments.append(new)
+				if link.get("href", None):
+					url = urllib.parse.urljoin(self.url_base, link['href'])
+					filename = link.get_text(strip=True)
+					new = {'url' : url,  'fname' : filename}
+					if new not in attachments:
+						attachments.append(new)
+				else:
+					self.log.error("Missing file link from attachment card: '%s'", str(content))
+					self.log.error("Relevant subsection: '%s'", str(link))
 
 
 			file['attachments'] = attachments
@@ -274,6 +280,10 @@ class RemoteExecClass(object):
 
 		# So urllib.error.URLError is also available within urllib.request.
 		except urllib.request.URLError:
+			file['error']   = False
+			return 0
+		# This is resolved out fully in the remote execution context
+		except WebRequest.Exceptions.FetchFailureError:
 			file['error']   = False
 			return 0
 

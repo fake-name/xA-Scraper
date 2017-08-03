@@ -9,6 +9,7 @@ import datetime
 import urllib.request
 import urllib.parse
 import time
+import signal
 import json
 import uuid
 import pprint
@@ -182,8 +183,15 @@ class GetYp(rewrite.modules.scraper_base.ScraperBase, rewrite.modules.rpc_base.R
 					cnt += 1
 					self.log.info("New file with the same name as existing file. Adding number: %s", fqpath)
 
-		with open(fqpath, "wb") as fp:
-			fp.write(filecontent)
+		if isinstance(filecontent, bytes):
+			with open(fqpath, "wb") as fp:
+				fp.write(filecontent)
+		elif isinstance(filecontent, str):
+			with open(fqpath, "w", encoding='utf-8') as fp:
+				fp.write(filecontent)
+		else:
+			self.log.error("Unknown data type: %s", type(filecontent))
+
 
 		return fqpath
 
@@ -366,10 +374,30 @@ class GetYp(rewrite.modules.scraper_base.ScraperBase, rewrite.modules.rpc_base.R
 			raise ValueError("You need to specify a namespace!")
 
 		nl = self.getNameList()
-		nl = random.sample(nl, k=25)
+		random.shuffle(nl)
 		for aid, _ in nl:
-			self.do_fetch_by_aid(aid)
 
+			try:
+				self.do_fetch_by_aid(aid)
+			except Exception:
+				for line in traceback.format_exc().split("\n"):
+					self.log.error(line)
+
+			if not flags.namespace.run:
+				print("Exiting!")
+				return
+
+def mgr_init():
+	signal.signal(signal.SIGINT, signal.SIG_IGN)
+	print('initialized manager')
+
+def signal_handler(dummy_signal, dummy_frame):
+	if flags.namespace.run:
+		flags.namespace.run = False
+		print("Telling threads to stop")
+	else:
+		print("Multiple keyboard interrupts. Raising")
+		raise KeyboardInterrupt
 
 def local_test():
 	import webFunctions
@@ -402,8 +430,10 @@ if __name__ == '__main__':
 
 	manager = multiprocessing.managers.SyncManager()
 	manager.start()
-	namespace = manager.Namespace()
-	namespace.run = True
+	flags.namespace = manager.Namespace()
+	flags.namespace.run = True
+
+	signal.signal(signal.SIGINT, signal_handler)
 
 	print(sys.argv)
 	if len(sys.argv) == 1:
@@ -411,7 +441,7 @@ if __name__ == '__main__':
 		# ins.getCookie()
 		print(ins)
 		print("Instance: ", ins)
-		ins.go(ctrlNamespace=namespace)
+		ins.go(ctrlNamespace=flags.namespace)
 		# ret = ins.do_fetch_by_aid(3745)
 		# ret = ins.do_fetch_by_aid(5688)
 		# ret = ins.do_fetch_by_aid(5071)
@@ -420,6 +450,7 @@ if __name__ == '__main__':
 		# dlPathBase, artPageUrl, artistName
 	else:
 		local_test()
+
 
 
 
