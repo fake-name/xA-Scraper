@@ -114,7 +114,7 @@ class GetPX(rewrite.modules.scraper_base.ScraperBase):
 
 
 		for indice, link in images:
-			regx4 = re.compile("http://.+/")
+			regx4 = re.compile("https?://.+/")
 			filename = regx4.sub("" , link)
 			filename = filename.rsplit("?")[0]
 

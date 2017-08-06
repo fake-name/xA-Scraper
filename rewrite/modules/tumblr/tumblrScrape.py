@@ -22,7 +22,7 @@ class GetTumblr(rewrite.modules.scraper_base.ScraperBase):
 
 	ovwMode = "Check Files"
 
-	numThreads = 1
+	numThreads = 2
 
 
 

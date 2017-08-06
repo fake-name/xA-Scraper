@@ -117,7 +117,7 @@ def go(managedNamespace):
 				},
 				'apscheduler.executors.default': {
 					'class': 'apscheduler.executors.pool:ThreadPoolExecutor',
-					'max_workers': '10'
+					'max_workers': '2'
 				},
 				'apscheduler.job_defaults.coalesce': 'true',
 				'apscheduler.job_defaults.max_instances': '1',
