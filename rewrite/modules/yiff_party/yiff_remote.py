@@ -195,8 +195,12 @@ class RemoteExecClass(object):
 							attachments.append(new)
 					else:
 
-						self.log.error("Missing content link from action_div card: '%s'", str(action_div))
-						self.log.error("Relevant subsection: '%s'", str(link))
+						if link.get('class', None) == 'activator' and link.get_text(strip=True) == 'View attachment':
+							# The button is based on a <a> tag, so skip that one item.
+							pass
+						else:
+							self.log.error("Missing content link from action_div card: '%s'", str(action_div))
+							self.log.error("Relevant subsection: '%s'", str(link))
 
 			post['attachments'] = attachments
 
