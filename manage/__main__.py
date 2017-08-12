@@ -2,6 +2,9 @@
 import sys
 
 import logSetup
+import multiprocessing
+import flags
+import signal
 
 from . import ttrssImport
 from .scrape_manage import do_fetch_all
@@ -69,7 +72,30 @@ def three_arg_go(command, param_1, param_2):
 	if command == "import":
 		do_import(param_1, param_2)
 
+
+
+def mgr_init():
+	print("Setup")
+	signal.signal(signal.SIGINT, signal.SIG_IGN)
+
+	manager = multiprocessing.managers.SyncManager()
+	manager.start()
+	flags.namespace = manager.Namespace()
+	flags.namespace.run = True
+
+	print('initialized manager')
+
+def signal_handler(dummy_signal, dummy_frame):
+	if flags.namespace.run:
+		flags.namespace.run = False
+		print("Telling threads to stop")
+	else:
+		print("Multiple keyboard interrupts. Raising")
+		raise KeyboardInterrupt
+
 def go():
+
+	mgr_init()
 
 	if len(sys.argv) == 1:
 		print("No arguments! Cannot do anything!")

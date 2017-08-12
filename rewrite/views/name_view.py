@@ -30,6 +30,11 @@ import main
 
 
 
+# @app.route('/watched-api', methods=['GET', 'POST'])
+# @auth.login_required
+# def watched_api():
+# 	return None
+
 @app.route('/watched-names', methods=['GET'])
 @auth.login_required
 def watched_names():
