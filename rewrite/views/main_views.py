@@ -74,7 +74,7 @@ def aggregate_table(page=1, count=app.config['POSTS_PER_PAGE'], site_filter=None
 
 	if site_filter:
 		print("Doing site-filter!")
-		subq = db.session.query(database.ArtItem.id) \
+		subq = db.session.query(database.ScrapeTargets.id) \
 			.filter(database.ScrapeTargets.site_name == site_filter)
 
 		releases = releases.filter(database.ArtItem.artist_id.in_(subq))
@@ -155,13 +155,19 @@ def index(pagenum=1):
 @app.route('/source/by-site/<site_name>', methods=['GET'])
 @auth.login_required
 def view_by_site(site_name, pagenum=1):
-
+	if 'page' in request.args and pagenum == 1:
+		try:
+			pagenum = int(request.args['page'])
+		except ValueError:
+			return error_page("That's not a number!", "The page number '%s' is not actually a number"
+				% (request.args['page'], ))
+	print("view_by_site, page:", pagenum)
 	valid_sitenanes = [tmp[-1] for tmp in main.JOBS]
 	if site_name not in valid_sitenanes:
 		return error_page("Invalid site-name!", "The site-name '%s' is not in the "
 			"valid site-name list %s" % (site_name, valid_sitenanes))
 
-	return error_page("Wat!", "Unavailable due to performance issues")
+	# return error_page("Wat!", "Unavailable due to performance issues")
 
 	source_list = get_source_list()
 	release_table = aggregate_table(page=pagenum, site_filter=site_name)

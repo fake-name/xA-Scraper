@@ -202,6 +202,7 @@ class RemoteExecClass(object):
 						else:
 							self.log.error("Missing content link from action_div card: '%s'", str(action_div))
 							self.log.error("Relevant subsection: '%s'", str(link))
+							self.log.error("Link class: '%s', link text: '%s'", link.get('class', None), link.get_text(strip=True))
 
 			post['attachments'] = attachments
 

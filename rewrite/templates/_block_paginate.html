@@ -21,7 +21,7 @@
 				<li>
 					{% if page %}
 						{% if page != pagination.page %}
-							<a href="{{ page }}">{{ page }}</a>
+							<a href="{{ url_for(request.endpoint, page=page, **view_args) }}">{{ page }}</a>
 						{% else %}
 							<a href="#"><strong>{{ page }}</strong></a>
 						{% endif %}

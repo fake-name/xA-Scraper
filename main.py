@@ -28,7 +28,11 @@ import rewrite.modules.yiff_party.yiff_scrape as yps
 from settings import settings
 import cherrypy
 
-
+class Nopper():
+	def __init__(self):
+		pass
+	def go(self, *args, **kwargs):
+		pass
 
 JOBS = [
 	(das.GetDA,      settings["da"]["runInterval"],   "da"),
@@ -42,6 +46,7 @@ JOBS = [
 	(tus.GetTumblr,  settings["tum"]["runInterval"], "tum"),
 	(pts.GetPatreon, settings["pat"]["runInterval"], "pat"),
 	# (yps.GetYp,      settings["yp"]["runInterval"],  "yp"),
+	(Nopper,         settings["yp"]["runInterval"],  "yp"),
 ]
 
 

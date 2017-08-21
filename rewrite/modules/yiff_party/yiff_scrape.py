@@ -272,6 +272,7 @@ class GetYp(rewrite.modules.scraper_base.ScraperBase, rewrite.modules.rpc_base.R
 			.filter(self.db.ArtItem.release_meta == post_struct['id']) \
 			.scalar()
 		if have:
+			sess.commit()
 			pass
 			# self.log.info("Have post: '%s'", post_struct['title'])
 		else:
@@ -287,7 +288,7 @@ class GetYp(rewrite.modules.scraper_base.ScraperBase, rewrite.modules.rpc_base.R
 					content_structured = {i:post_struct[i] for i in post_struct if i!='attachments'},
 				)
 			sess.add(have)
-			sess.flush()
+			sess.commit()
 
 		if post_struct['attachments']:
 			if all(['skipped' in file and file['skipped'] == True for file in post_struct['attachments']]):
@@ -329,9 +330,8 @@ class GetYp(rewrite.modules.scraper_base.ScraperBase, rewrite.modules.rpc_base.R
 					content_structured = post_struct,
 				)
 			sess.add(have)
-			sess.flush()
 
-		# print("File struct: ", post_struct)
+		sess.commit()
 
 		if 'skipped' in post_struct and post_struct['skipped'] == True:
 			pass
@@ -363,37 +363,24 @@ class GetYp(rewrite.modules.scraper_base.ScraperBase, rewrite.modules.rpc_base.R
 						have.append(file.file_meta)
 
 		self.log.info("Have %s items.", len(have))
-		# for item in have:
-		# 	print("have", item)
-
-		# print()
-
-		# assert len(have) > 15
-		# return
-
 		resp_iterator = self.blocking_remote_call(
 			remote_cls      = yiff_remote.RemoteExecClass,
 			call_kwargs     = {'mode' : 'yp_get_content_for_artist', 'aid' : arow.artist_name, 'have_urls' : have, 'yield_chunk' : 1024 * 1024 * 64},
 			expect_partials = True)
-		# resp = self.blocking_remote_call(yiff_remote.RemoteExecClass, {'mode' : 'yp_get_content_for_artist', 'aid' : arow.artist_name })
-
-		# with open('rfetch-{}.json'.format(time.time()), 'w', encoding='utf-8') as fp:
-		# 	fp.write(pprint.pformat(resp))
 
 		for resp in resp_iterator:
-			if resp['meta']['artist_name'].lower() != arow.extra_meta['name'].lower():
-				self.log.error("Artist name mismatch! '%s' -> '%s'", resp['meta']['artist_name'], arow.extra_meta['name'])
-				return
-			for post in resp['posts'].values():
-				with self.db.context_sess() as sess:
+			with self.db.context_sess() as sess:
+				if resp['meta']['artist_name'].lower() != arow.extra_meta['name'].lower():
+					self.log.error("Artist name mismatch! '%s' -> '%s'", resp['meta']['artist_name'], arow.extra_meta['name'])
+					return
+				for post in resp['posts'].values():
 					self._process_response_post(sess, arow, post)
-			for file in resp['files'].values():
-				with self.db.context_sess() as sess:
+				for file in resp['files'].values():
 					self._process_response_file(sess, arow, file)
 
-			with self.db.context_sess() as sess:
 				if all([post.state != 'new' for post in arow.posts]):
 					arow.last_fetched = datetime.datetime.now()
+					sess.commit()
 
 	def go(self, ctrlNamespace=None, update_namelist=True):
 		if ctrlNamespace is None:

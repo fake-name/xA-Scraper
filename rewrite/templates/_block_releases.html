@@ -17,33 +17,36 @@
 			</tr>
 
 			{% for row in release_data %}
-				<tr>
-					<td class="padded"><a href="/source/by-site/{{row.artist.site_name}}">{{row.artist.site_name}}</a></td>
-					<td class="padded" style=" overflow: hidden;">
-						<div style="width: 100px;">
-							<a href="/source/by-artist/{{row.artist.id}}">{{ aentry_to_nice_name(row.artist.site_name, row.artist.artist_name) }}</a>
-						</div>
-					</td>
-					<td class="padded"><a href="{{source_list[row.artist.site_name]['user-url'] % row.artist.artist_name}}">[src]</a></td>
-					{% if row.files %}
-						{% if row.files | length == 1 %}
-							{% for img_file in row.files %}
-								<td class="padded showTT" imageID="{{img_file.id}}">
-										<span class="padded"><a href='{{row.release_meta}}'>{{release_entry_to_nice_url(row.artist.site_name, row.release_meta)}}</a></span>
-								</td>
-							{% endfor %}
-						{% else %}
-							<td class="padded">
+				{% if row.files %}
+					<tr>
+						<td class="padded"><a href="/source/by-site/{{row.artist.site_name}}">{{row.artist.site_name}}</a></td>
+						<td class="padded" style=" overflow: hidden;">
+							<div style="width: 100px;">
+								<a href="/source/by-artist/{{row.artist.id}}">{{ aentry_to_nice_name(row.artist.site_name, row.artist.artist_name) }}</a>
+							</div>
+						</td>
+						<td class="padded"><a href="{{source_list[row.artist.site_name]['user-url'] % row.artist.artist_name}}">[src]</a></td>
+						{% if row.files %}
+							{% if row.files | length == 1 %}
 								{% for img_file in row.files %}
-										<span class="padded showTT" imageID="{{img_file.id}}" style='height: 100%'><a href='{{row.release_meta}}'>{{release_entry_to_nice_url(row.artist.site_name, row.release_meta)}}</a></span>
+									<td class="padded showTT" imageID="{{img_file.id if img_file.id else "None"}}">
+											<span class="padded"><a href='{{row.release_meta}}'>{{release_entry_to_nice_url(row.artist.site_name, row.release_meta)}}</a></span>
+									</td>
 								{% endfor %}
-							</td>
+							{% else %}
+								<td class="padded">
+									{% for img_file in row.files %}
+											<span class="padded showTT" imageID="{{img_file.id if img_file.id else "None"}}" style='height: 100%'><a href='{{row.release_meta}}'>{{release_entry_to_nice_url(row.artist.site_name, row.release_meta)}}</a></span>
+									{% endfor %}
+								</td>
+							{% endif %}
+						{% else %}
+							 <td class="padded"><a href='{{row.release_meta}}'>(No Attachments) {{row.release_meta}}</a></td>
 						{% endif %}
-					{% else %}
-						<td class="padded"><a href='{{row.release_meta}}'>{{row.release_meta}}</a></td>
-					{% endif %}
-					<td class="padded">{{terse_ago(row.addtime)}}</td>
-				</tr>
+						<td class="padded">{{terse_ago(row.addtime)}}</td>
+					</tr>
+				{% endif %}
+
 			{% endfor %}
 
 		</table>
