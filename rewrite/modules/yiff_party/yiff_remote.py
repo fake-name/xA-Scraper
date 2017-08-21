@@ -9,6 +9,7 @@ import urllib.request
 import urllib.parse
 import time
 import json
+import copy
 import uuid
 import pprint
 
@@ -157,7 +158,7 @@ class RemoteExecClass(object):
 		return retv
 
 	def get_posts_from_page(self, soup):
-		posts = []
+		posts = {}
 		postdivs = soup.find_all("div", class_='yp-post')
 		for postdiv in postdivs:
 			post = {}
@@ -213,12 +214,14 @@ class RemoteExecClass(object):
 
 				comments.append(comment)
 			post['comments'] = comments
-			posts.append(post)
 
+			posts[str(post['id']) + str(post['time'])] = post
+
+		self.log.info("Found %s posts on page", len(posts))
 		return posts
 
 	def get_files_from_page(self, soup):
-		files = []
+		files = {}
 		file_divs = soup.find_all('div', class_='yp-shared-card')
 		for file_div in file_divs:
 
@@ -242,7 +245,10 @@ class RemoteExecClass(object):
 
 
 			file['attachments'] = attachments
-			files.append(file)
+			files[str(file['title']) + str(file['post_ts'])] = file
+
+
+		self.log.info("Found %s files on page", len(files))
 
 		return files
 
@@ -275,7 +281,10 @@ class RemoteExecClass(object):
 	def fetch_file(self, aid, file):
 		self.log.info("Fetching attachment: %s -> %s", aid, file['url'])
 		try:
-			filectnt, fname         = self.wg.getFileAndName(file['url'], addlHeaders={"Referer" : 'https://yiff.party/{}'.format(aid)})
+			# So yp provides pre-quoted, but WebGet auto-quotes, so we unquote, so we don't end up with
+			# double-quoted data.
+			urltmp = urllib.parse.unquote(file['url'])
+			filectnt, fname         = self.wg.getFileAndName(urltmp, addlHeaders={"Referer" : 'https://yiff.party/{}'.format(aid)})
 			self.log.info("Filename from request: %s", fname)
 			file['header_fn'] = fname
 			file['fdata']     = filectnt
@@ -291,46 +300,95 @@ class RemoteExecClass(object):
 			file['error']   = False
 			return 0
 
-	def fetch_files(self, aid, releases, have_urls, fetch_limit_bytes):
-		self.log.info("Have posts: %s", have_urls)
-		releases['posts'].reverse()
-		releases['files'].reverse()
+		# The serialization env causes some issues here, as it winds up
+		# trying to re-serialize an exception in the logging system.
+		# Anyways, just ignore that.
+		except TypeError:
+			file['error']   = False
+			return 0
+
+	def set_skipped(self, releases):
+		import itertools
+		for item in itertools.chain(releases['posts'].values(), releases['files'].values()):
+			for file in item['attachments']:
+				if not any(['error' in file, 'fdata' in file]):
+					file['skipped'] = True
+
+	def push_partial_resp(self, releases, partial_resp_interface):
+		self.log.info("Pushing partial response")
+		self.set_skipped(releases)
+		partial_resp_interface(logs=self.out_buffer, content=releases)
+
+		# Truncate the log buffer now.
+		self.out_buffer = []
+
+
+	def fetch_files(self, aid, releases, have_urls, yield_chunk, partial_resp_interface):
+		self.log.info("Have %s posts", len(have_urls))
+		process_chunk = copy.deepcopy(releases)
+
+		post_keys = list(releases['posts'].keys()) + list(releases['files'].keys())
+		post_keys.reverse()
 
 		fetched       = 0
 		skipped       = 0
 		total         = 0
 		fetched_bytes = 0
 
-		for post in releases['files'] + releases['posts']:
-			for file in post['attachments']:
+
+		# for post in releases['files'] + releases['posts']:
+		for post_key in post_keys:
+			if post_key in process_chunk['posts']:
+				file_list = process_chunk['posts'][post_key]
+			elif post_key in process_chunk['files']:
+				file_list = process_chunk['files'][post_key]
+			else:
+				self.log.critical("Missing post key?")
+				continue
+
+			for file in file_list['attachments']:
 				total += 1
 				if file['url'] in have_urls:
 					self.log.info("Have file from URL %s, nothing to do", file['url'])
 					file['skipped'] = True
 					skipped += 1
-				elif fetched_bytes < fetch_limit_bytes:
+				else:
 					filesize = self.fetch_file(aid, file)
 					fetched       += 1
 					fetched_bytes += filesize
-				else:
-					self.log.info("Skipping file from URL %s due to fetch limit (%s ->%s)", file['url'], fetch_limit_bytes, fetched_bytes)
-					file['skipped'] = True
-					skipped += 1
+					self.log.info("Fetched %s bytes of data so far", fetched_bytes)
+					if fetched_bytes > yield_chunk:
+						self.log.info("Incrememtal return!")
+						self.push_partial_resp(process_chunk, partial_resp_interface)
+						process_chunk = copy.deepcopy(releases)
+						fetched_bytes = 0
+
 		self.log.info("Finished fetch_files step.")
 		self.log.info("Skipped %s files, fetched %s files. %s files total (%s bytes).", skipped, fetched, total, fetched_bytes)
 
 		return releases
 
 
-	def yp_get_content_for_artist(self, aid, have_urls, fetch_limit_bytes=16777216):
+	def yp_get_content_for_artist(self, aid, have_urls, yield_chunk=16777216, partial_resp_interface=None):
 		self.log.info("Getting content for artist: %s", aid)
+		self.log.info("partial_resp_interface: %s", partial_resp_interface)
+
+
+		# <function RpcHandler.partial_response.<locals>.partial_capture at 0x7fd4b260fd08>
+		if "partial_capture" in str(partial_resp_interface):
+			self.log.info("Partials interface!")
+
+		else:
+			raise ValueError
+
 		ok = self.yp_walk_to_entry()
 		if not ok:
 			return "Error! Failed to access entry!"
 
 		releases = self.get_releases_for_aid(aid)
-		releases = self.fetch_files(aid, releases, have_urls, fetch_limit_bytes)
+		releases = self.fetch_files(aid, releases, have_urls, yield_chunk, partial_resp_interface)
 		# else:
+		self.set_skipped(releases)
 		self.log.info("Content retreival finished.")
 		return releases
 

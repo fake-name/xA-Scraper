@@ -11,6 +11,7 @@ import urllib.parse
 import time
 import signal
 import json
+import sys
 import uuid
 import pprint
 
@@ -72,7 +73,12 @@ class GetYp(rewrite.modules.scraper_base.ScraperBase, rewrite.modules.rpc_base.R
 		for line in pprint.pformat(resp).split("\n"):
 			self.log.info(line)
 		if 'traceback' in resp:
-			for line in resp['traceback'].split("\n"):
+			if isinstance(resp['traceback'], str):
+				trace_arr = resp['traceback'].split("\n")
+			else:
+				trace_arr = resp['traceback']
+
+			for line in trace_arr:
 				self.log.error(line)
 
 	def print_remote_log(self, log_lines, debug=False):
@@ -90,11 +96,12 @@ class GetYp(rewrite.modules.scraper_base.ScraperBase, rewrite.modules.rpc_base.R
 					log_call(line)
 
 
-	def blocking_remote_call(self, remote_cls, call_kwargs):
+	def blocking_remote_call(self, remote_cls, call_kwargs, expect_partials=False):
 		jid = str(uuid.uuid4())
 
 		scls = self.serialize_class(remote_cls)
-		self.put_outbound_callable(jid, scls, call_kwargs=call_kwargs)
+		if 'drain' not in sys.argv:
+			self.put_outbound_callable(jid, scls, call_kwargs=call_kwargs)
 
 		self.log.info("Waiting for remote response")
 		for step in range(self.rpc_timeout_s):
@@ -104,7 +111,16 @@ class GetYp(rewrite.modules.scraper_base.ScraperBase, rewrite.modules.rpc_base.R
 					if 'ret' in ret:
 						if len(ret['ret']) == 2:
 							self.print_remote_log(ret['ret'][0])
-							return ret['ret'][1]
+
+							if expect_partials:
+								if 'partial' in ret and ret['partial']:
+									yield ret['ret'][1]
+								else:
+									yield ret['ret'][1]
+									raise StopIteration
+
+							else:
+								return ret['ret'][1]
 						else:
 							self.pprint_resp(ret)
 							raise RuntimeError("Response not of length 2!")
@@ -157,8 +173,9 @@ class GetYp(rewrite.modules.scraper_base.ScraperBase, rewrite.modules.rpc_base.R
 
 		self.log.info("Had %s new names, %s with changes since last update.", new, updated)
 
-	def getNameList(self):
-		self.fetch_update_names()
+	def getNameList(self, update_namelist):
+		if update_namelist:
+			self.fetch_update_names()
 		return super().getNameList()
 
 	def get_save_dir(self, aname):
@@ -205,6 +222,7 @@ class GetYp(rewrite.modules.scraper_base.ScraperBase, rewrite.modules.rpc_base.R
 				resname = "{} {}".format(file['header_fn'], urlfn).strip()
 
 				aname = "{} - {}".format(arow.id, arow.extra_meta['name'])
+				aname = urllib.parse.unquote(aname)
 				fqDlPath = self.save_file(aname, resname, file['fdata'])
 				self.log.info("Saving file to '%s'", fqDlPath)
 
@@ -235,7 +253,12 @@ class GetYp(rewrite.modules.scraper_base.ScraperBase, rewrite.modules.rpc_base.R
 				pass
 				# self.log.info("Skipped file: %s", file['url'])
 			else:
-				print("File missing 'fdata': %s", len(file))
+				self.log.error("File missing 'fdata': %s", len(file))
+				asstr = str(file)
+				if len(asstr) < 100000:
+					self.log.error("File info: %s", asstr)
+				else:
+					self.log.error("File as str is %s bytes long, not printing.", len(asstr))
 				have_all = False
 				update = True
 
@@ -339,41 +362,44 @@ class GetYp(rewrite.modules.scraper_base.ScraperBase, rewrite.modules.rpc_base.R
 					if file.file_meta:
 						have.append(file.file_meta)
 
-		print()
-		print(have)
-		print()
-		for item in have:
-			print("have", item)
+		self.log.info("Have %s items.", len(have))
+		# for item in have:
+		# 	print("have", item)
 
-		print()
+		# print()
 
 		# assert len(have) > 15
 		# return
 
-		resp = self.blocking_remote_call(yiff_remote.RemoteExecClass, {'mode' : 'yp_get_content_for_artist', 'aid' : arow.artist_name, 'have_urls' : have, 'fetch_limit_bytes' : 1024 * 1024 * 128})
+		resp_iterator = self.blocking_remote_call(
+			remote_cls      = yiff_remote.RemoteExecClass,
+			call_kwargs     = {'mode' : 'yp_get_content_for_artist', 'aid' : arow.artist_name, 'have_urls' : have, 'yield_chunk' : 1024 * 1024 * 64},
+			expect_partials = True)
 		# resp = self.blocking_remote_call(yiff_remote.RemoteExecClass, {'mode' : 'yp_get_content_for_artist', 'aid' : arow.artist_name })
 
 		# with open('rfetch-{}.json'.format(time.time()), 'w', encoding='utf-8') as fp:
 		# 	fp.write(pprint.pformat(resp))
 
-		if resp['meta']['artist_name'].lower() != arow.extra_meta['name'].lower():
-			self.log.error("Artist name mismatch! '%s' -> '%s'", resp['meta']['artist_name'], arow.extra_meta['name'])
-			return
-		with self.db.context_sess() as sess:
-			for post in resp['posts']:
-				self._process_response_post(sess, arow, post)
-			for file in resp['files']:
-				self._process_response_file(sess, arow, file)
+		for resp in resp_iterator:
+			if resp['meta']['artist_name'].lower() != arow.extra_meta['name'].lower():
+				self.log.error("Artist name mismatch! '%s' -> '%s'", resp['meta']['artist_name'], arow.extra_meta['name'])
+				return
+			for post in resp['posts'].values():
+				with self.db.context_sess() as sess:
+					self._process_response_post(sess, arow, post)
+			for file in resp['files'].values():
+				with self.db.context_sess() as sess:
+					self._process_response_file(sess, arow, file)
 
-		with self.db.context_sess() as sess:
-			if all([post.state != 'new' for post in arow.posts]):
-				arow.last_fetched = datetime.datetime.now()
+			with self.db.context_sess() as sess:
+				if all([post.state != 'new' for post in arow.posts]):
+					arow.last_fetched = datetime.datetime.now()
 
-	def go(self, nameList=None, ctrlNamespace=None):
+	def go(self, ctrlNamespace=None, update_namelist=True):
 		if ctrlNamespace is None:
 			raise ValueError("You need to specify a namespace!")
 
-		nl = self.getNameList()
+		nl = self.getNameList(update_namelist)
 		random.shuffle(nl)
 		for aid, _ in nl:
 
@@ -436,15 +462,18 @@ if __name__ == '__main__':
 	signal.signal(signal.SIGINT, signal_handler)
 
 	print(sys.argv)
-	if len(sys.argv) == 1:
+	if len(sys.argv) == 1 or 'drain' in sys.argv:
 		ins = GetYp()
 		# ins.getCookie()
 		print(ins)
 		print("Instance: ", ins)
-		ins.go(ctrlNamespace=flags.namespace)
+		ins.go(ctrlNamespace=flags.namespace, update_namelist=False)
 		# ret = ins.do_fetch_by_aid(3745)
 		# ret = ins.do_fetch_by_aid(5688)
 		# ret = ins.do_fetch_by_aid(5071)
+		# ret = ins.do_fetch_by_aid(8178)
+		# ret = ins.do_fetch_by_aid(5881)
+		# ret = ins.do_fetch_by_aid()
 		# print(ret)
 		# ins.do_fetch_by_aid(8450)   # z
 		# dlPathBase, artPageUrl, artistName
