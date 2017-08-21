@@ -206,7 +206,7 @@ class GetHF(rewrite.modules.scraper_base.ScraperBase):
 		self.log.info("Image tags: %s", list(tags))
 		self.log.info("Image Posted: %s", posttime)
 
-		return itemTitle, itemCaption, tags, posttime
+		return itemTitle, itemCaption, tags, posttime.replace(tzinfo=None)
 
 	def _getArtPage(self, dlPathBase, artPageUrl, artistName):
 

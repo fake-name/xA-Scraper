@@ -41,7 +41,7 @@ JOBS = [
 	# (ass.GetAs,      settings["as"]["runInterval"],   "as"),
 	(tus.GetTumblr,  settings["tum"]["runInterval"], "tum"),
 	(pts.GetPatreon, settings["pat"]["runInterval"], "pat"),
-	(yps.GetYp,      settings["yp"]["runInterval"],  "yp"),
+	# (yps.GetYp,      settings["yp"]["runInterval"],  "yp"),
 ]
 
 
