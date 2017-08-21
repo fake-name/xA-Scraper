@@ -29,6 +29,7 @@ from settings import settings
 import cherrypy
 
 class Nopper():
+	pluginName = "Nop Job"
 	def __init__(self):
 		pass
 	def go(self, *args, **kwargs):
