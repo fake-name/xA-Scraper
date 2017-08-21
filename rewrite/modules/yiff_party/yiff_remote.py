@@ -196,7 +196,7 @@ class RemoteExecClass(object):
 							attachments.append(new)
 					else:
 
-						if link.get('class', None) == 'activator' and link.get_text(strip=True) == 'View attachment':
+						if link.get('class', None) == ['activator'] and link.get_text(strip=True) == 'View attachments':
 							# The button is based on a <a> tag, so skip that one item.
 							pass
 						else:

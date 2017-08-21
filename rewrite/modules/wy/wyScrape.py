@@ -132,7 +132,7 @@ class GetWy(rewrite.modules.scraper_base.ScraperBase):
 
 		datestr = soup.find("p", class_='date')
 		dstr = datestr.get_text()
-		dval = dateparser.parse(dstr)
+		dval = dateparser.parse(dstr).replace(tzinfo=None)
 		return title, desc, dval
 
 	def _getArtPage(self, dlPathBase, artPageUrl, artistName):
@@ -161,6 +161,7 @@ class GetWy(rewrite.modules.scraper_base.ScraperBase):
 		self.log.info("			Page Image Title	= %s", itemTitle)
 		self.log.info("			FileURL				= %s", imageURL)
 		self.log.info("			dlPath				= %s", filePath)
+		self.log.info("			timestamp			= %s", itemDate)
 
 		if self._checkFileExists(filePath):
 			self.log.info("Exists, skipping...")

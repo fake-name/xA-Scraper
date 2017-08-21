@@ -14,6 +14,7 @@ import json
 import sys
 import uuid
 import pprint
+import sqlalchemy.exc
 
 import bs4
 import dateparser
@@ -267,6 +268,7 @@ class GetYp(rewrite.modules.scraper_base.ScraperBase, rewrite.modules.rpc_base.R
 		return ret, update
 
 	def _process_response_post(self, sess, arow, post_struct):
+		sess.expire_all()
 		have = sess.query(self.db.ArtItem)                             \
 			.filter(self.db.ArtItem.artist_id    == arow.id)           \
 			.filter(self.db.ArtItem.release_meta == post_struct['id']) \
@@ -310,6 +312,7 @@ class GetYp(rewrite.modules.scraper_base.ScraperBase, rewrite.modules.rpc_base.R
 
 	def _process_response_file(self, sess, arow, post_struct):
 
+		sess.expire_all()
 		have = sess.query(self.db.ArtItem)                             \
 			.filter(self.db.ArtItem.artist_id    == arow.id)           \
 			.filter(self.db.ArtItem.release_meta == post_struct['title']) \
@@ -348,6 +351,43 @@ class GetYp(rewrite.modules.scraper_base.ScraperBase, rewrite.modules.rpc_base.R
 
 		sess.commit()
 
+	def process_resp(self, arow, resp):
+
+		for x in range(50):
+			try:
+				with self.db.context_sess() as sess:
+					if resp['meta']['artist_name'].lower() != arow.extra_meta['name'].lower():
+						self.log.error("Artist name mismatch! '%s' -> '%s'", resp['meta']['artist_name'], arow.extra_meta['name'])
+						return
+					for post in resp['posts'].values():
+						self._process_response_post(sess, arow, post)
+					for file in resp['files'].values():
+						self._process_response_file(sess, arow, file)
+
+					if all([post.state != 'new' for post in arow.posts]):
+						arow.last_fetched = datetime.datetime.now()
+					sess.commit()
+
+					return
+
+			except sqlalchemy.exc.InvalidRequestError:
+				print("InvalidRequest error!")
+				sess.rollback()
+				traceback.print_exc()
+				if x > 10:
+					raise
+			except sqlalchemy.exc.OperationalError:
+				print("InvalidRequest error!")
+				sess.rollback()
+				if x > 10:
+					raise
+			except sqlalchemy.exc.IntegrityError:
+				print("Integrity error!")
+				traceback.print_exc()
+				sess.rollback()
+				if x > 10:
+					raise
+
 	def do_fetch_by_aid(self, aid):
 
 		with self.db.context_sess() as sess:
@@ -369,18 +409,7 @@ class GetYp(rewrite.modules.scraper_base.ScraperBase, rewrite.modules.rpc_base.R
 			expect_partials = True)
 
 		for resp in resp_iterator:
-			with self.db.context_sess() as sess:
-				if resp['meta']['artist_name'].lower() != arow.extra_meta['name'].lower():
-					self.log.error("Artist name mismatch! '%s' -> '%s'", resp['meta']['artist_name'], arow.extra_meta['name'])
-					return
-				for post in resp['posts'].values():
-					self._process_response_post(sess, arow, post)
-				for file in resp['files'].values():
-					self._process_response_file(sess, arow, file)
-
-				if all([post.state != 'new' for post in arow.posts]):
-					arow.last_fetched = datetime.datetime.now()
-					sess.commit()
+			self.process_resp(arow, resp)
 
 	def go(self, ctrlNamespace=None, update_namelist=True):
 		if ctrlNamespace is None:
