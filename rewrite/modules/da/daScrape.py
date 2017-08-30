@@ -45,6 +45,8 @@ class GetDA(rewrite.modules.scraper_base.ScraperBase):
 		# print prepage
 		soup = bs4.BeautifulSoup(prepage, "lxml")
 		form = soup.find("form", action=login_page)
+		if not form:
+			raise rewrite.modules.exceptions.AccountDisabledException("DA Scraper is bot-blocked. Please log in manually from your IP to un-wedge.")
 		items = form.find_all("input")
 		logDict = {}
 		for item in items:
@@ -60,6 +62,8 @@ class GetDA(rewrite.modules.scraper_base.ScraperBase):
 		# logDict["ref"]      = 'https://www.deviantart.com/users/loggedin'
 
 		pagetext = self.wg.getpage(login_page, postData = logDict, addlHeaders={'Referer':login_page})
+
+		#
 
 		# print pagetext
 		if re.search("The username or password you entered was incorrect", pagetext):

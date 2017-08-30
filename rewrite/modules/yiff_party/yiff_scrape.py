@@ -42,7 +42,7 @@ class GetYp(rewrite.modules.scraper_base.ScraperBase, rewrite.modules.rpc_base.R
 
 	pluginName = "YpGet"
 
-	rpc_timeout_s = 60 * 30
+	rpc_timeout_s = 60 * 60 * 6
 
 	remote_log = logging.getLogger("Main.RPC.Remote")
 
@@ -105,7 +105,9 @@ class GetYp(rewrite.modules.scraper_base.ScraperBase, rewrite.modules.rpc_base.R
 			self.put_outbound_callable(jid, scls, call_kwargs=call_kwargs)
 
 		self.log.info("Waiting for remote response")
-		for step in range(self.rpc_timeout_s):
+		timeout = self.rpc_timeout_s
+		while timeout:
+			timeout -= 1
 			ret = self.process_responses()
 			if ret:
 				if 'jobid' in ret and ret['jobid'] == jid:
@@ -115,6 +117,7 @@ class GetYp(rewrite.modules.scraper_base.ScraperBase, rewrite.modules.rpc_base.R
 
 							if expect_partials:
 								if 'partial' in ret and ret['partial']:
+									timeout = self.rpc_timeout_s
 									yield ret['ret'][1]
 								else:
 									yield ret['ret'][1]
@@ -132,7 +135,7 @@ class GetYp(rewrite.modules.scraper_base.ScraperBase, rewrite.modules.rpc_base.R
 						raise RpcExceptionError("RPC Call has no ret value. Probably encountered a remote exception: %s" % ret)
 
 			time.sleep(1)
-			print("\r`fetch_and_flush` sleeping for {}\r".format(str((self.rpc_timeout_s - step)).rjust(4)), end='')
+			print("\r`fetch_and_flush` sleeping for {}\r".format(str((timeout)).rjust(4)), end='')
 
 		raise RpcTimeoutError("No RPC Response within timeout period (%s sec)" % self.rpc_timeout_s)
 
