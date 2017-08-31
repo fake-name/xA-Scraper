@@ -97,12 +97,19 @@ class GetYp(rewrite.modules.scraper_base.ScraperBase, rewrite.modules.rpc_base.R
 					log_call(line)
 
 
-	def blocking_remote_call(self, remote_cls, call_kwargs, expect_partials=False):
+	def blocking_remote_call(self, remote_cls, call_kwargs, meta=None, expect_partials=False):
+
+		if not meta:
+			meta = {}
+
 		jid = str(uuid.uuid4())
 
 		scls = self.serialize_class(remote_cls)
-		if 'drain' not in sys.argv:
-			self.put_outbound_callable(jid, scls, call_kwargs=call_kwargs)
+		if 'drain' in sys.argv:
+			print("Consuming replies only")
+			self.check_open_rpc_interface()
+		else:
+			self.put_outbound_callable(jid, scls, call_kwargs=call_kwargs, meta=meta)
 
 		self.log.info("Waiting for remote response")
 		timeout = self.rpc_timeout_s
@@ -110,7 +117,7 @@ class GetYp(rewrite.modules.scraper_base.ScraperBase, rewrite.modules.rpc_base.R
 			timeout -= 1
 			ret = self.process_responses()
 			if ret:
-				if 'jobid' in ret and ret['jobid'] == jid:
+				if 'jobid' in ret and ret['jobid'] == jid or expect_partials:
 					if 'ret' in ret:
 						if len(ret['ret']) == 2:
 							self.print_remote_log(ret['ret'][0])
@@ -354,7 +361,11 @@ class GetYp(rewrite.modules.scraper_base.ScraperBase, rewrite.modules.rpc_base.R
 
 		sess.commit()
 
-	def process_resp(self, arow, resp):
+	def process_resp(self, resp):
+
+
+		with self.db.context_sess() as sess:
+			arow = sess.query(self.db.ScrapeTargets).filter(self.db.ScrapeTargets.id == resp['extra_meta']['aid']).one()
 
 		for x in range(50):
 			try:
@@ -408,11 +419,18 @@ class GetYp(rewrite.modules.scraper_base.ScraperBase, rewrite.modules.rpc_base.R
 		self.log.info("Have %s items.", len(have))
 		resp_iterator = self.blocking_remote_call(
 			remote_cls      = yiff_remote.RemoteExecClass,
-			call_kwargs     = {'mode' : 'yp_get_content_for_artist', 'aid' : arow.artist_name, 'have_urls' : have, 'yield_chunk' : 1024 * 1024 * 64},
-			expect_partials = True)
+			call_kwargs     = {
+					'mode'        : 'yp_get_content_for_artist',
+					'aid'         : arow.artist_name,
+					'have_urls'   : have,
+					'yield_chunk' : 1024 * 1024 * 64,
+					'extra_meta'  : {'aid' : aid},
+				},
+			expect_partials = True,
+			)
 
 		for resp in resp_iterator:
-			self.process_resp(arow, resp)
+			self.process_resp(resp)
 
 	def go(self, ctrlNamespace=None, update_namelist=True):
 		if ctrlNamespace is None:

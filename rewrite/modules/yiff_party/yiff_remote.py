@@ -370,7 +370,8 @@ class RemoteExecClass(object):
 		return releases
 
 
-	def yp_get_content_for_artist(self, aid, have_urls, yield_chunk=16777216, partial_resp_interface=None):
+	def yp_get_content_for_artist(self, aid, have_urls, yield_chunk=16777216, partial_resp_interface=None, extra_meta=None):
+
 		self.log.info("Getting content for artist: %s", aid)
 		self.log.info("partial_resp_interface: %s", partial_resp_interface)
 
@@ -387,10 +388,14 @@ class RemoteExecClass(object):
 			return "Error! Failed to access entry!"
 
 		releases = self.get_releases_for_aid(aid)
+
+		releases['extra_meta'] = extra_meta
+
 		releases = self.fetch_files(aid, releases, have_urls, yield_chunk, partial_resp_interface)
 		# else:
 		self.set_skipped(releases)
 		self.log.info("Content retreival finished.")
+
 		return releases
 
 	def _go(self, mode, **kwargs):

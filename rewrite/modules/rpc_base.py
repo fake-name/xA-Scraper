@@ -51,6 +51,7 @@ def buildjob(
 			'jobid'        : jobid,
 			'dispatch_key' : dispatchKey,
 			'postDelay'    : postDelay,
+			'serialize'    : True,
 		}
 	if unique_id is not None:
 		job['unique_id'] = unique_id
@@ -82,9 +83,11 @@ class RemoteJobInterface(log_base.LoggerMixin):
 
 	def get_job(self):
 		try:
+			print("Get job")
 			j = self.rpc_client.getJob(self.interfacename)
 			return j
 		except Exception as e:
+			print("Failed to get job")
 			raise e
 
 	def get_job_nowait(self):
