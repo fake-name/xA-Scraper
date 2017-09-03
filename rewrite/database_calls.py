@@ -100,12 +100,13 @@ def context_sess():
 
 	except sqlalchemy.exc.InvalidRequestError:
 		print("InvalidRequest error!")
-		sess.rollback()
 		traceback.print_exc()
+		sess.rollback()
 		raise
 
 	except sqlalchemy.exc.OperationalError:
 		print("InvalidRequest error!")
+		traceback.print_exc()
 		sess.rollback()
 		raise
 

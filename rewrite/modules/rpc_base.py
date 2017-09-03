@@ -141,7 +141,7 @@ class RpcMixin():
 
 
 	def put_outbound_fetch_job(self, jobid, joburl):
-		self.log.info("Dispatching new job")
+		self.log.info("Dispatching new fetch job")
 		raw_job = buildjob(
 			module         = 'WebRequest',
 			call           = 'getItem',
@@ -156,7 +156,7 @@ class RpcMixin():
 		self.put_outbound_raw(raw_job)
 
 	def put_outbound_callable(self, jobid, serialized, meta={}, call_args=[], call_kwargs={}):
-		self.log.info("Dispatching new job")
+		self.log.info("Dispatching new callable job")
 		call_kwargs = {'code_struct' : serialized, **call_kwargs}
 
 		raw_job = buildjob(

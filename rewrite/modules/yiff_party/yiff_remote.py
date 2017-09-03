@@ -364,6 +364,9 @@ class RemoteExecClass(object):
 						process_chunk = copy.deepcopy(releases)
 						fetched_bytes = 0
 
+						# Rate limiting.
+						time.sleep(60 * 3)
+
 		self.log.info("Finished fetch_files step.")
 		self.log.info("Skipped %s files, fetched %s files. %s files total (%s bytes).", skipped, fetched, total, fetched_bytes)
 

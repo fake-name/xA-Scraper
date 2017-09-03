@@ -382,6 +382,7 @@ class GetYp(rewrite.modules.scraper_base.ScraperBase, rewrite.modules.rpc_base.R
 						arow.last_fetched = datetime.datetime.now()
 					sess.commit()
 
+					self.log.info("Response processed!")
 					return
 
 			except sqlalchemy.exc.InvalidRequestError:
@@ -401,6 +402,20 @@ class GetYp(rewrite.modules.scraper_base.ScraperBase, rewrite.modules.rpc_base.R
 				sess.rollback()
 				if x > 10:
 					raise
+
+	def process_retry(self, resp):
+
+		for x in range(10):
+			try:
+				self.process_resp(resp)
+				return
+			except sqlalchemy.exc.OperationalError:
+				self.log.error("Failure in process_retry - sqlalchemy.exc.OperationalError")
+				pass
+			except sqlalchemy.exc.OperationalError:
+				self.log.error("Failure in process_retry - sqlalchemy.exc.OperationalError")
+				pass
+		self.log.error("Failure in process_retry, out of attempts!")
 
 	def do_fetch_by_aid(self, aid):
 
@@ -430,7 +445,9 @@ class GetYp(rewrite.modules.scraper_base.ScraperBase, rewrite.modules.rpc_base.R
 			)
 
 		for resp in resp_iterator:
-			self.process_resp(resp)
+			self.process_retry(resp)
+		self.log.info("do_fetch_by_aid has completed")
+
 
 	def go(self, ctrlNamespace=None, update_namelist=True):
 		if ctrlNamespace is None:
