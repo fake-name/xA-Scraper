@@ -33,6 +33,10 @@ class RpcTimeoutError(RuntimeError):
 class RpcExceptionError(RuntimeError):
 	pass
 
+def batch(iterable, n=1):
+	l = len(iterable)
+	for ndx in range(0, l, n):
+		yield iterable[ndx:min(ndx + n, l)]
 
 
 class GetYp(rewrite.modules.scraper_base.ScraperBase, rewrite.modules.rpc_base.RpcMixin):
@@ -96,8 +100,7 @@ class GetYp(rewrite.modules.scraper_base.ScraperBase, rewrite.modules.rpc_base.R
 				if key in line and log_call:
 					log_call(line)
 
-
-	def blocking_remote_call(self, remote_cls, call_kwargs, meta=None, expect_partials=False):
+	def put_job(self, remote_cls, call_kwargs, meta=None):
 
 		if not meta:
 			meta = {}
@@ -111,13 +114,20 @@ class GetYp(rewrite.modules.scraper_base.ScraperBase, rewrite.modules.rpc_base.R
 		else:
 			self.put_outbound_callable(jid, scls, call_kwargs=call_kwargs, meta=meta)
 
+		return jid
+
+	def process_response_items(self, jobids, expect_partials):
 		self.log.info("Waiting for remote response")
 		timeout = self.rpc_timeout_s
+
+		assert isinstance(jobids, list)
+
 		while timeout:
 			timeout -= 1
 			ret = self.process_responses()
 			if ret:
-				if 'jobid' in ret and ret['jobid'] == jid or expect_partials:
+
+				if ('jobid' in ret and ret['jobid'] in jobids) or expect_partials:
 					if 'ret' in ret:
 						if len(ret['ret']) == 2:
 							self.print_remote_log(ret['ret'][0])
@@ -128,7 +138,12 @@ class GetYp(rewrite.modules.scraper_base.ScraperBase, rewrite.modules.rpc_base.R
 									yield ret['ret'][1]
 								else:
 									yield ret['ret'][1]
-									raise StopIteration
+									if 'jobid' in ret and ret['jobid'] in jobids:
+										jobids.remove(ret['jobid'])
+										if len(jobids) == 0:
+											raise StopIteration
+									else:
+										self.log.error("Response that's not partial, and yet has no jobid?")
 
 							else:
 								return ret['ret'][1]
@@ -145,6 +160,11 @@ class GetYp(rewrite.modules.scraper_base.ScraperBase, rewrite.modules.rpc_base.R
 			print("\r`fetch_and_flush` sleeping for {}\r".format(str((timeout)).rjust(4)), end='')
 
 		raise RpcTimeoutError("No RPC Response within timeout period (%s sec)" % self.rpc_timeout_s)
+
+	def blocking_remote_call(self, remote_cls, call_kwargs, meta=None, expect_partials=False):
+
+		jobid = self.put_job(remote_cls, call_kwargs, meta)
+		return self.process_response_items([jobid], expect_partials)
 
 
 	def fetch_update_names(self):
@@ -187,7 +207,17 @@ class GetYp(rewrite.modules.scraper_base.ScraperBase, rewrite.modules.rpc_base.R
 	def getNameList(self, update_namelist):
 		if update_namelist:
 			self.fetch_update_names()
-		return super().getNameList()
+
+		with self.db.context_sess() as sess:
+			res = sess.query(self.db.ScrapeTargets)                                                                \
+				.filter(self.db.ScrapeTargets.site_name == self.targetShortName)                                   \
+				.filter(self.db.ScrapeTargets.last_fetched > datetime.datetime.now() - datetime.timedelta(days=7)) \
+				.all()
+
+			ret = [(row.id, row.artist_name) for row in res]
+			sess.commit()
+
+		return ret
 
 	def get_save_dir(self, aname):
 
@@ -411,16 +441,16 @@ class GetYp(rewrite.modules.scraper_base.ScraperBase, rewrite.modules.rpc_base.R
 				return
 			except sqlalchemy.exc.OperationalError:
 				self.log.error("Failure in process_retry - sqlalchemy.exc.OperationalError")
-				pass
 			except sqlalchemy.exc.OperationalError:
 				self.log.error("Failure in process_retry - sqlalchemy.exc.OperationalError")
-				pass
+
 		self.log.error("Failure in process_retry, out of attempts!")
 
-	def do_fetch_by_aid(self, aid):
-
+	def trigger_fetch(self, aid):
 		with self.db.context_sess() as sess:
 			arow = sess.query(self.db.ScrapeTargets).filter(self.db.ScrapeTargets.id == aid).one()
+			arow.last_fetched = datetime.datetime.now()
+			sess.commit()
 
 		print(arow, arow.id, arow.site_name, arow.artist_name, arow.extra_meta)
 		have = []
@@ -432,7 +462,7 @@ class GetYp(rewrite.modules.scraper_base.ScraperBase, rewrite.modules.rpc_base.R
 						have.append(file.file_meta)
 
 		self.log.info("Have %s items.", len(have))
-		resp_iterator = self.blocking_remote_call(
+		jid = self.put_job(
 			remote_cls      = yiff_remote.RemoteExecClass,
 			call_kwargs     = {
 					'mode'        : 'yp_get_content_for_artist',
@@ -441,12 +471,17 @@ class GetYp(rewrite.modules.scraper_base.ScraperBase, rewrite.modules.rpc_base.R
 					'yield_chunk' : 1024 * 1024 * 64,
 					'extra_meta'  : {'aid' : aid},
 				},
-			expect_partials = True,
 			)
+		return jid
+
+	def do_fetch_by_aids(self, aids):
+
+		jobids = [self.trigger_fetch(aid) for aid in aids]
+		resp_iterator = self.process_response_items(jobids, True)
 
 		for resp in resp_iterator:
 			self.process_retry(resp)
-		self.log.info("do_fetch_by_aid has completed")
+		self.log.info("do_fetch_by_aids has completed")
 
 
 	def go(self, ctrlNamespace=None, update_namelist=True):
@@ -454,11 +489,11 @@ class GetYp(rewrite.modules.scraper_base.ScraperBase, rewrite.modules.rpc_base.R
 			raise ValueError("You need to specify a namespace!")
 
 		nl = self.getNameList(update_namelist)
-		random.shuffle(nl)
-		for aid, _ in nl:
+
+		for chunk in batch(nl, 10):
 
 			try:
-				self.do_fetch_by_aid(aid)
+				self.do_fetch_by_aids([aid for aid, _ in chunk])
 			except Exception:
 				for line in traceback.format_exc().split("\n"):
 					self.log.error(line)

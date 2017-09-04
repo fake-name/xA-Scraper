@@ -105,6 +105,7 @@ class ScrapeTargets(Base):
 
 	posts           = relationship("ArtItem")
 
+	in_progress     = Column(Boolean, default=False)
 
 	__table_args__ = (
 		UniqueConstraint('site_name', 'artist_name'),
