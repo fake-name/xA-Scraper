@@ -38,6 +38,7 @@ def batch(iterable, n=1):
 	for ndx in range(0, l, n):
 		yield iterable[ndx:min(ndx + n, l)]
 
+PARALLEL_JOBS = 10
 
 class GetYp(rewrite.modules.scraper_base.ScraperBase, rewrite.modules.rpc_base.RpcMixin):
 
@@ -137,6 +138,7 @@ class GetYp(rewrite.modules.scraper_base.ScraperBase, rewrite.modules.rpc_base.R
 							self.print_remote_log(ret['ret'][0])
 
 							if expect_partials:
+								self.log.info("Incremental return because expect_partials is %s", expect_partials)
 								if 'partial' in ret and ret['partial']:
 									timeout = self.rpc_timeout_s
 									yield ret['ret'][1]
@@ -153,7 +155,9 @@ class GetYp(rewrite.modules.scraper_base.ScraperBase, rewrite.modules.rpc_base.R
 											self.log.error("Response that's not partial, and yet has no jobid?")
 
 							else:
-								return ret['ret'][1]
+								self.log.info("Non incremental return")
+								yield ret['ret'][1]
+								raise StopIteration
 						else:
 							self.pprint_resp(ret)
 							raise RuntimeError("Response not of length 2!")
@@ -171,15 +175,18 @@ class GetYp(rewrite.modules.scraper_base.ScraperBase, rewrite.modules.rpc_base.R
 	def blocking_remote_call(self, remote_cls, call_kwargs, meta=None, expect_partials=False):
 
 		jobid = self.put_job(remote_cls, call_kwargs, meta)
-		return self.process_response_items([jobid], expect_partials)
+		ret = self.process_response_items([jobid], expect_partials)
+		if not expect_partials:
+			ret = next(ret)
+		return ret
 
 
 	def fetch_update_names(self):
-		name_json = self.blocking_remote_call(yiff_remote.RemoteExecClass, meta={'mode' : 'yp_get_names'})
-		namelist = json.loads(name_json)
+		namelist = self.blocking_remote_call(yiff_remote.RemoteExecClass, call_kwargs={'mode' : 'yp_get_names'})
 		new     = 0
 		updated = 0
 
+		self.log.info("Received %s names", len(namelist['creators']))
 		# Push the name list into the DB
 		with self.db.context_sess() as sess:
 			for adict in namelist['creators']:
@@ -218,12 +225,12 @@ class GetYp(rewrite.modules.scraper_base.ScraperBase, rewrite.modules.rpc_base.R
 		with self.db.context_sess() as sess:
 			res = sess.query(self.db.ScrapeTargets)                                                                \
 				.filter(self.db.ScrapeTargets.site_name == self.targetShortName)                                   \
-				.filter(self.db.ScrapeTargets.last_fetched > datetime.datetime.now() - datetime.timedelta(days=7)) \
+				.filter(self.db.ScrapeTargets.last_fetched < datetime.datetime.now() - datetime.timedelta(days=7)) \
 				.all()
 
 			ret = [(row.id, row.artist_name) for row in res]
 			sess.commit()
-
+		self.log.info("Found %s names to fetch", len(ret))
 		return ret
 
 	def get_save_dir(self, aname):
@@ -493,7 +500,7 @@ class GetYp(rewrite.modules.scraper_base.ScraperBase, rewrite.modules.rpc_base.R
 
 		nl = self.getNameList(update_namelist)
 
-		for chunk in batch(nl, 1):
+		for chunk in batch(nl, PARALLEL_JOBS):
 			try:
 				self.do_fetch_by_aids([aid for aid, _ in chunk])
 			except Exception:
@@ -560,6 +567,7 @@ if __name__ == '__main__':
 		# ins.getCookie()
 		print(ins)
 		print("Instance: ", ins)
+		# ins.go(ctrlNamespace=flags.namespace, update_namelist=True)
 		ins.go(ctrlNamespace=flags.namespace, update_namelist=False)
 		# ret = ins.do_fetch_by_aid(3745)
 		# ret = ins.do_fetch_by_aid(5688)

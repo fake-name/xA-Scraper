@@ -5,6 +5,7 @@ import queue
 import datetime
 import zerorpc
 import mprpc
+import logging
 import dill
 import pprint
 
@@ -69,9 +70,8 @@ class RemoteJobInterface(log_base.LoggerMixin):
 		for x in range(99999):
 			try:
 				# Cut-the-corners TCP Client:
-				self.rpc_client = mprpc.RPCClient(server_ip, server_port)
-				# self.rpc_client.connect(server_ip, server_port)
-
+				self.rpc_client = zerorpc.Client()
+				self.rpc_client.connect("tcp://{address}:{port}".format(address=server_ip, port=server_port))
 				# self.rpc_client = self.rpc.get_peer_proxy(timeout=10)
 				self.check_ok()
 				return
@@ -86,7 +86,7 @@ class RemoteJobInterface(log_base.LoggerMixin):
 	def get_job(self):
 		try:
 			print("Get job")
-			j = self.rpc_client.call("getJob", self.interfacename)
+			j = self.rpc_client.getJob(self.interfacename)
 			return j
 		except Exception as e:
 			print("Failed to get job")
@@ -94,32 +94,30 @@ class RemoteJobInterface(log_base.LoggerMixin):
 
 	def get_job_nowait(self):
 		try:
-			j = self.rpc_client.call("getJobNoWait", self.interfacename)
+			j = self.rpc_client.getJobNoWait(self.interfacename)
 			return j
 		except Exception as e:
 			raise e
 
 	def put_feed_job(self, message):
 		assert isinstance(message, (str, bytes, bytearray))
-		self.rpc_client.call('putRss', message)
+		self.rpc_client.putRss(message)
 
 	def put_many_feed_job(self, messages):
 		assert isinstance(messages, (list, set))
-		self.rpc_client.call('putManyRss', messages)
+		self.rpc_client.putManyRss(messages)
 
 	def put_job(self, job):
-		self.rpc_client.call('putJob', self.interfacename, job)
+		self.rpc_client.putJob(self.interfacename, job)
 
 
 	def check_ok(self):
-		ret, bstr = self.rpc_client.call('checkOk')
+		ret, bstr = self.rpc_client.checkOk()
 		assert ret is True
 		assert len(bstr) > 0
 
 	def close(self):
 		self.rpc_client.close()
-
-
 
 
 class RpcMixin():

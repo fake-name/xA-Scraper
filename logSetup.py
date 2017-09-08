@@ -148,4 +148,7 @@ def initLogging(logLevel=logging.INFO):
 	# Install override for excepthook, to catch all errors
 	sys.excepthook = exceptHook
 
+	# Do not propigate up to the root logger
+	mainLogger.propagate = False
+
 	print("done")

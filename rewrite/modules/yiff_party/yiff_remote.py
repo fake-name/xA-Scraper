@@ -144,7 +144,8 @@ class RemoteExecClass(object):
 		self.log.info("Getting available artist names!")
 		ok = self.yp_walk_to_entry()
 		if ok:
-			return self.wg.getpage('https://yiff.party/creators2.json', addlHeaders={"Referer" : 'https://yiff.party/'})
+			data = self.wg.getpage('https://yiff.party/creators2.json', addlHeaders={"Referer" : 'https://yiff.party/'})
+			return json.loads(data)
 		else:
 			return None
 
