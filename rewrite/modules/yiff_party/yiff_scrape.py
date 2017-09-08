@@ -493,8 +493,7 @@ class GetYp(rewrite.modules.scraper_base.ScraperBase, rewrite.modules.rpc_base.R
 
 		nl = self.getNameList(update_namelist)
 
-		for chunk in batch(nl, 10):
-
+		for chunk in batch(nl, 1):
 			try:
 				self.do_fetch_by_aids([aid for aid, _ in chunk])
 			except Exception:

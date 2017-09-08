@@ -4,6 +4,7 @@ import traceback
 import queue
 import datetime
 import zerorpc
+import mprpc
 import dill
 import pprint
 
@@ -61,15 +62,16 @@ class RemoteJobInterface(log_base.LoggerMixin):
 
 	loggerPath = "Main.RemoteJobInterface"
 
-	def __init__(self, interfacename, connection_path):
+	def __init__(self, interfacename, server_ip, server_port):
 		self.interfacename = interfacename
 
 		# Execute in self.rpc_client:
 		for x in range(99999):
 			try:
 				# Cut-the-corners TCP Client:
-				self.rpc_client = zerorpc.Client()
-				self.rpc_client.connect(connection_path)
+				self.rpc_client = mprpc.RPCClient(server_ip, server_port)
+				# self.rpc_client.connect(server_ip, server_port)
+
 				# self.rpc_client = self.rpc.get_peer_proxy(timeout=10)
 				self.check_ok()
 				return
@@ -84,7 +86,7 @@ class RemoteJobInterface(log_base.LoggerMixin):
 	def get_job(self):
 		try:
 			print("Get job")
-			j = self.rpc_client.getJob(self.interfacename)
+			j = self.rpc_client.call("getJob", self.interfacename)
 			return j
 		except Exception as e:
 			print("Failed to get job")
@@ -92,25 +94,25 @@ class RemoteJobInterface(log_base.LoggerMixin):
 
 	def get_job_nowait(self):
 		try:
-			j = self.rpc_client.getJobNoWait(self.interfacename)
+			j = self.rpc_client.call("getJobNoWait", self.interfacename)
 			return j
 		except Exception as e:
 			raise e
 
 	def put_feed_job(self, message):
 		assert isinstance(message, (str, bytes, bytearray))
-		self.rpc_client.putRss(message)
+		self.rpc_client.call('putRss', message)
 
 	def put_many_feed_job(self, messages):
 		assert isinstance(messages, (list, set))
-		self.rpc_client.putManyRss(messages)
+		self.rpc_client.call('putManyRss', messages)
 
 	def put_job(self, job):
-		self.rpc_client.putJob(self.interfacename, job)
+		self.rpc_client.call('putJob', self.interfacename, job)
 
 
 	def check_ok(self):
-		ret, bstr = self.rpc_client.checkOk()
+		ret, bstr = self.rpc_client.call('checkOk')
 		assert ret is True
 		assert len(bstr) > 0
 
@@ -218,7 +220,7 @@ class RpcMixin():
 
 	def check_open_rpc_interface(self):
 		if not hasattr(self, "rpc_interface"):
-			self.rpc_interface = RemoteJobInterface("XA-RPC-Fetcher", settings['rpc-server']['address'])
+			self.rpc_interface = RemoteJobInterface("XA-RPC-Fetcher", settings['rpc-server']['address'], settings['rpc-server']['port'])
 		try:
 			if self.rpc_interface.check_ok():
 				return
@@ -235,7 +237,7 @@ class RpcMixin():
 				self.log.error("Failure when closing errored RPC interface")
 				for line in traceback.format_exc().split("\n"):
 					self.log.error(line)
-			self.rpc_interface = RemoteJobInterface("XA-RPC-Fetcher", settings['rpc-server']['address'])
+			self.rpc_interface = RemoteJobInterface("XA-RPC-Fetcher", settings['rpc-server']['address'], settings['rpc-server']['port'])
 
 
 
