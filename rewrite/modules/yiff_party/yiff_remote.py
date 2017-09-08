@@ -336,8 +336,6 @@ class RemoteExecClass(object):
 		total         = 0
 		fetched_bytes = 0
 
-
-		# for post in releases['files'] + releases['posts']:
 		for post_key in post_keys:
 			if post_key in process_chunk['posts']:
 				file_list = process_chunk['posts'][post_key]
@@ -357,20 +355,21 @@ class RemoteExecClass(object):
 					filesize = self.fetch_file(aid, file)
 					fetched       += 1
 					fetched_bytes += filesize
-					self.log.info("Fetched %s bytes of data so far", fetched_bytes)
-					if fetched_bytes > yield_chunk:
-						self.log.info("Incrememtal return!")
-						self.push_partial_resp(process_chunk, partial_resp_interface)
-						process_chunk = copy.deepcopy(releases)
-						fetched_bytes = 0
 
-						# Rate limiting.
-						time.sleep(60 * 3)
+			self.log.info("Fetched %s bytes of data so far", fetched_bytes)
+			if fetched_bytes > yield_chunk:
+				self.log.info("Incrememtal return!")
+				self.push_partial_resp(process_chunk, partial_resp_interface)
+				process_chunk = copy.deepcopy(releases)
+				fetched_bytes = 0
+
+				# Rate limiting.
+				time.sleep(60 * 3)
 
 		self.log.info("Finished fetch_files step.")
 		self.log.info("Skipped %s files, fetched %s files. %s files total (%s bytes).", skipped, fetched, total, fetched_bytes)
 
-		return releases
+		return process_chunk
 
 
 	def yp_get_content_for_artist(self, aid, have_urls, yield_chunk=16777216, partial_resp_interface=None, extra_meta=None):
@@ -402,8 +401,6 @@ class RemoteExecClass(object):
 		return releases
 
 	def _go(self, mode, **kwargs):
-		self.log.info("_go() called with mode: '%s'", mode)
-		self.log.info("_go() kwargs: '%s'", kwargs)
 
 		if mode == 'yp_get_names':
 			return self.yp_get_names()

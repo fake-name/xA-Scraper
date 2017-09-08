@@ -155,19 +155,19 @@ class RpcMixin():
 
 		self.put_outbound_raw(raw_job)
 
-	def put_outbound_callable(self, jobid, serialized, meta={}, call_args=[], call_kwargs={}):
+	def put_outbound_callable(self, jobid, serialized, meta={}, call_kwargs={}):
 		self.log.info("Dispatching new callable job")
-		call_kwargs = {'code_struct' : serialized}
+		call_kwargs_out = {'code_struct' : serialized}
 		for key, value in call_kwargs.items():
-			call_kwargs[key] = value
+			call_kwargs_out[key] = value
 
 		raw_job = buildjob(
 			module         = 'RemoteExec',
 			call           = 'callCode',
 			dispatchKey    = "rpc-system",
 			jobid          = jobid,
-			args           = call_args,
-			kwargs         = call_kwargs,
+			args           = [],
+			kwargs         = call_kwargs_out,
 			additionalData = meta,
 			postDelay      = 0
 		)

@@ -100,7 +100,10 @@ class GetYp(rewrite.modules.scraper_base.ScraperBase, rewrite.modules.rpc_base.R
 				if key in line and log_call:
 					log_call(line)
 
-	def put_job(self, remote_cls, call_kwargs, meta=None):
+	def put_job(self, remote_cls, call_kwargs=None, meta=None):
+
+		if call_kwargs is None:
+			call_kwargs = {}
 
 		if not meta:
 			meta = {}
@@ -112,6 +115,7 @@ class GetYp(rewrite.modules.scraper_base.ScraperBase, rewrite.modules.rpc_base.R
 			print("Consuming replies only")
 			self.check_open_rpc_interface()
 		else:
+			print("Putting job:", jid, call_kwargs)
 			self.put_outbound_callable(jid, scls, call_kwargs=call_kwargs, meta=meta)
 
 		return jid
@@ -143,7 +147,10 @@ class GetYp(rewrite.modules.scraper_base.ScraperBase, rewrite.modules.rpc_base.R
 										if len(jobids) == 0:
 											raise StopIteration
 									else:
-										self.log.error("Response that's not partial, and yet has no jobid?")
+										if 'jobid' in ret:
+											self.log.info("Received completed job response from a previous session?")
+										else:
+											self.log.error("Response that's not partial, and yet has no jobid?")
 
 							else:
 								return ret['ret'][1]
@@ -168,7 +175,7 @@ class GetYp(rewrite.modules.scraper_base.ScraperBase, rewrite.modules.rpc_base.R
 
 
 	def fetch_update_names(self):
-		name_json = self.blocking_remote_call(yiff_remote.RemoteExecClass, {'mode' : 'yp_get_names'})
+		name_json = self.blocking_remote_call(yiff_remote.RemoteExecClass, meta={'mode' : 'yp_get_names'})
 		namelist = json.loads(name_json)
 		new     = 0
 		updated = 0
@@ -291,8 +298,8 @@ class GetYp(rewrite.modules.scraper_base.ScraperBase, rewrite.modules.rpc_base.R
 			elif 'error' in file and file['error']:
 				pass
 			elif 'skipped' in file and file['skipped']:
+				# self.log.info("Skipped file: %s, %s, %s", file['skipped'], file['url'], list(file.keys()))
 				pass
-				# self.log.info("Skipped file: %s", file['url'])
 			else:
 				self.log.error("File missing 'fdata': %s", len(file))
 				asstr = str(file)
@@ -315,7 +322,6 @@ class GetYp(rewrite.modules.scraper_base.ScraperBase, rewrite.modules.rpc_base.R
 			.scalar()
 		if have:
 			sess.commit()
-			pass
 			# self.log.info("Have post: '%s'", post_struct['title'])
 		else:
 			self.log.info("New post: '%s'", post_struct['title'])
@@ -333,15 +339,12 @@ class GetYp(rewrite.modules.scraper_base.ScraperBase, rewrite.modules.rpc_base.R
 			sess.commit()
 
 		if post_struct['attachments']:
-			if all(['skipped' in file and file['skipped'] == True for file in post_struct['attachments']]):
-				pass
-			else:
-				result, update = self.save_files(sess, arow, have, post_struct['attachments'])
-				if update:
-					self.log.info("Saved attachment result: %s", result)
-					have.state = result
-				else:
-					self.log.info("Item skipped, not changing row.")
+			result, update = self.save_files(sess, arow, have, post_struct['attachments'])
+			if update:
+				self.log.info("Saved attachment result: %s", result)
+				have.state = result
+			# else:
+			# 	self.log.info("Item skipped, not changing row.")
 		else:
 			if have.state != 'complete':
 				have.state = 'complete'
@@ -359,8 +362,7 @@ class GetYp(rewrite.modules.scraper_base.ScraperBase, rewrite.modules.rpc_base.R
 			.scalar()
 
 		if have:
-			pass
-			# self.log.info("Have attachment: '%s'", post_struct['title'])
+			self.log.info("Have attachment: '%s'", post_struct['title'])
 		else:
 			self.log.info("New attachment: '%s'", post_struct['title'])
 			post_struct['type'] = 'file'
@@ -376,13 +378,12 @@ class GetYp(rewrite.modules.scraper_base.ScraperBase, rewrite.modules.rpc_base.R
 
 		sess.commit()
 
-		if 'skipped' in post_struct and post_struct['skipped'] == True:
-			pass
+		result, update = self.save_files(sess, arow, have, post_struct['attachments'])
+		if update:
+			self.log.info("Saved file result: %s", result)
+			have.state = result
 		else:
-				result, update = self.save_files(sess, arow, have, post_struct['attachments'])
-				if update:
-					self.log.info("Saved file result: %s", result)
-					have.state = result
+			self.log.info("Item skipped, not changing row.")
 
 		if not post_struct['attachments']:
 			self.log.info("File post '%s' is missing the actual file?", post_struct['title'])
@@ -438,6 +439,7 @@ class GetYp(rewrite.modules.scraper_base.ScraperBase, rewrite.modules.rpc_base.R
 		for x in range(10):
 			try:
 				self.process_resp(resp)
+				self.log.info("Response processed!")
 				return
 			except sqlalchemy.exc.OperationalError:
 				self.log.error("Failure in process_retry - sqlalchemy.exc.OperationalError")
@@ -480,6 +482,7 @@ class GetYp(rewrite.modules.scraper_base.ScraperBase, rewrite.modules.rpc_base.R
 		resp_iterator = self.process_response_items(jobids, True)
 
 		for resp in resp_iterator:
+			self.log.info("Processing response chunk.")
 			self.process_retry(resp)
 		self.log.info("do_fetch_by_aids has completed")
 
@@ -501,6 +504,8 @@ class GetYp(rewrite.modules.scraper_base.ScraperBase, rewrite.modules.rpc_base.R
 			if not flags.namespace.run:
 				print("Exiting!")
 				return
+
+		self.log.info("YiffScrape has finished!")
 
 def mgr_init():
 	signal.signal(signal.SIGINT, signal.SIG_IGN)
