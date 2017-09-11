@@ -37,5 +37,5 @@ else
 fi;
 
 echo "Launching executable."
-python3 -m manage upgrade-db
+python3 db_migrate.py db upgrade
 python3 ./main.py
