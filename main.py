@@ -44,7 +44,7 @@ JOBS = [
 	(pxs.GetPX,      settings["px"]["runInterval"],   "px"),
 	(sfs.GetSf,      settings["sf"]["runInterval"],   "sf"),
 	# (ass.GetAs,      settings["as"]["runInterval"],   "as"),
-	(tus.GetTumblr,  settings["tum"]["runInterval"], "tum"),
+	# (tus.GetTumblr,  settings["tum"]["runInterval"], "tum"),
 	(pts.GetPatreon, settings["pat"]["runInterval"], "pat"),
 	# (yps.GetYp,      settings["yp"]["runInterval"],  "yp"),
 	(Nopper,         settings["yp"]["runInterval"],  "yp"),
