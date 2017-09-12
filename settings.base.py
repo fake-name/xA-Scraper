@@ -9,6 +9,18 @@ settings = {
 		"database" : "pg_database_name",
 	},
 
+	"rpc-server" :
+	{
+		"address_zeroroc" : 'tcp://ip:port',
+		"address"         : 'ip',
+		"port"            : 'other-port',
+	},
+
+	"captcha" :
+	{
+		"2Captcha-API-key" : '<key goes here>',
+	},
+
 	"webCtntPath" : "absolute_path_to_this_repo/Content/",
 	"runThreads"  : 8,
 	"dldCtntPath" : "absolute_path_downloads_will_go_here",
@@ -138,6 +150,29 @@ settings = {
 		"password"        : "your_password",
 		"runInterval"     : 60*60*24*2
 	},
+
+
+	"yp" :  # SoFurry
+	{
+		"dlDirName"       : "YiffParty",
+		"shortName"       : "yp",
+		"runInterval"     : 60*60*24*2,   # every 24 hours
+
+		'user-url'        : "%s-None"
+	},
+
+	"pat" :  # Patreon
+	{
+		"username"        : "<username>",
+		"password"        : "<password>",
+
+		"dlDirName"       : "Patreon",
+		"shortName"       : "pat",
+		"runInterval"     : 60*60*18,   # every 24 hours
+
+		'user-url'        : "%s-None"
+	},
+
 }
 
 
