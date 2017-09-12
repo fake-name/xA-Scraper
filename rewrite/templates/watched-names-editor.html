@@ -9,7 +9,7 @@
 				<h2 style='display: inline-block' >Artists for site: {{ sitename | upper }}</h2>
 			</span>
 
-			<form>
+			<form class='name-form'>
 				Add new artist:
 				<input type="hidden" name="target" value="addName">
 				<input type="hidden" name="add", value="True">
@@ -66,14 +66,8 @@
 {% block content %}
 	{% include '_block_flash.html' %}
 	<div class="subdiv mtMainId">
-		<div class="contentdiv">
 			<h3>Site Fetched Names</h3>
 
-			<div>
-
-			</div>
-			<hr>
-		</div>
 	</div>
 	{% for sitename in skeys %}
 		{{ render_artist_list_site(sitename, watched_sorted[sitename]) }}
@@ -91,18 +85,16 @@
 			console.log("Content = ", reqData);
 			console.log("StatusStr - ", statusStr);
 			console.log("jqXHR", jqXHR);
-			ctnt = JSON.parse(reqData);
-			console.log(ctnt);
-			var text = reqData;
-			text = text.replace(/ +/g,' ').replace(/(\r\n|\n|\r)/gm,"");
-			if (ctnt["Status"] == "Error")
+
+			console.log(reqData);
+			if (reqData["error"])
 			{
-				window.alert("Error!\n"+ctnt["Message"])
+				window.alert("Error!\n"+reqData["message"])
 			}
 			else
 			{
-				window.alert("Succeeded!\n"+ctnt["Message"])
-				// location.reload();
+				window.alert("Succeeded!\n"+reqData["message"])
+				location.reload();
 
 			}
 
@@ -142,14 +134,27 @@
 				});
 				if (!$.isEmptyObject(ret))
 				{
-					ret["change-artist-name"] = true;
-					$.ajax("api", {"data": ret, success: ajaxSuccess})
+					ret["mode"] = 'change-artist-name';
+					$.ajax("api", {"data": ret, success: ajaxSuccess, method:'POST'})
 				}
 
 
 
 			}
 		};
+
+		function addName(e)
+		{
+			e.preventDefault();
+			var formdata = $(this).serializeArray();
+
+			formdata.push({ name: "mode", value: "add-artist-name" });
+			$.ajax("api", {"data": formdata, success: ajaxSuccess, method:'POST'})
+
+			return false;
+		}
+
+		$(".name-form").on('submit', addName)
 
 
 	</script>
