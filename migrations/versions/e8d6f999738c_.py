@@ -303,7 +303,7 @@ def upgrade():
     conn = op.get_bind()
     res = conn.execute('''
             SELECT
-             *
+             tablename
             FROM
              pg_catalog.pg_tables
             WHERE
@@ -311,7 +311,11 @@ def upgrade():
             AND schemaname != 'information_schema';'''
         )
     have = res.fetchall()
+    have = [tmp for tmp, in have]
     if 'retrieved_pages' in have:
+        print("Have:", have)
+        migrate_data()
+    elif ('retrieved_pages', ) in have:
         print("Have:", have)
         migrate_data()
 
