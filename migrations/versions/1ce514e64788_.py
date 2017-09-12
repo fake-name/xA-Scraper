@@ -24,12 +24,13 @@ def upgrade():
                existing_type=sa.BIGINT(),
                nullable=False)
     op.create_index(op.f('ix_art_item_release_meta'), 'art_item', ['release_meta'], unique=False)
-    op.drop_index('art_item_artist_id_release_meta_idx', table_name='art_item')
-    op.drop_index('art_item_release_meta_idx', table_name='art_item')
+
+    # op.drop_index('art_item_artist_id_release_meta_idx', table_name='art_item')
+    # op.drop_index('art_item_release_meta_idx', table_name='art_item')
     op.add_column('scrape_targets', sa.Column('extra_meta', postgresql.JSON(astext_type=sa.Text()), nullable=True))
     op.add_column('scrape_targets', sa.Column('release_cnt', sa.Integer(), nullable=True))
     op.create_index(op.f('ix_scrape_targets_artist_name'), 'scrape_targets', ['artist_name'], unique=False)
-    op.drop_index('scrape_targets_artist_name_idx', table_name='scrape_targets')
+    # op.drop_index('scrape_targets_artist_name_idx', table_name='scrape_targets')
     # ### end Alembic commands ###
 
 

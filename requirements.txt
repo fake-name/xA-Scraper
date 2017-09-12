@@ -13,6 +13,7 @@ MarkupSafe
 ## PasteDeploy
 pyramid
 sqlalchemy
+alembic
 python-tumblpy
 pytz
 ## PyYAML
@@ -38,6 +39,9 @@ flask_csrf
 flask-paginate
 Flask-HTTPAuth
 zerorpc
+flask_script
+flask_migrate
+sqlalchemy-citext
 
 
 dill
