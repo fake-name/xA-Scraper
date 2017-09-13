@@ -13,6 +13,7 @@ down_revision = None
 from alembic import op
 import sqlalchemy as sa
 import citext
+import sys
 import datetime
 import settings
 from sqlalchemy.dialects import postgresql
@@ -312,11 +313,21 @@ def upgrade():
         )
     have = res.fetchall()
     have = [tmp for tmp, in have]
-    if 'retrieved_pages' in have:
+    print("Current tables:")
+    print(have)
+    print("Have old-data tables:", 'retrieved_pages' in have or 'siteartistnames' in have)
+    print("sys.argv:", sys.argv)
+    if 'siteartistnames' in have:
+        print("Have:", have)
+        migrate_data()
+    elif 'retrieved_pages' in have:
         print("Have:", have)
         migrate_data()
     elif ('retrieved_pages', ) in have:
         print("Have:", have)
+        migrate_data()
+    elif "force-migrate" in sys.argv:
+        print("Forcing a values-present migrations")
         migrate_data()
 
     ##########################################################################################
