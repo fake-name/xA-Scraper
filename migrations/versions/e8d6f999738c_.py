@@ -18,7 +18,7 @@ import settings
 from sqlalchemy.dialects import postgresql
 import os.path
 
-def migrate_data():
+def migrate_data(scrape_targets_tbl, art_item_tbl, art_file_tbl, art_tag_tbl):
 
     conn = op.get_bind()
     res = conn.execute('''
@@ -314,10 +314,10 @@ def upgrade():
     have = [tmp for tmp, in have]
     if 'retrieved_pages' in have:
         print("Have:", have)
-        migrate_data()
+        migrate_data(scrape_targets_tbl, art_item_tbl, art_file_tbl, art_tag_tbl)
     elif ('retrieved_pages', ) in have:
         print("Have:", have)
-        migrate_data()
+        migrate_data(scrape_targets_tbl, art_item_tbl, art_file_tbl, art_tag_tbl)
 
     ##########################################################################################
     ##########################################################################################
