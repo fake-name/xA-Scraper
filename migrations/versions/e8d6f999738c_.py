@@ -261,7 +261,7 @@ def upgrade():
 
     art_item_tbl = op.create_table('art_item',
     sa.Column('id', sa.BigInteger(), nullable=False),
-    sa.Column('state', postgresql.ENUM('new', 'fetching', 'processing', 'complete', 'error', 'removed', 'disabled', 'specialty_deferred', 'specialty_ready', name='dlstate_enum'), nullable=False),
+    sa.Column('state', postgresql.ENUM('new', 'fetching', 'processing', 'complete', 'error', 'removed', 'disabled', 'specialty_deferred', 'specialty_ready', 'not_set', name='dlstate_enum'), nullable=False),
     sa.Column('errno', sa.Integer(), nullable=True),
     sa.Column('artist_id', sa.BigInteger(), nullable=True),
     sa.Column('release_meta', sa.Text(), nullable=False),

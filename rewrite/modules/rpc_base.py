@@ -40,7 +40,6 @@ def buildjob(
 			kwargs         = {},
 			additionalData = None,
 			postDelay      = 0,
-			extra_keys     = {},
 			unique_id      = None,
 		):
 
