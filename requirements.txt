@@ -42,7 +42,7 @@ zerorpc
 flask_script
 flask_migrate
 sqlalchemy-citext
-
+mprpc
 
 dill
 git+https://github.com/berkerpeksag/astor.git
