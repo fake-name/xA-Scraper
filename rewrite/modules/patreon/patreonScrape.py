@@ -30,7 +30,6 @@ class GetPatreon(rewrite.modules.scraper_base.ScraperBase):
 
 	numThreads = 3
 
-
 	# Stubbed functions
 	_getGalleries = None
 	_getTotalArtCount = None
@@ -217,11 +216,6 @@ class GetPatreon(rewrite.modules.scraper_base.ScraperBase):
 
 		attachments = {item['id'] : item for item in post['included'] if item['type'] == 'attachment'}
 
-		if len(attachments ):
-			self.log.info("Found %s attachments on post.", len(attachments))
-		else:
-			self.log.warning("No attachments on post %s!", postId)
-
 		post_content = post['data']
 		post_info = post_content['attributes']
 
@@ -239,23 +233,35 @@ class GetPatreon(rewrite.modules.scraper_base.ScraperBase):
 			'post_tags'  : tags,
 		}
 
+		# print("Post:")
+		# pprint.pprint(post)
 
 		files = []
 		try:
-			if "post_file" in post_content and post_content['post_file']:
-				fpath = self.save_image(artistName, postId, post_content['post_file']['name'], post_content['post_file']['url'])
+			if "post_file" in post_info and post_info['post_file']:
+				furl = urllib.parse.unquote(post_info['post_file']['url'])
+				# print("Post file!", post_info['post_file']['url'], furl)
+				fpath = self.save_image(artistName, postId, post_info['post_file']['name'], furl)
 				files.append(fpath)
 
-			if 'post_type' in post_content and post_content['post_type'] == 'video_embed':
-				fpath = self.fetch_video_embed(post_content)
+			if 'post_type' in post_info and post_info['post_type'] == 'video_embed':
+				# print("Post video_embed")
+				fpath = self.fetch_video_embed(post_info)
 				files.append(fpath)
 
 			for aid, dat_struct in attachments.items():
+				# print("Post attachments")
 				fpath = self.save_attachment(artistName, postId, dat_struct)
 				files.append(fpath)
 
 		except urllib.error.URLError:
 			self.log.error("Failure retreiving content from post: %s", post)
+
+		if len(files):
+			self.log.info("Found %s images/attachments on post.", len(attachments))
+		else:
+			self.log.warning("No images/attachments on post %s!", postId)
+
 
 		files = [filen for filen in files if filen]
 		ret['dl_path'] = files
