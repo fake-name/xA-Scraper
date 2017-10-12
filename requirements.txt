@@ -19,7 +19,7 @@ pytz==2017.2
 ## PyYAML
 ## repoze.lru
 requests==2.18.4
-requests-oauthlib
+requests-oauthlib==0.8.0
 six
 ## translationstring
 tzlocal
