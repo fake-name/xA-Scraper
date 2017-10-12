@@ -25,7 +25,7 @@ six==1.11.0
 tzlocal==1.4
 ## venusian
 ## WebOb
-zope.deprecation
+zope.deprecation==4.3.0
 zope.interface
 flask
 flask-sqlalchemy
