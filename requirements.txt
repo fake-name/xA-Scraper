@@ -31,7 +31,7 @@ flask==0.12.2
 flask-sqlalchemy==2.3.2
 flask-debugtoolbar==0.10.1
 flask-markdown==0.3
-dateparser
+dateparser==0.6.0
 markdown
 flask_login
 psycopg2
