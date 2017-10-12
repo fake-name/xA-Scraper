@@ -30,7 +30,7 @@ zope.interface==4.4.3
 flask==0.12.2
 flask-sqlalchemy==2.3.2
 flask-debugtoolbar==0.10.1
-flask-markdown
+flask-markdown==0.3
 dateparser
 markdown
 flask_login
