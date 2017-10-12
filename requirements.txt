@@ -11,7 +11,7 @@ MarkupSafe==1.0
 ## natsort
 ## oauthlib
 ## PasteDeploy
-pyramid
+pyramid==1.9.1
 sqlalchemy
 alembic
 python-tumblpy
