@@ -1,6 +1,6 @@
 APScheduler==3.3.1
 Babel==2.5.1
-beautifulsoup4
+beautifulsoup4==4.6.0
 CherryPy
 colorama
 future
