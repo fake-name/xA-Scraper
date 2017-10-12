@@ -28,7 +28,7 @@ tzlocal==1.4
 zope.deprecation==4.3.0
 zope.interface==4.4.3
 flask==0.12.2
-flask-sqlalchemy
+flask-sqlalchemy==2.3.2
 flask-debugtoolbar
 flask-markdown
 dateparser
