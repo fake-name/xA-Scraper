@@ -33,7 +33,7 @@ flask-debugtoolbar==0.10.1
 flask-markdown==0.3
 dateparser==0.6.0
 markdown==2.6.9
-flask_login
+flask_login==0.4.0
 psycopg2
 flask_csrf
 flask-paginate
