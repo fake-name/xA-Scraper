@@ -40,7 +40,7 @@ flask-paginate==0.5.1
 Flask-HTTPAuth==3.2.3
 zerorpc==0.6.1
 flask_script==2.0.6
-flask_migrate
+flask_migrate==2.1.1
 sqlalchemy-citext
 mprpc
 
