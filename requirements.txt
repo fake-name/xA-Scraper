@@ -27,7 +27,7 @@ tzlocal==1.4
 ## WebOb
 zope.deprecation==4.3.0
 zope.interface==4.4.3
-flask
+flask==0.12.2
 flask-sqlalchemy
 flask-debugtoolbar
 flask-markdown
