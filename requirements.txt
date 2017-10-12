@@ -1,4 +1,4 @@
-APScheduler
+APScheduler==3.3.1
 Babel
 beautifulsoup4
 CherryPy
