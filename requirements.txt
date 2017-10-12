@@ -26,7 +26,7 @@ tzlocal==1.4
 ## venusian
 ## WebOb
 zope.deprecation==4.3.0
-zope.interface
+zope.interface==4.4.3
 flask
 flask-sqlalchemy
 flask-debugtoolbar
