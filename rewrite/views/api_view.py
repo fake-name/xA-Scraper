@@ -54,7 +54,29 @@ def add_artist_name(params):
 	allowed_modes = [tmp[-1] for tmp in main.JOBS]
 	assert params['site'] in allowed_modes, "Site %s not in available modes: %s" % (params['site'], allowed_modes)
 
-	return getResponse("Succeeded", error=False)
+
+	have_item = db.session.query(database.ScrapeTargets)                      \
+		.filter(database.ScrapeTargets.site_name == params['site'])         \
+		.filter(database.ScrapeTargets.artist_name == params['artistName']) \
+		.scalar()
+
+	if have_item:
+		db.session.commit()
+		return getResponse("Error: Artist '%s' for site '%s' already fetched!" %
+			(params['site'], params['artistName']),
+			error=True)
+
+	new = database.ScrapeTargets(
+		site_name   = params['site'],
+		artist_name = params['artistName'],
+		)
+
+	db.session.add(new)
+	db.session.commit()
+
+	return getResponse("Added artist '%s' for site '%s'." %
+		(params['site'], params['artistName']),
+		error=False)
 
 
 
@@ -75,7 +97,9 @@ def handle_api(params):
 		return getResponse(message="Unknown mode parameter!", error=True)
 
 	try:
-		return DISPATCH_MAP[params['mode']](params)
+		ret = DISPATCH_MAP[params['mode']](params)
+		print("API Response:", ret)
+		return ret
 	except AssertionError as e:
 		traceback.print_exc()
 		return getResponse("Error processing API request: '%s'!" % e, error=True)

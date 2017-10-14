@@ -12,6 +12,7 @@ import multiprocessing
 import multiprocessing.managers
 import sys
 
+from . import cli_utils
 
 manager = multiprocessing.managers.SyncManager()
 manager.start()
@@ -19,7 +20,6 @@ namespace = manager.Namespace()
 namespace.run = True
 
 from main import JOBS
-print(JOBS)
 
 PLUGINS = {
 		key : (cls_def, cls_def.pluginName)
@@ -80,49 +80,5 @@ def do_fetch_all():
 		print("Plugin status: ", status)
 
 
-
-
-def do_import(sitename, filename):
-	if not sitename in PLUGINS:
-		print("Error! Plugin short-name '%s' is not known!" % sitename)
-		print("Showing help instead.")
-		print("")
-		print("")
-		cli_help()
-		return
-	if not os.path.exists(filename):
-		print("Error! File '%s' does not appear to exist!" % filename)
-		print("Showing help instead.")
-		print("")
-		print("")
-		cli_help()
-		return
-	if sitename.lower() == "px":
-		print("Error!")
-		print("Pixiv scraper uses a different mechanism for storing names.")
-		print("(It uses your account favorites to determine who to scrape)")
-		print("You cannot import names into it.")
-		print("Showing help instead.")
-		print("")
-		print("")
-		cli_help()
-		return
-
-	print("Import call: ", sitename, filename)
-
-	with open(filename) as fp:
-		names = fp.readlines()
-		names = [name.strip() for name in names if name.strip()]
-		if any([" " in name for name in names]):
-			print("Error! A name with a space in it was found! That's not supported")
-			print("for any plugin, at the moment! Something is wrong with the name")
-			print("list file!")
-			return
-		print("Found %s names to insert into DB!" % len(names))
-	conn = get_db_conn()
-	cur = conn.cursor()
-	for name in names:
-		add_name(cur, sitename, name)
-	cur.execute("COMMIT;")
 
 

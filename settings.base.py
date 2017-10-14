@@ -11,7 +11,6 @@ settings = {
 
 	"rpc-server" :
 	{
-		"address_zeroroc" : 'tcp://ip:port',
 		"address"         : 'ip',
 		"port"            : 'other-port',
 	},
