@@ -81,13 +81,13 @@ def checkout_session():
 	ctid = threading.current_thread().name
 	csid = "{}-{}".format(cpid, ctid)
 
-	print("Getting DB session (avail: %s, ID: '%s')" % (POOL.qsize(), csid))
+	# print("Getting DB session (avail: %s, ID: '%s')" % (POOL.qsize(), csid))
 	sess = POOL.get()
 	return sess
 
 def release_session(session):
 	POOL.put(session)
-	print("Returning db handle to pool. Handles available: %s" % (POOL.qsize(), ))
+	# print("Returning db handle to pool. Handles available: %s" % (POOL.qsize(), ))
 
 @contextlib.contextmanager
 def context_sess():

@@ -49,6 +49,31 @@ class StatusMixin(metaclass=abc.ABCMeta):
 
 			sess.commit()
 
+	def getValue(self, sitename, key):
+
+		with self.db.context_sess() as sess:
+			row = sess.query(self.db.ScraperStatus)                  \
+				.filter(self.db.ScraperStatus.site_name == sitename) \
+				.scalar()
+
+			if not row:
+				row = self.db.ScraperStatus(site_name=sitename)
+				sess.add(row)
+
+			if key == 'nextRun':
+				ret = row.next_run
+			elif key == 'prevRun':
+				ret = row.prev_run
+			elif key == 'prevRunTime':
+				ret = row.prev_run_time
+			elif key == 'isRunning':
+				ret = row.is_running
+			else:
+				self.log.error("Unknown key to fetch: '%s'", key)
+
+			sess.commit()
+
+		return ret
 
 	def updateNextRunTime(self, name, timestamp):
 		self.updateValue(name, "nextRun", timestamp)
@@ -62,3 +87,5 @@ class StatusMixin(metaclass=abc.ABCMeta):
 	def updateRunningStatus(self, name, state):
 		self.updateValue(name, "isRunning", state)
 
+	def getRunningStatus(self, name):
+		return self.getValue(name, "isRunning")

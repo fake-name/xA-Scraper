@@ -324,6 +324,19 @@ class WebGetRobust:
 			hName = info['Content-Disposition'].split('filename=')[1]
 
 
+		if not hName:
+			resolved_url = pghandle.geturl()
+			purl = urllib.parse.urlparse(resolved_url)
+
+			urlpath = purl.path
+			fname = os.path.split(urlpath)[-1]
+
+			# if we have a filename from the urlpath, and
+			# no hname, we use the filename
+			if fname:
+				hName = fname
+
+
 		return pgctnt, hName
 
 

@@ -11,6 +11,8 @@ import rewrite.modules.scraper_base
 
 class FetchError(Exception):
 	pass
+class MissingContentError(Exception):
+	pass
 
 class GetTumblr(rewrite.modules.scraper_base.ScraperBase):
 
@@ -106,7 +108,7 @@ class GetTumblr(rewrite.modules.scraper_base.ScraperBase):
 		if "photos" in post_struct:
 			contenturls = [tmp['original_size']['url'] for tmp in post_struct['photos']]
 		else:
-			raise FetchError("Cannot find content!")
+			raise MissingContentError("Cannot find content!")
 
 		have = self._checkHaveUrl(artistName, pgurl)
 		if have:
@@ -123,6 +125,9 @@ class GetTumblr(rewrite.modules.scraper_base.ScraperBase):
 		seq = 1
 		for url in contenturls:
 			content, fName = self.wg.getFileAndName(url, addlHeaders={'Referer' : pgurl})
+			if len(fName) == 0:
+				raise FetchError("Missing Filename for file '%s' (url: %s)" % (fName, url))
+
 			filePath = os.path.join(dlPathBase, fName)
 
 			# NFI how this was happening.
@@ -199,17 +204,21 @@ class GetTumblr(rewrite.modules.scraper_base.ScraperBase):
 				self._getArtPage(post_struct, artist)
 			except urllib.error.URLError:  # WebGetRobust throws urlerrors
 				self.log.error("Page Retrieval failed!")
-				self.log.error("Source URL = '%s'", post_struct)
+				self.log.error("Post Struct = '%s'", post_struct)
 				self.log.error(traceback.format_exc())
 				# self._updateUnableToRetrieve(artist, pageURL)
+			except MissingContentError:
+				self.log.error("Page Retrieval failed!")
+				self.log.error("Continuing on next page")
 			except FetchError:
 				self.log.error("Page Retrieval failed!")
-				self.log.error("Source URL = '%s'", post_struct)
+				self.log.error("Post Struct = '%s'", post_struct)
 				self.log.error(traceback.format_exc())
+				self.log.error("Continuing on next page")
 				# self._updateUnableToRetrieve(artist, pageURL)
 			except:
 				self.log.error("Unknown error in page retrieval!")
-				self.log.error("Source URL = '%s'", post_struct)
+				self.log.error("Post Struct = '%s'", post_struct)
 				self.log.error(traceback.format_exc())
 				# self._updateUnableToRetrieve(artist, pageURL)
 

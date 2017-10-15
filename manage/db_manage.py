@@ -8,8 +8,6 @@ from settings import settings
 
 import signal
 import time
-import multiprocessing
-import multiprocessing.managers
 import sys
 import re
 import sqlalchemy.exc
