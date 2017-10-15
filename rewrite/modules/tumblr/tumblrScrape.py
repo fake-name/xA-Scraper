@@ -137,6 +137,8 @@ class GetTumblr(rewrite.modules.scraper_base.ScraperBase):
 			if isinstance(content, str):
 				content = content.encode(encoding='UTF-8')
 
+
+			self.log.info("Saving file %s to path %s", fName, filePath)
 			with open(filePath, "wb") as fp:								# Open file for saving image (Binary)
 				fp.write(content)						# Write Image to File
 
