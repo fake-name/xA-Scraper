@@ -5,6 +5,7 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_debugtoolbar import DebugToolbarExtension
 from flask_httpauth import HTTPBasicAuth
 import datetime
+import settings
 
 import urllib.parse
 
@@ -23,12 +24,13 @@ auth = HTTPBasicAuth()
 db = SQLAlchemy(app)
 
 
-users = {"herp" : "wattttttt"}
 
 @auth.get_password
 def get_pw(username):
-	if username in users:
-		return users.get(username)
+	if 'web-logins' not in settings.settings:
+		raise RuntimeError("The web login settings have moved to the `settings.py` file. Please see `settings.base.py` for the required changes.")
+	if username in settings.settings['web-logins']:
+		return settings.settings['web-logins'].get(username)
 	return None
 
 

@@ -1,6 +1,13 @@
 
 settings = {
 
+	# Web logins go here.
+	# format is 'username' : 'password',
+	'web-logins' :
+	{
+		"herp" : "wattttttt"
+	},
+
 	"postgres" :
 	{
 		"username" : "pg_username",
