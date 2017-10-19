@@ -69,6 +69,25 @@
 			<h3>Site Fetched Names</h3>
 
 	</div>
+
+
+	<div class="subdiv none_id">
+		<div class="contentdiv">
+
+			<span>
+				<h2 style='display: inline-block' >Note</h2>
+			</span>
+			<ul>
+				<li>Patreon scrape targets are derived from the list of artists you support.</li>
+				<li>Pixiv scraped targets are extracted from the list of artists you follow on pixiv.com.</li>
+				<li>The yiff-party module scrapes all content, and has no filtering facilities.</li>
+			</ul>
+
+
+
+		</div>
+	</div>
+
 	{% for sitename in skeys %}
 		{{ render_artist_list_site(sitename, watched_sorted[sitename]) }}
 	{% endfor %}

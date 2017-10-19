@@ -46,8 +46,16 @@ def watched_names():
 		watched_sorted.setdefault(row.site_name, [])
 		watched_sorted[row.site_name].append(row)
 
+
+
 	skeys = [key for key in watched_sorted.keys()]
 	skeys.sort()
+
+	non_editable_keys = ['pat', 'yp', 'px']
+
+	for bad in non_editable_keys:
+		if bad in skeys:
+			skeys.remove(bad)
 
 	for skey in skeys:
 		watched_sorted[skey].sort(key=lambda r:r.artist_name.lower())
