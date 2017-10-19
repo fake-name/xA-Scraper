@@ -89,3 +89,22 @@ class StatusMixin(metaclass=abc.ABCMeta):
 
 	def getRunningStatus(self, name):
 		return self.getValue(name, "isRunning")
+
+class StatusResetter(StatusMixin):
+
+	db = rewrite.database
+	pluginName = None
+
+	def __init__(self):
+		super().__init__()
+		self.log = logging.getLogger("Main.StatusMgr")
+
+	def resetRunState(self):
+		with self.db.context_sess() as sess:
+			rows = sess.query(self.db.ScraperStatus).all()
+			for row in rows:
+				if row.is_running:
+					self.log.info("Resetting run-state flag for %s", row.site_name)
+					row.is_running = False
+					sess.commit()
+

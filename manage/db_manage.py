@@ -16,6 +16,7 @@ from sqlalchemy.orm import joinedload
 from sqlalchemy import func
 
 import rewrite.database as db
+import rewrite.status_monitor
 
 def move_delete_files(sess, from_p, to_p):
 
@@ -44,6 +45,11 @@ def move_delete_files(sess, from_p, to_p):
 				sess.delete(item)
 
 	sess.commit()
+
+def reset_run_state():
+
+	resetter = rewrite.status_monitor.StatusResetter()
+	resetter.resetRunState()
 
 def move_delete_tags(sess, from_p, to_p):
 

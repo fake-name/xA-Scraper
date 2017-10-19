@@ -469,7 +469,7 @@ class ScraperBase(module_base.ModuleBase, metaclass=abc.ABCMeta):
 		is_another_active = self.getRunningStatus(self.settingsDictKey)
 
 		if is_another_active:
-			self.log.error("Another instance of the tumblr scraper is running.")
+			self.log.error("Another instance of the %s scraper is running.", self.targetShortName)
 			self.log.error("Not starting")
 			return
 		try:

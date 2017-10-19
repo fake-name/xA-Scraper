@@ -10,6 +10,7 @@ import multiprocessing
 import multiprocessing.managers
 import threading
 import logSetup
+import rewrite.status_monitor
 
 from apscheduler.schedulers.background import BackgroundScheduler
 
@@ -106,6 +107,11 @@ def scheduleJobs(sched, managedNamespace):
 
 def go(managedNamespace):
 	print("Go()")
+
+
+	resetter = rewrite.status_monitor.StatusResetter()
+	resetter.resetRunState()
+
 	# statusMgr = manage.statusDbManager.StatusResource()
 	managedNamespace.run = True
 	managedNamespace.serverRun = True

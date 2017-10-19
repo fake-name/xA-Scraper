@@ -27,6 +27,8 @@ def one_arg_go(command):
 		db_manage.db_name_clean()
 	elif command == 'db-misrelink-clean':
 		db_manage.db_misrelink_clean()
+	elif command == 'reset-run-state':
+		db_manage.reset_run_state()
 	else:
 		cli_utils.print_help()
 
