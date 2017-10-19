@@ -137,6 +137,13 @@ def error_page(error_title, error_message):
 @app.route('/index', methods=['GET'])
 @auth.login_required
 def index(pagenum=1):
+
+	if pagenum == 1 and 'page' in request.args:
+		try:
+			pagenum = int(request.args['page'])
+		except ValueError:
+			pass
+
 	source_list = get_source_list()
 	release_table = aggregate_table(page=pagenum)
 
