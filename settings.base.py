@@ -28,7 +28,6 @@ settings = {
 	},
 
 	"webCtntPath" : "absolute_path_to_this_repo/Content/",
-	"runThreads"  : 8,
 	"dldCtntPath" : "absolute_path_downloads_will_go_here",
 
 	# These are built by the little script at the bottom of the file.

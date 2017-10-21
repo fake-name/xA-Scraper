@@ -48,7 +48,9 @@ def watched_names():
 
 
 
-	skeys = [key for key in watched_sorted.keys()]
+	skeys = [key for key in watched_sorted.keys()] + ["da", "fa", "hf", "ib", "wy", "as", "sf"]
+	skeys = list(set(skeys))
+
 	skeys.sort()
 
 	non_editable_keys = ['pat', 'yp', 'px']
