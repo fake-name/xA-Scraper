@@ -60,6 +60,7 @@ def watched_names():
 			skeys.remove(bad)
 
 	for skey in skeys:
+		watched_sorted.setdefault(skey, [])
 		watched_sorted[skey].sort(key=lambda r:r.artist_name.lower())
 
 	return render_template('watched-names-editor.html',
