@@ -24,7 +24,7 @@ class GetFA(rewrite.modules.scraper_base.ScraperBase, util.captcha2upload.Captch
 
 	ovwMode = "Check Files"
 
-	numThreads = 3
+	numThreads = 1
 
 
 
