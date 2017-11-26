@@ -26,7 +26,7 @@ class GetTumblr(rewrite.modules.scraper_base.ScraperBase):
 
 	ovwMode = "Check Files"
 
-	numThreads = 2
+	numThreads = 5
 
 
 
@@ -229,11 +229,6 @@ class GetTumblr(rewrite.modules.scraper_base.ScraperBase):
 			self.log.info("Pages for %s remaining = %s", artist, len(artPages))
 			if ctrlNamespace.run == False:
 				break
-
-
-
-
-
 
 		# self._updatePreviouslyRetreived(artist, tmp)
 
