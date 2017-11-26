@@ -3,6 +3,8 @@ import os
 import os.path
 import traceback
 import urllib.parse
+import concurrent.futures
+import datetime
 from settings import settings
 from tumblpy import Tumblpy
 
@@ -237,3 +239,67 @@ class GetTumblr(rewrite.modules.scraper_base.ScraperBase):
 
 		self.log.info("Successfully retreived content for artist %s", artist)
 		return False
+
+
+	@classmethod
+	def get_artist_proc(cls, aName, ctrlNamespace):
+		try:
+			clsinstance = cls()
+			return clsinstance.getArtist(artist=aName, ctrlNamespace=ctrlNamespace)
+		except Exception:
+			traceback.print_exc()
+			return True
+
+	def go(self, nameList=None, ctrlNamespace=None):
+		if ctrlNamespace is None:
+			raise ValueError("You need to specify a namespace!")
+		is_another_active = self.getRunningStatus(self.settingsDictKey)
+
+		if is_another_active:
+			self.log.error("Another instance of the %s scraper is running.", self.targetShortName)
+			self.log.error("Not starting")
+			return
+		try:
+			self.updateRunningStatus(self.settingsDictKey, True)
+			startTime = datetime.datetime.now()
+			self.updateLastRunStartTime(self.settingsDictKey, startTime)
+
+			if not nameList:
+				nameList = self.getNameList()
+
+			haveCookie, dummy_message = self.checkCookie()
+			if not haveCookie:
+				self.log.info("Do not have login cookie. Retreiving one now.")
+				cookieStatus = self.getCookie()
+				self.log.info("Login attempt status = %s.", cookieStatus)
+
+			haveCookie, dummy_message = self.checkCookie()
+			if not haveCookie:
+				self.log.critical("Failed to download cookie! Exiting!")
+				return False
+
+
+			errored = False
+
+			# Farm out requests to the thread-pool
+			with concurrent.futures.ProcessPoolExecutor(max_workers=self.numThreads) as executor:
+
+				future_to_url = {}
+				for aId, aName in nameList:
+					future_to_url[executor.submit(GetTumblr.get_artist_proc, aName, ctrlNamespace)] = aName
+
+				for future in concurrent.futures.as_completed(future_to_url):
+					# aName = future_to_url[future]
+					# res = future.result()
+					errored  |= future.result()
+					# self.log.info("Return = %s, aName = %s, errored = %s" % (res, aName, errored))
+
+			if errored:
+				self.log.warn("Had errors!")
+
+			runTime = datetime.datetime.now()-startTime
+			self.updateLastRunDuration(self.settingsDictKey, runTime)
+
+		finally:
+			self.updateRunningStatus(self.settingsDictKey, False)
+
