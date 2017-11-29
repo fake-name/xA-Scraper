@@ -20,7 +20,7 @@ from sqlalchemy.schema import UniqueConstraint
 
 import datetime
 from sqlalchemy.types import Enum
-from sqlalchemy.types import JSON
+import sqlalchemy_jsonfield
 
 
 
@@ -47,7 +47,7 @@ class ArtItem(Base):
 
 	title               = Column(Text)
 	content             = Column(Text)
-	content_structured  = Column(JSON)
+	content_structured  = Column(sqlalchemy_jsonfield.JSONField())
 
 	artist         = relationship("ScrapeTargets")
 	files          = relationship("ArtFile")
@@ -99,7 +99,7 @@ class ScrapeTargets(Base):
 	uploadeh        = Column(Boolean,  index = True, default=False, nullable=True)
 	last_fetched    = Column(DateTime, nullable=False, default=datetime.datetime.min)
 
-	extra_meta      = Column(JSON)
+	extra_meta      = Column(sqlalchemy_jsonfield.JSONField())
 
 	release_cnt     = Column(Integer, default='0')
 

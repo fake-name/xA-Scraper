@@ -46,10 +46,12 @@ def get_engine():
 			# waiting on the lock.
 			if csid in ENGINES:
 				return ENGINES[csid]
-
+			iso_level = "REPEATABLE READ"
+			if SQLALCHEMY_DATABASE_URI.startswith("sqlite://"):
+				iso_level = 'SERIALIZABLE'
 			print("INFO: Creating engine for process! Engine name: '%s'" % csid)
 			ENGINES[csid] = create_engine(SQLALCHEMY_DATABASE_URI,
-						isolation_level="REPEATABLE READ")
+						isolation_level=iso_level)
 						# isolation_level="READ COMMITTED")
 
 	return ENGINES[csid]

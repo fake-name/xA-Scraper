@@ -1,6 +1,7 @@
 
 USE_POSTGRESQL = False
 import os.path
+import os
 
 settings = {
 
@@ -199,6 +200,7 @@ if USE_POSTGRESQL:
 		)
 else:
 	SQLALCHEMY_DATABASE_URI = 'sqlite://{db_path}'.format(db_path = settings['sqlite']['sqlite_db_path'])
+	print("Sqlite database path: '%s'" % SQLALCHEMY_DATABASE_URI)
 
 
 
