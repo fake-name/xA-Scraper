@@ -1,5 +1,6 @@
 
 from settings import settings
+from settings import SQLALCHEMY_DATABASE_URI  as C_SQLALCHEMY_DATABASE_URI
 
 
 import os
@@ -32,7 +33,8 @@ class BaseConfig(object):
 	DATABASE_USER          = settings['postgres']["username"]
 	DATABASE_PASS          = settings['postgres']["password"]
 
-	SQLALCHEMY_DATABASE_URI = 'postgresql://{user}:{passwd}@{host}:5432/{database}'.format(user=DATABASE_USER, passwd=DATABASE_PASS, host=DATABASE_IP, database=DATABASE_DB_NAME)
+
+	SQLALCHEMY_DATABASE_URI = C_SQLALCHEMY_DATABASE_URI
 	SQLALCHEMY_MIGRATE_REPO = os.path.join(basedir, 'db_repository')
 
 	CSRF_ENABLED = True

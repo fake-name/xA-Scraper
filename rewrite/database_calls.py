@@ -6,6 +6,7 @@ import threading
 import sqlalchemy.exc
 
 from settings import settings
+from settings import SQLALCHEMY_DATABASE_URI
 
 
 from sqlalchemy import create_engine
@@ -20,23 +21,11 @@ from sqlalchemy.ext.associationproxy import association_proxy
 
 import queue
 
-# from settings import MAX_DB_SESSIONS
-# from settings import DATABASE_IP            as C_DATABASE_IP
-# from settings import DATABASE_DB_NAME       as C_DATABASE_DB_NAME
-# from settings import DATABASE_USER          as C_DATABASE_USER
-# from settings import DATABASE_PASS          as C_DATABASE_PASS
-
 import traceback
 
 # from flask import g
 import flags
 
-SQLALCHEMY_DATABASE_URI = 'postgresql://{user}:{passwd}@{host}:5432/{database}'.format(
-	user     = settings['postgres']['username'],
-	passwd   = settings['postgres']['password'],
-	host     = settings['postgres']['address'],
-	database = settings['postgres']['database']
-	)
 
 
 SESSIONS = {}

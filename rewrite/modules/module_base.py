@@ -33,8 +33,6 @@ class ModuleBase(rewrite.status_monitor.StatusMixin, metaclass=abc.ABCMeta):
 		self.log = logging.getLogger("Main.%s" % self.pluginName)
 		self.wg = WebGetRobust()
 
-
-
 		print("Starting up?")
 
 		super().__init__()

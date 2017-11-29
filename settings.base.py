@@ -1,4 +1,7 @@
 
+USE_POSTGRESQL = False
+import os.path
+
 settings = {
 
 	# Web logins go here.
@@ -8,12 +11,17 @@ settings = {
 		"herp" : "wattttttt"
 	},
 
+	# You only need to set these if USE_POSTGRESQL is set to true.
 	"postgres" :
 	{
 		"username" : "pg_username",
 		"password" : "pg_password",
 		"address"  : "pg_ip_addr",
 		"database" : "pg_database_name",
+	},
+	"sqlite" :
+	{
+		"sqlite_db_path" : os.path.abspath(os.path.join("./", "sqlite_db.db"))
 	},
 
 	"rpc-server" :
@@ -179,6 +187,18 @@ settings = {
 	},
 
 }
+
+
+if USE_POSTGRESQL:
+
+	SQLALCHEMY_DATABASE_URI = 'postgresql://{user}:{passwd}@{host}:5432/{database}'.format(
+		user     = settings['postgres']['username'],
+		passwd   = settings['postgres']['password'],
+		host     = settings['postgres']['address'],
+		database = settings['postgres']['database']
+		)
+else:
+	SQLALCHEMY_DATABASE_URI = 'sqlite://{db_path}'.format(db_path = settings['sqlite']['sqlite_db_path'])
 
 
 

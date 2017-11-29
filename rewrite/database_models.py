@@ -19,12 +19,12 @@ from sqlalchemy.orm import relationship
 from sqlalchemy.schema import UniqueConstraint
 
 import datetime
-from sqlalchemy.dialects.postgresql import ENUM
-from sqlalchemy.dialects.postgresql import JSON
+from sqlalchemy.types import Enum
+from sqlalchemy.types import JSON
 
 
 
-dlstate_enum   = ENUM('new', 'fetching', 'processing', 'complete', 'error', 'removed', 'disabled', 'specialty_deferred', 'specialty_ready', 'not_set', name='dlstate_enum')
+dlstate_enum   = Enum('new', 'fetching', 'processing', 'complete', 'error', 'removed', 'disabled', 'specialty_deferred', 'specialty_ready', 'not_set', name='dlstate_enum')
 
 from sqlalchemy.ext.declarative import declarative_base
 Base = declarative_base()
