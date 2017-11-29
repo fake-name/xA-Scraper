@@ -22,6 +22,13 @@ import datetime
 from sqlalchemy.types import Enum
 import sqlalchemy_jsonfield
 
+from sqlalchemy.ext.compiler import compiles
+
+# This is craptacularly retarded. Sqlite is retarded
+# see https://bitbucket.org/zzzeek/sqlalchemy/issues/2074/map-biginteger-type-to-integer-to-allow
+@compiles(BigInteger, 'sqlite')
+def bi_c(element, compiler, **kw):
+	return "INTEGER"
 
 
 dlstate_enum   = Enum('new', 'fetching', 'processing', 'complete', 'error', 'removed', 'disabled', 'specialty_deferred', 'specialty_ready', 'not_set', name='dlstate_enum')
