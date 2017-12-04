@@ -28,11 +28,6 @@ def get_random(chars):
 
 class BaseConfig(object):
 
-	DATABASE_IP            = settings['postgres']["address"]
-	DATABASE_DB_NAME       = settings['postgres']["database"]
-	DATABASE_USER          = settings['postgres']["username"]
-	DATABASE_PASS          = settings['postgres']["password"]
-
 
 	SQLALCHEMY_DATABASE_URI = C_SQLALCHEMY_DATABASE_URI
 	SQLALCHEMY_MIGRATE_REPO = os.path.join(basedir, 'db_repository')
@@ -60,7 +55,6 @@ class BaseConfig(object):
 	FEED_ITEMS_PER_PAGE = 150
 	SQLALCHEMY_TRACK_MODIFICATIONS = False
 
-	RESOURCE_DIR = settings['webCtntPath']
 
 	# flask-assets
 	# ------------

@@ -71,9 +71,9 @@ def runServer():
 	server = cherrypy._cpserver.Server()
 
 	# Configure the server object
-	server.socket_host = "0.0.0.0"
-	server.socket_port = 6543
-	server.thread_pool = 30
+	server.socket_host = settings['server-conf']['listen-address']
+	server.socket_port = settings['server-conf']['listen-port']
+	server.thread_pool = settings['server-conf']['thread-pool-size']
 
 	server.subscribe()
 

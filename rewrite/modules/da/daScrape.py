@@ -3,9 +3,12 @@ import os
 import os.path
 import traceback
 import re
-import bs4
 import datetime
+import time
 import urllib.request
+
+import bs4
+
 import flags
 from settings import settings
 
@@ -57,13 +60,15 @@ class GetDA(rewrite.modules.scraper_base.ScraperBase):
 		# print(logDict)
 		if not "username" in logDict and "password" in logDict:
 			raise ValueError("Login form structure changed! Don't know how to log in correctly!	")
-		logDict["username"] = settings["da"]["username"]
-		logDict["password"] = settings["da"]["password"]
-		# logDict["ref"]      = 'https://www.deviantart.com/users/loggedin'
+
+		logDict["username"]     = settings["da"]["username"]
+		logDict["password"]     = settings["da"]["password"]
+		# logDict["ref"]          = 'https://www.deviantart.com/'
+		logDict["remember_me"]  = 1
+
+		time.sleep(5)
 
 		pagetext = self.wg.getpage(login_page, postData = logDict, addlHeaders={'Referer':login_page})
-
-		#
 
 		# print pagetext
 		if re.search("The username or password you entered was incorrect", pagetext):

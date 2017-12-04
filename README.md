@@ -30,17 +30,25 @@ it before now.
 
 Dependencies:
 
- - Postgres >= 9.3
+ - Postgres >= 9.3 or Sqlite
  - CherryPy
  - Pyramid
  - Mako
  - BeautifulSoup 4
  - others
 
-DB setup is left to the user. xA-Scraper requires it's own database, and the ability
-to make IP-based connections to the hosting PG instance. The connection information,
-DB name, and client name must be set by copying settings.base.py to settings.py,
+The backend can either use a local sqlite database (which has poor performance, particularly
+when cold, but is *very* easy to set up), or a full postgresql instance.
+
+DB Backend is selected via the `USE_POSTGRESQL` parameter in `settings.py`. 
+
+If using postgre, DB setup is left to the user. xA-Scraper requires it's own database, 
+and the ability to make IP-based connections to the hosting PG instance. The connection 
+information, DB name, and client name must be set by copying settings.base.py to `settings.py`,
 and updating the appropriate strings. 
+
+When using sqlite, you just have to specify the path to where you want the sqlite db to
+be located (or you can use the default, which is `./sqlite_db.db`).
 
 `settings.py` is also where the login information for the various plugins goes.
 
@@ -54,24 +62,28 @@ python3-dev libz-dev), and then install all the required python modules in a loc
 virtualenv. Additonally, it checks if the virtualenv is present, so once it's created,
 `./run.sh` will just source the venv, and run the scraper witout any reinstallation.
 
-Currently, there are some aspects that need work. The artist selection system is currently a bit broken, as I was
-in the process of converting it from being based on text-files to being stored in the database. Currently, there isn't a clean way to remove artists from the scrape list, though you can add or modify them.
+Currently, there are some aspects that need work. The artist selection system is currently a bit 
+broken. Currently, there isn't a clean way to remove artists from the scrape list, though you can 
+add or modify them.
 
-The Yiff-Party scraper requires significant external infrastructure, as it currently depends on
+
+## Notes:  
+
+ - The Yiff-Party scraper requires significant external infrastructure, as it currently depends on
 threading it's fetch requests through my [autotriever](https://github.com/fake-name/AutoTriever)
 project. This depends on having both a publically available RabbitMQ instance, and 
-an executing instance of the FetchAgent components of the [ReadableWebProxy](https://github.com/fake-name/ReadableWebProxy) fetch-agent RPC service on your local LAN.
+an executing instance of the FetchAgent components of the [ReadableWebProxy](https://github.com/fake-name/ReadableWebProxy) 
+fetch-agent RPC service on your local LAN.
 
-## Note:  
+ -FurAffinity has a login captcha. This requires you either manually log the FA scraper in 
+(via the "Manual FA Login" facility in the web-interface), or you can use a automated captcha service.
+Currently, the only solver service supported is the [2Captcha service](https://2captcha.com/).
 
-**This is my oldest "maintained" project, and the codebase is commensuarately *horrible*.
+ - **This is my oldest "maintained" project, and the codebase is commensuarately *horrible*.
 Portions of it were designed and written while I was still learning python, so there
 are a bunch of really terrible design decisons baked into the class structure, and 
 much of the code just does stupid things.**
 
-Since it works, I haven't been able to muster the energy for a rewrite. The newer
-plugins are much better implemented, though the design constraints still place some
-limits on the structure.
 
 ---
 

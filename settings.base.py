@@ -12,6 +12,13 @@ settings = {
 		"herp" : "wattttttt"
 	},
 
+	'server-conf' :
+	{
+		'listen-address'      : "0.0.0.0",
+		'listen-port'         : 6543,
+		'thread-pool-size'    : 20,
+	},
+
 	# You only need to set these if USE_POSTGRESQL is set to true.
 	"postgres" :
 	{
@@ -19,7 +26,13 @@ settings = {
 		"password" : "pg_password",
 		"address"  : "pg_ip_addr",
 		"database" : "pg_database_name",
+
+
+		# 'import_db'      : 'ttrss',
+		# 'import_db_user' : 'ttrss_readable_user',
+		# 'import_db_pass' : 'ttrss_user_pw',
 	},
+
 	"sqlite" :
 	{
 		"sqlite_db_path" : os.path.abspath(os.path.join("./", "sqlite_db.db"))
@@ -36,7 +49,6 @@ settings = {
 		"2Captcha-API-key" : '<key goes here>',
 	},
 
-	"webCtntPath" : "absolute_path_to_this_repo/Content/",
 	"dldCtntPath" : "absolute_path_downloads_will_go_here",
 
 	# These are built by the little script at the bottom of the file.

@@ -619,7 +619,7 @@ class WebGetRobust:
 				except urllib.error.HTTPError as e:								# Lotta logging
 					self.log.warning("Error opening page: %s at %s On Attempt %s.", pgreq.get_full_url(), time.ctime(time.time()), retryCount)
 					self.log.warning("Error Code: %s", e)
-					# print("Error content: ", e.fp.read())
+					print("Error content: ", e.fp.read())
 					#traceback.print_exc()
 					lastErr = e
 					try:
