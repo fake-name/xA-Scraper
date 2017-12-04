@@ -43,15 +43,16 @@ def buildjob(
 		):
 
 	job = {
-			'call'         : call,
-			'module'       : module,
-			'args'         : args,
-			'kwargs'       : kwargs,
-			'extradat'     : additionalData,
-			'jobid'        : jobid,
-			'dispatch_key' : dispatchKey,
-			'postDelay'    : postDelay,
-			'serialize'    : True,
+			'call'                 : call,
+			'module'               : module,
+			'args'                 : args,
+			'kwargs'               : kwargs,
+			'extradat'             : additionalData,
+			'jobid'                : jobid,
+			'dispatch_key'         : dispatchKey,
+			'postDelay'            : postDelay,
+			'serialize'            : True,
+			'response_routing_key' : 'lowrate_response',
 		}
 	if unique_id is not None:
 		job['unique_id'] = unique_id
