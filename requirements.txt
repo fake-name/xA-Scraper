@@ -32,7 +32,7 @@ flask-sqlalchemy==2.3.2
 flask-debugtoolbar==0.10.1
 flask-markdown==0.3
 dateparser==0.6.0
-markdown==2.6.9
+markdown==2.6.10
 flask_login==0.4.1
 psycopg2==2.7.3.2
 flask_csrf==0.9.2
