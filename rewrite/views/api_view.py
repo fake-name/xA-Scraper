@@ -51,7 +51,7 @@ def add_artist_name(params):
 	assert params['add']    == 'True',            "Wrong add-artist name"
 	assert params['mode']   == 'add-artist-name', "Wrong add-artist name"
 
-	allowed_modes = [tmp[-1] for tmp in main.JOBS]
+	allowed_modes = [tmp[-1] for tmp in main.JOBS] + [tmp[-1] for tmp in main.JOBS_DISABLED]
 	assert params['site'] in allowed_modes, "Site %s not in available modes: %s" % (params['site'], allowed_modes)
 
 

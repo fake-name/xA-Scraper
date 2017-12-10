@@ -341,13 +341,13 @@ class ScraperBase(module_base.ModuleBase, metaclass=abc.ABCMeta):
 	# ---------------------------------------------------------------------------------------------------------------------------------------------------------
 
 	def _load_art(self, artist):
+		aid = self._artist_name_to_rid(artist)
 		try:
 			totalArt = self._getTotalArtCount(artist)
 		except exceptions.AccountDisabledException:
 			return []
 
 		artPages = self._getGalleries(artist)
-		aid = self._artist_name_to_rid(artist)
 
 		if totalArt is None:
 			self.log.info("Site does not support total art counts. Found total gallery items %s", len(artPages))

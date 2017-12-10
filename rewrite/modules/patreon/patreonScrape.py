@@ -5,6 +5,7 @@ import traceback
 import datetime
 import pytz
 import dateutil.parser
+import bs4
 import urllib.parse
 import json
 import pprint
@@ -87,7 +88,6 @@ class GetPatreon(rewrite.modules.scraper_base.ScraperBase):
 		else:
 			apikey = ""
 
-		print("")
 		content = self.wg.getpage("https://api.patreon.com{endpoint}{api}".format(endpoint=endpoint, api=apikey),
 			addlHeaders={
 				"Accept"          : "application/json, text/plain, */*",
@@ -95,6 +95,34 @@ class GetPatreon(rewrite.modules.scraper_base.ScraperBase):
 				"Origin"          : "https://www.patreon.com",
 				"Host"            : "api.patreon.com",
 				"Content-Type"    : "application/json; charset=UTF-8",
+				"Accept-Encoding" : "gzip, deflate",
+				"Pragma"          : "no-cache",
+				"Cache-Control"   : "no-cache",
+				},
+			postData = postData,
+			retryQuantity = retries)
+
+		if content is None:
+			self.log.error("Couldn't login! Please check username and password!")
+			raise LoginFailure("Failed to login. Please check your username and password are correct!")
+
+		content = content.decode("utf-8")
+		vals = json.loads(content)
+		return vals
+
+	def get_new_json(self, endpoint, postData = None, retries=3):
+		if postData:
+			postData = {"data" : postData}
+			postData = json.dumps(postData, sort_keys=True)
+
+		print("")
+		content = self.wg.getpage("https://www.patreon.com/api/{endpoint}".format(endpoint=endpoint),
+			addlHeaders={
+				"Accept"          : "application/json, text/plain, */*",
+				"Referer"         : "https://www.patreon.com/login",
+				"Origin"          : "https://www.patreon.com",
+				"Host"            : "www.patreon.com",
+				"Content-Type"    : "application/json",
 				"Accept-Encoding" : "gzip, deflate",
 				"Pragma"          : "no-cache",
 				"Cache-Control"   : "no-cache",
@@ -207,10 +235,7 @@ class GetPatreon(rewrite.modules.scraper_base.ScraperBase):
 
 		raise ValueError("Wat?")
 
-
-	def _getArtPage(self, postId, artistName):
-
-
+	def _get_art_post(self, postId, artistName):
 		post = self.get_json("/posts/{pid}".format(pid=postId), apikey=True)
 
 
@@ -235,6 +260,8 @@ class GetPatreon(rewrite.modules.scraper_base.ScraperBase):
 
 		# print("Post:")
 		# pprint.pprint(post)
+		# print("Content:")
+		# pprint.pprint(post_info['content'])
 
 		files = []
 		try:
@@ -254,8 +281,22 @@ class GetPatreon(rewrite.modules.scraper_base.ScraperBase):
 				fpath = self.save_attachment(artistName, postId, dat_struct)
 				files.append(fpath)
 
+
+
+
 		except urllib.error.URLError:
 			self.log.error("Failure retreiving content from post: %s", post)
+
+
+		ctnt_soup = bs4.BeautifulSoup(post_info['content'], 'lxml')
+		for img in ctnt_soup.find_all("img", src=True):
+
+			furl = img['src']
+			fparsed = urllib.parse.urlparse(furl)
+			fname = fparsed.path.split("/")[-1]
+			fpath = self.save_image(artistName, postId, fname, furl)
+			files.append(fpath)
+
 
 		if len(files):
 			self.log.info("Found %s images/attachments on post.", len(attachments))
@@ -269,27 +310,38 @@ class GetPatreon(rewrite.modules.scraper_base.ScraperBase):
 
 		# pprint.pprint(ret)
 		return ret
+	def _getArtPage(self, post_meta, artistName):
+		item_type, postid = post_meta
 
-	def _load_art(self, campaign_id, artist_raw):
+		if item_type == 'post':
+			return self._get_art_post(postid, artistName)
+		else:
+			self.log.error("Unknown post type: '%s'", item_type)
+			raise RuntimeError("Wat?")
 
-		artPages = self.get_campaign_posts(campaign_id)
-
+	def _load_art(self, patreon_aid, artist_raw):
 		aid = self._artist_name_to_rid(artist_raw)
+
+		artPages = self.get_campaign_posts(patreon_aid)
+
 
 		self.log.info("Total gallery items %s", len(artPages))
 
 		new = 0
 		with self.db.context_sess() as sess:
 			for item in artPages:
-				new += self._upsert_if_new(sess, aid, item)
+				item_json = json.dumps(item, sort_keys=True)
+				new += self._upsert_if_new(sess, aid, item_json)
 
 		self.log.info("%s new art pages, %s total", new, len(artPages))
 
-		# oldArt = self._getPreviouslyRetreived(artist)
-		# newArt = artPages - oldArt
-		# self.log.info("Old art items = %s, newItems = %s", len(oldArt), len(newArt))
+		oldArt = self._getPreviouslyRetreived(artist_raw)
+		newArt = artPages - oldArt
+		self.log.info("Old art items = %s, newItems = %s", len(oldArt), len(newArt))
 
-		return self._getNewToRetreive(aid=aid)
+		new_raw = self._getNewToRetreive(aid=aid)
+
+		return [json.loads(tmp) for tmp in new_raw]
 
 	def getArtist(self, artist_undecoded, ctrlNamespace):
 		artist_decoded = json.loads(artist_undecoded)
@@ -307,7 +359,7 @@ class GetPatreon(rewrite.modules.scraper_base.ScraperBase):
 			if 'campaign' in artist_meta and artist_meta['campaign']['data']['type'] == 'campaign':
 				campaign_id = artist_meta['campaign']['data']['id']
 
-				newArt = self._load_art(campaign_id, artist_undecoded)
+				newArt = self._load_art(patreon_aid, artist_undecoded)
 			else:
 				newArt = []
 
@@ -332,7 +384,7 @@ class GetPatreon(rewrite.modules.scraper_base.ScraperBase):
 							self._updatePreviouslyRetreived(
 									artist=artist_undecoded,
 									state='complete',
-									release_meta=postid,
+									release_meta=json.dumps(postid),
 									fqDlPath=item,
 									pageDesc=ret['page_desc'],
 									pageTitle=ret['page_title'],
@@ -408,12 +460,7 @@ class GetPatreon(rewrite.modules.scraper_base.ScraperBase):
 					sess.add(self.db.ScrapeTargets(site_name=self.targetShortName, artist_name=name))
 					sess.commit()
 
-
 		return super().getNameList()
-
-
-
-
 
 
 
@@ -421,32 +468,54 @@ class GetPatreon(rewrite.modules.scraper_base.ScraperBase):
 	# Gallery Scraping
 	# ---------------------------------------------------------------------------------------------------------------------------------------------------------
 
-
-
-	def get_campaign_posts(self, cid, count=10):
+	def get_campaign_posts(self, patreon_aid, count=10):
 		now = datetime.datetime.utcnow().replace(tzinfo = pytz.utc).replace(microsecond=0)
 
 		postids = set()
-		while 1:
-			self.log.info("iterating over listing of campaign posts.")
-			current = self.get_json("/campaigns/{cid}/posts?filter[is_by_creator]=true&page[count]={count}&use-defaults-for-included-resources=false".format(cid=cid, count=count) +
-				"&fields[post]=published_at" +
+		types = ['posts', 'poll']
+		while True:
+			current = self.get_new_json("stream?" +
+				"include=recent_comments.commenter%2Crecent_comments.parent%2Crecent_comments.post%2Crecent_comments.first_reply.commenter%2Crecent_comments.first_reply.parent%2Crecent_comments.first_reply.post" +
+				"&fields[post]=change_visibility_at%2Ccomment_count%2Ccontent%2Ccurrent_user_can_delete%2Ccurrent_user_can_view%2Ccurrent_user_has_liked%2Cearly_access_min_cents%2Cembed%2Cimage%2Cis_paid%2Clike_count%2Cmin_cents_pledged_to_view%2Cpost_file%2Cpublished_at%2Cpatron_count%2Cpatreon_url%2Cpost_type%2Cpledge_url%2Cthumbnail_url%2Ctitle%2Cupgrade_url%2Curl" +
+				"&fields[user]=image_url%2Cfull_name%2Curl" +
+				"&fields[campaign]=earnings_visibility" +
 				"&page[cursor]={now}".format(now=str(now.isoformat())) +
-				"&fields[post]=comment_count&json-api-version=1.0", apikey=False)
+				"&filter[is_by_creator]=true" +
+				"&filter[is_following]=false" +
+				"&filter[creator_id]={patreon_aid}".format(patreon_aid=patreon_aid) +
+				"&filter[contains_exclusive_posts]=true" +
+				"&json-api-use-default-includes=false" +
+				"&json-api-version=1.0" +
+				"&fields[comment]=body%2Ccreated%2Cdeleted_at%2Cis_by_patron%2Cis_by_creator%2Cvote_sum%2Ccurrent_user_vote%2Creply_count" +
+				"&fields[post]=comment_count" +
+				"&fields[user]=image_url%2Cfull_name%2Curl" +
+				""
+				)
 
 			had_post = False
-			for post in current['data']:
-				if post['type'] != "post":
-					continue
-				postdate = dateutil.parser.parse(post['attributes']['published_at'])
-				postid   = post['id']
+			for release in current['data']:
+				if release['type'] == "post" or release['type'] == "poll":
+					postdate = dateutil.parser.parse(release['attributes']['published_at'])
+					postid   = release['id']
 
-				if postdate < now:
-					now = postdate
-				if not postid in postids:
-					postids.add(postid)
-					had_post = True
+					if postdate < now:
+						now = postdate
 
+
+					post_tup = (release['type'], postid)
+					if not post_tup in postids:
+						postids.add(post_tup)
+						had_post = True
+
+					if release['type'] != "post":
+						self.log.warning("Non post release!")
+				else:
+					self.log.warning("Unknown type!")
+					for line in pprint.pformat(release).split("\n"):
+						self.log.warning(line)
+
+
+			self.log.info("iterating over listing of campaign posts. Found %s so far, have new: %s.", len(postids), had_post)
 			if not had_post:
 				break
 
@@ -478,13 +547,13 @@ if __name__ == '__main__':
 	# nl = ins.getCookie()
 	# nl = ins.getNameList()
 
-	ins.go(ctrlNamespace=namespace)
+	# ins.go(ctrlNamespace=namespace)
 
 	# print(nl)
 	# print(ins)
 	# print("Instance: ", ins)
 	# dlPathBase, artPageUrl, artistName
-	# ins.getArtist('["191466", ["Dan Shive", {"campaign": {"links": {"related": "https://www.patreon.com/api/campaigns/96494"}, "data": {"type": "campaign", "id": "96494"}}}]]', 'testtt')
+	# ins.getArtist('["191466", ["Dan Shive", {"campaign": {"links": {"related": "https://www.patreon.com/api/campaigns/96494"}, "data": {"type": "campaign", "id": "96494"}}}]]', ctrlNamespace=namespace)
 
 	# ins._fetch_retrier(13131994, "Dan Shive")
 	# ins.getArtist('["191466", ["Dan Shive", {"campaign": {"links": {"related": "https://www.patreon.com/api/campaigns/96494"}, "data": {"type": "campaign", "id": "96494"}}}]]', namespace)

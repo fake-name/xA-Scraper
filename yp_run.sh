@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 
 # source venv/bin/activate
-# python3 -m rewrite.modules.yiff_party.yiff_scrape
+
+python3 -m rewrite.modules.yiff_party.yiff_scrape drain
+python3 -m rewrite.modules.yiff_party.yiff_scrape
 
 
 until python3 -m rewrite.modules.yiff_party.yiff_scrape drain; do

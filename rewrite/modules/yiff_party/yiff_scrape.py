@@ -486,9 +486,8 @@ class GetYp(rewrite.modules.scraper_base.ScraperBase, rewrite.modules.rpc_base.R
 	def do_fetch_by_aids(self, aids):
 
 		jobids = [self.trigger_fetch(aid) for aid in aids]
-		resp_iterator = self.process_response_items(jobids, True)
 
-		for resp in resp_iterator:
+		for resp in self.process_response_items(jobids, True):
 			self.log.info("Processing response chunk.")
 			self.process_retry(resp)
 		self.log.info("do_fetch_by_aids has completed")
