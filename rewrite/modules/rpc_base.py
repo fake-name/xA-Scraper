@@ -78,17 +78,11 @@ class RemoteJobInterface(log_base.LoggerMixin):
 				if x > 3:
 					raise e
 
-	def __del__(self):
-		if hasattr(self, 'rpc_client'):
-			self.rpc_client.call('close', ) # Closes the socket 's' also
-
 	def get_job(self):
 		try:
-			print("Get job")
 			j = self.rpc_client.call('getJob', self.interfacename)
 			return j
 		except Exception as e:
-			print("Failed to get job")
 			raise e
 
 	def get_job_nowait(self):
@@ -237,13 +231,3 @@ class RpcMixin():
 			self.rpc_interface = RemoteJobInterface("XA-RPC-Fetcher", settings['rpc-server']['address'], settings['rpc-server']['port'])
 
 
-
-	def __del__(self):
-		try:
-			self.rpc_interface.close()
-		except Exception:
-			pass
-		try:
-			del self.rpc_interface
-		except Exception:
-			pass

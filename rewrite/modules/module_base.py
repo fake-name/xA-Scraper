@@ -37,9 +37,6 @@ class ModuleBase(rewrite.status_monitor.StatusMixin, metaclass=abc.ABCMeta):
 
 		super().__init__()
 
-	def __del__(self):
-		self.log.info("Unoading %s" % self.pluginName)
-
 
 	# ---------------------------------------------------------------------------------------------------------------------------------------------------------
 	# Messy hack to do log indirection so I can inject thread info into log statements, and give each thread it's own DB handle

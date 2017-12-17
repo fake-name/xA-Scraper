@@ -567,7 +567,8 @@ if __name__ == '__main__':
 		print(ins)
 		print("Instance: ", ins)
 		# ins.go(ctrlNamespace=flags.namespace, update_namelist=True)
-		ins.go(ctrlNamespace=flags.namespace, update_namelist=False)
+		update_nl = not "drain" in sys.argv
+		ins.go(ctrlNamespace=flags.namespace, update_namelist=update_nl)
 		# ret = ins.do_fetch_by_aid(3745)
 		# ret = ins.do_fetch_by_aid(5688)
 		# ret = ins.do_fetch_by_aid(5071)

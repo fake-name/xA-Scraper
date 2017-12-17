@@ -29,7 +29,7 @@ class GetPatreon(rewrite.modules.scraper_base.ScraperBase):
 
 	ovwMode = "Check Files"
 
-	numThreads = 3
+	numThreads = 1
 
 	# Stubbed functions
 	_getGalleries = None
@@ -249,7 +249,9 @@ class GetPatreon(rewrite.modules.scraper_base.ScraperBase):
 			for tagmeta in post_content['relationships']['user_defined_tags']['data']:
 				tags.append(tagmeta['id'].split(";")[-1])
 
-		# pprint.pprint(post_content['relationships'])
+
+		# if not 'content' in post_info:
+		pprint.pprint(post_content)
 
 		ret = {
 			'page_desc'  : post_info['content'],
