@@ -168,7 +168,7 @@ class GetYp(rewrite.modules.scraper_base.ScraperBase, rewrite.modules.rpc_base.R
 						raise RpcExceptionError("RPC Call has no ret value. Probably encountered a remote exception: %s" % ret)
 
 			time.sleep(1)
-			print("\r`fetch_and_flush` sleeping for {}\r".format(str((timeout)).rjust(4)), end='')
+			print("\r`fetch_and_flush` sleeping for {}\r".format(str((timeout)).rjust(4)), end='', flush=True)
 
 		raise RpcTimeoutError("No RPC Response within timeout period (%s sec)" % self.rpc_timeout_s)
 
@@ -225,8 +225,8 @@ class GetYp(rewrite.modules.scraper_base.ScraperBase, rewrite.modules.rpc_base.R
 		with self.db.context_sess() as sess:
 			res = sess.query(self.db.ScrapeTargets)                                                                \
 				.filter(self.db.ScrapeTargets.site_name == self.targetShortName)                                   \
-				.filter(self.db.ScrapeTargets.last_fetched < datetime.datetime.now() - datetime.timedelta(days=7)) \
 				.all()
+				# .filter(self.db.ScrapeTargets.last_fetched < datetime.datetime.now() - datetime.timedelta(days=7)) \
 
 			ret = [(row.id, row.artist_name) for row in res]
 			sess.commit()
