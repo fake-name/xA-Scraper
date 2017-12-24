@@ -33,8 +33,10 @@ else
 	rm get-pip.py
 	source venv/bin/activate
 	./venv/bin/pip install requests
-	./venv/bin/pip install --upgrade -r requirements.txt
 fi;
+
+echo "Checking dependencies are up-to-date."
+./venv/bin/pip install --upgrade -r requirements.txt
 
 echo "Launching executable."
 python3 db_migrate.py db upgrade
