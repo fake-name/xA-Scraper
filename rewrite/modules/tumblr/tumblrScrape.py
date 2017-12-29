@@ -159,12 +159,11 @@ class GetTumblr(rewrite.modules.scraper_base.ScraperBase):
 
 	def _getGalleries(self, artist):
 
-		artlinks = set()
 		artist = artist.strip()
 
 		baseUrl = self.urlBase.format(user=artist)
 
-		posts = []
+		post_count = 0
 		offset = 0
 		step   = 20
 		while 1:
@@ -173,14 +172,17 @@ class GetTumblr(rewrite.modules.scraper_base.ScraperBase):
 			offset += step
 			if len(addposts['posts']) == 0:
 				break
-			posts.extend(addposts['posts'])
 
-		self.log.info("Found %s links" % (len(posts)))
-		return posts
+			for post in addposts['posts']:
+				yield post
+
+			post_count += 1
+
+		self.log.info("Found %s links", post_count)
+
 
 	def _getTotalArtCount(self):
 		pass
-
 
 
 	def getArtist(self, artist, ctrlNamespace):
@@ -195,13 +197,13 @@ class GetTumblr(rewrite.modules.scraper_base.ScraperBase):
 		self.log.info("GetArtist - %s", artist)
 		self.setupDir(artist)
 
-		artPages = self._getGalleries(artist)
+		# artPages = self._getGalleries(artist)
 
-		oldArt = self._getPreviouslyRetreived(artist)
+		# oldArt = self._getPreviouslyRetreived(artist)
 
 
-		while len(artPages) > 0:
-			post_struct = artPages.pop(0)
+		# while len(artPages) > 0:
+		for post_struct in self._getGalleries(artist):
 			pageURL = post_struct['post_url']
 
 			try:
@@ -226,7 +228,7 @@ class GetTumblr(rewrite.modules.scraper_base.ScraperBase):
 				self.log.error(traceback.format_exc())
 				# self._updateUnableToRetrieve(artist, pageURL)
 
-			self.log.info("Pages for %s remaining = %s", artist, len(artPages))
+			# self.log.info("Pages for %s remaining = %s", artist, len(artPages))
 			if ctrlNamespace.run == False:
 				break
 
@@ -277,7 +279,7 @@ class GetTumblr(rewrite.modules.scraper_base.ScraperBase):
 			errored = False
 
 			# Farm out requests to the thread-pool
-			with concurrent.futures.ProcessPoolExecutor(max_workers=self.numThreads) as executor:
+			with concurrent.futures.ThreadPoolExecutor(max_workers=self.numThreads) as executor:
 
 				future_to_url = {}
 				for aId, aName in nameList:
