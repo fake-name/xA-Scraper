@@ -41,7 +41,9 @@ class GetTumblr(rewrite.modules.scraper_base.ScraperBase):
 
 	def checkCookie(self):
 		# I dunno if this is the "proper" way to check auth, but wth.
-		have_auth = settings['tum']['username'] in self.t.post('user/info')['user']['blogs'][0]['url']
+		tum_url = self.t.post('user/info')['user']['blogs'][0]['url']
+		tum_uname = settings['tum']['username']
+		have_auth = tum_uname.lower() in tum_url.lower()
 		self.log.info("Can access account: %s", have_auth)
 		return have_auth, "Ok"
 
