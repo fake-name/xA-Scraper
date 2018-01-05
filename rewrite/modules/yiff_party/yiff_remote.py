@@ -282,6 +282,7 @@ class RemoteExecClass(object):
 
 	def fetch_file(self, aid, file):
 		self.log.info("Fetching attachment: %s -> %s", aid, file['url'])
+		file['bytes']     = 0
 		try:
 			# So yp provides pre-quoted, but WebGet auto-quotes, so we unquote, so we don't end up with
 			# double-quoted data.
@@ -291,22 +292,33 @@ class RemoteExecClass(object):
 			file['header_fn'] = fname
 			file['fdata']     = filectnt
 			file['skipped']   = False
-			return len(filectnt)
+			file['bytes']     = len(filectnt)
+
+			return file
 
 		# So urllib.error.URLError is also available within urllib.request.
 		except urllib.request.URLError:
-			file['error']   = False
+			self.log.error("URLError in request!")
+			for line in traceback.format_exc().split("\n"):
+				self.log.error("%s", line)
+			file['error']   = True
 			return 0
 		# This is resolved out fully in the remote execution context
 		except WebRequest.Exceptions.FetchFailureError:
-			file['error']   = False
+			self.log.error("FetchFailureError in request!")
+			for line in traceback.format_exc().split("\n"):
+				self.log.error("%s", line)
+			file['error']   = True
 			return 0
 
 		# The serialization env causes some issues here, as it winds up
 		# trying to re-serialize an exception in the logging system.
 		# Anyways, just ignore that.
 		except TypeError:
-			file['error']   = False
+			self.log.error("TypeError in request!")
+			for line in traceback.format_exc().split("\n"):
+				self.log.error("%s", line)
+			file['error']   = True
 			return 0
 
 	def set_skipped(self, releases):
@@ -348,14 +360,21 @@ class RemoteExecClass(object):
 
 			for file in file_list['attachments']:
 				total += 1
+				file['skipped']   = True
+
 				if file['url'] in have_urls:
 					self.log.info("Have file from URL %s, nothing to do", file['url'])
 					file['skipped'] = True
 					skipped += 1
 				else:
-					filesize = self.fetch_file(aid, file)
+					self.fetch_file(aid, file)
+					self.log.info("fetch_file() returned %s bytes, file keys: %s, skipped: %s",
+							file['bytes'],
+							list(file.keys()),
+							file['skipped'] if 'skipped' in file else "unknown"
+						)
 					fetched       += 1
-					fetched_bytes += filesize
+					fetched_bytes += file['bytes']
 
 			self.log.info("Fetched %s bytes of data so far", fetched_bytes)
 			if fetched_bytes > yield_chunk:

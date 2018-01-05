@@ -38,7 +38,7 @@ def batch(iterable, n=1):
 	for ndx in range(0, l, n):
 		yield iterable[ndx:min(ndx + n, l)]
 
-PARALLEL_JOBS = 1
+PARALLEL_JOBS = 3
 
 class GetYp(rewrite.modules.scraper_base.ScraperBase, rewrite.modules.rpc_base.RpcMixin):
 
@@ -146,6 +146,7 @@ class GetYp(rewrite.modules.scraper_base.ScraperBase, rewrite.modules.rpc_base.R
 									yield ret['ret'][1]
 									if 'jobid' in ret and ret['jobid'] in jobids:
 										jobids.remove(ret['jobid'])
+										self.log.info("Last partial received. Response chunking complete.")
 										if len(jobids) == 0:
 											raise StopIteration
 									else:
@@ -219,8 +220,8 @@ class GetYp(rewrite.modules.scraper_base.ScraperBase, rewrite.modules.rpc_base.R
 		self.log.info("Had %s new names, %s with changes since last update.", new, updated)
 
 	def getNameList(self, update_namelist):
-		if update_namelist:
-			self.fetch_update_names()
+		#if update_namelist:
+		#	self.fetch_update_names()
 
 		with self.db.context_sess() as sess:
 			res = sess.query(self.db.ScrapeTargets)                                                                \
@@ -420,7 +421,6 @@ class GetYp(rewrite.modules.scraper_base.ScraperBase, rewrite.modules.rpc_base.R
 						arow.last_fetched = datetime.datetime.now()
 					sess.commit()
 
-					self.log.info("Response processed!")
 					return
 
 			except sqlalchemy.exc.InvalidRequestError:
@@ -566,8 +566,16 @@ if __name__ == '__main__':
 		# ins.getCookie()
 		print(ins)
 		print("Instance: ", ins)
+
+		update_nl = True
+		if "no_namelist" in sys.argv:
+			update_nl = False
+		if "drain" in sys.argv:
+			update_nl = False
+		if not update_nl:
+			print("Not fetching new names from site!")
+
 		# ins.go(ctrlNamespace=flags.namespace, update_namelist=True)
-		update_nl = not "drain" in sys.argv
 		ins.go(ctrlNamespace=flags.namespace, update_namelist=update_nl)
 		# ret = ins.do_fetch_by_aid(3745)
 		# ret = ins.do_fetch_by_aid(5688)
