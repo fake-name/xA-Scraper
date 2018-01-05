@@ -42,7 +42,7 @@ class GetTumblr(rewrite.modules.scraper_base.ScraperBase):
 	def checkCookie(self):
 		# I dunno if this is the "proper" way to check auth, but wth.
 		have_auth = settings['tum']['username'] in self.t.post('user/info')['user']['blogs'][0]['url']
-		self.log.info("Have authentication: %s", have_auth)
+		self.log.info("Can access account: %s", have_auth)
 		return have_auth, "Ok"
 
 
@@ -56,21 +56,7 @@ class GetTumblr(rewrite.modules.scraper_base.ScraperBase):
 		return t
 
 	def getCookie(self):
-		try:
-
-			accessToken = self.getToken()
-
-			#print soup.find_all("input")
-			#print soup
-			if accessToken:
-				return True, "Logged In"
-
-		except:
-			self.log.critical("Caught Error")
-			self.log.critical(traceback.format_exc())
-			traceback.print_exc()
-		return False, "Login Failed"
-
+		pass
 
 
 
@@ -266,13 +252,7 @@ class GetTumblr(rewrite.modules.scraper_base.ScraperBase):
 
 			haveCookie, dummy_message = self.checkCookie()
 			if not haveCookie:
-				self.log.info("Do not have login cookie. Retreiving one now.")
-				cookieStatus = self.getCookie()
-				self.log.info("Login attempt status = %s.", cookieStatus)
-
-			haveCookie, dummy_message = self.checkCookie()
-			if not haveCookie:
-				self.log.critical("Failed to download cookie! Exiting!")
+				self.log.critical("Tumblr Authentication is failing! Are your API keys correct? Cannot continue!")
 				return False
 
 
