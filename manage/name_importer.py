@@ -10,13 +10,15 @@ import os
 
 from rewrite import db
 from rewrite import database
+import rewrite.modules.tumblr.tumblrScrape
 
 from .scrape_manage import PLUGINS
 from . import cli_utils
 
 from settings import settings
 
-class NameImporter(object):
+
+class NameImporter(rewrite.modules.tumblr.tumblrScrape.GetTumblr):
 
 	log = logging.getLogger("Main.NameImporter")
 
@@ -55,6 +57,15 @@ class NameImporter(object):
 		aname = url.netloc.rsplit(".", 2)[0]
 
 		self.checkInsertName("tum", aname)
+
+	def update_names_from_tumblr_followed(self):
+		self.log.info("Updating artists from follows on tumblr.")
+		following = self.t.following()
+		self.log.info( "Following: %s artists on tumblr", len(following))
+		for info in following["blogs"]:
+			name = info["name"]
+			self.checkInsertName("tum", name)
+
 
 	def checkInsertName(self, site, name):
 		have_item = db.session.query(database.ScrapeTargets)    \
