@@ -82,7 +82,10 @@ class GetTumblr(rewrite.modules.scraper_base.ScraperBase):
 
 	def _getArtPage(self, post_struct, artistName):
 
-
+		have = self._checkHaveUrl(artistName, post_struct['post_url'])
+		if have:
+			self.log.info("Have content for url! %s, %s", have, post_struct['post_url'])
+			return
 
 		orga  = post_struct['blog_name']
 		pgurl = post_struct['post_url']
@@ -92,18 +95,12 @@ class GetTumblr(rewrite.modules.scraper_base.ScraperBase):
 		html_tags = "".join(["<div><ul class='tags'>"] +
 			["<li>{tag}</li>".format(tag=tag) for tag in raw_tags] +
 			["</ul></div>"])
-
 		self._updatePreviouslyRetreived(artist=orga, release_meta=pgurl, pageDesc=desc+html_tags, pageTitle=title, postTags=raw_tags)
 
 		if "photos" in post_struct:
 			contenturls = [tmp['original_size']['url'] for tmp in post_struct['photos']]
 		else:
 			raise MissingContentError("Cannot find content!")
-
-		have = self._checkHaveUrl(artistName, pgurl)
-		if have:
-			self.log.info("Have content for url! %s, %s", have, pgurl)
-			return
 
 		dlPathBase = self.getDownloadPath(self.dlBasePath, orga)
 

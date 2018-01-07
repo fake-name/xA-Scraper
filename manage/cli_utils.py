@@ -32,6 +32,8 @@ def print_help():
 	print("		calls, you can do it manually too.")
 	print("	'rss-import'")
 	print("		Import tumblr feeds from a ttrss database instance.")
+	print("	'tumblr-import'")
+	print("		Import the artists you follow on tumblr to your scraped-artists list.")
 	print("	'upgrade-db'")
 	print("		Make any needed schema changes to the database, if needed.")
 	print("	'name-clean'")

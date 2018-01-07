@@ -19,6 +19,10 @@ def one_arg_go(command):
 	if command == "rss-import":
 		importer = name_importer.NameImporter()
 		importer.update_from_tt_rss()
+
+	elif command == "tumblr-import":
+		importer = name_importer.NameImporter()
+		importer.update_names_from_tumblr_followed()
 	elif command == "fetch":
 		do_fetch([])
 	elif command == "fetch-all":
