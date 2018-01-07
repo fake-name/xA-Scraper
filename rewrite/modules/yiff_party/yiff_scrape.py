@@ -51,6 +51,10 @@ class GetYp(rewrite.modules.scraper_base.ScraperBase, rewrite.modules.rpc_base.R
 
 	remote_log = logging.getLogger("Main.RPC.Remote")
 
+	def __init__(self, *args, **kwargs):
+		super().__init__(*args, **kwargs)
+		self.job_map = {}
+
 	# # ---------------------------------------------------------------------------------------------------------------------------------------------------------
 	# # Giant bunch of stubs to shut up the abstract base class
 	# # ---------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -121,6 +125,17 @@ class GetYp(rewrite.modules.scraper_base.ScraperBase, rewrite.modules.rpc_base.R
 
 		return jid
 
+	def __mark_id_complete(self, jobid):
+		if jobid in self.job_map:
+			with self.db.context_sess() as sess:
+				arow = sess.query(self.db.ScrapeTargets).filter(self.db.ScrapeTargets.id == self.job_map[jobid]).one()
+				self.log.info("Marking artist %s as fetched (id: %s)", arow.extra_meta['name'], arow.id)
+				arow.last_fetched = datetime.datetime.now()
+				sess.commit()
+		else:
+			self.log.warning("Job id %s not in job_map. Do not know how to cross-correlate to mark complete response",
+				jobid)
+
 	def process_response_items(self, jobids, expect_partials):
 		self.log.info("Waiting for remote response")
 		timeout = self.rpc_timeout_s
@@ -145,8 +160,14 @@ class GetYp(rewrite.modules.scraper_base.ScraperBase, rewrite.modules.rpc_base.R
 								else:
 									yield ret['ret'][1]
 									if 'jobid' in ret and ret['jobid'] in jobids:
+
+										self.__mark_id_complete(ret['jobid'])
+
 										jobids.remove(ret['jobid'])
-										self.log.info("Last partial received. Response chunking complete.")
+
+										self.log.info("Last partial received for job %s, %s remaining.",
+											ret['jobid'], len(jobids))
+
 										if len(jobids) == 0:
 											raise StopIteration
 									else:
@@ -220,16 +241,17 @@ class GetYp(rewrite.modules.scraper_base.ScraperBase, rewrite.modules.rpc_base.R
 		self.log.info("Had %s new names, %s with changes since last update.", new, updated)
 
 	def getNameList(self, update_namelist):
-		#if update_namelist:
-		#	self.fetch_update_names()
+		if update_namelist:
+			self.fetch_update_names()
 
 		with self.db.context_sess() as sess:
 			res = sess.query(self.db.ScrapeTargets)                                                                \
 				.filter(self.db.ScrapeTargets.site_name == self.targetShortName)                                   \
+				.filter(self.db.ScrapeTargets.last_fetched < datetime.datetime.now() - datetime.timedelta(days=7)) \
 				.all()
-				# .filter(self.db.ScrapeTargets.last_fetched < datetime.datetime.now() - datetime.timedelta(days=7)) \
 
 			ret = [(row.id, row.artist_name) for row in res]
+			random.shuffle(ret)
 			sess.commit()
 		self.log.info("Found %s names to fetch", len(ret))
 		return ret
@@ -430,7 +452,7 @@ class GetYp(rewrite.modules.scraper_base.ScraperBase, rewrite.modules.rpc_base.R
 				if x > 10:
 					raise
 			except sqlalchemy.exc.OperationalError:
-				print("InvalidRequest error!")
+				print("Operational error!")
 				sess.rollback()
 				if x > 10:
 					raise
@@ -446,20 +468,16 @@ class GetYp(rewrite.modules.scraper_base.ScraperBase, rewrite.modules.rpc_base.R
 		for x in range(10):
 			try:
 				self.process_resp(resp)
-				self.log.info("Response processed!")
 				return
-			except sqlalchemy.exc.OperationalError:
-				self.log.error("Failure in process_retry - sqlalchemy.exc.OperationalError")
 			except sqlalchemy.exc.OperationalError:
 				self.log.error("Failure in process_retry - sqlalchemy.exc.OperationalError")
 
 		self.log.error("Failure in process_retry, out of attempts!")
 
 	def trigger_fetch(self, aid):
+
 		with self.db.context_sess() as sess:
 			arow = sess.query(self.db.ScrapeTargets).filter(self.db.ScrapeTargets.id == aid).one()
-			arow.last_fetched = datetime.datetime.now()
-			sess.commit()
 
 		print(arow, arow.id, arow.site_name, arow.artist_name, arow.extra_meta)
 		have = []
@@ -481,6 +499,7 @@ class GetYp(rewrite.modules.scraper_base.ScraperBase, rewrite.modules.rpc_base.R
 					'extra_meta'  : {'aid' : aid},
 				},
 			)
+		self.job_map[jid] = aid
 		return jid
 
 	def do_fetch_by_aids(self, aids):
@@ -490,6 +509,7 @@ class GetYp(rewrite.modules.scraper_base.ScraperBase, rewrite.modules.rpc_base.R
 		for resp in self.process_response_items(jobids, True):
 			self.log.info("Processing response chunk.")
 			self.process_retry(resp)
+			self.log.info("Response chunk processed.")
 		self.log.info("do_fetch_by_aids has completed")
 
 
@@ -561,7 +581,7 @@ if __name__ == '__main__':
 	signal.signal(signal.SIGINT, signal_handler)
 
 	print(sys.argv)
-	if len(sys.argv) == 1 or 'drain' in sys.argv:
+	if len(sys.argv) == 1 or 'drain' in sys.argv or 'no_namelist' in sys.argv:
 		ins = GetYp()
 		# ins.getCookie()
 		print(ins)

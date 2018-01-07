@@ -123,6 +123,7 @@ class RpcMixin():
 
 	def put_outbound_raw(self, raw_job):
 		# Recycle the rpc interface if it ded
+		errors = 0
 		while 1:
 			try:
 				self.rpc_interface.put_job(raw_job)
@@ -131,6 +132,13 @@ class RpcMixin():
 				self.check_open_rpc_interface()
 			except KeyError:
 				self.check_open_rpc_interface()
+			except BrokenPipeError:
+				self.check_open_rpc_interface()
+			except Exception as e:
+				self.check_open_rpc_interface()
+				errors += 1
+				if errors > 5:
+					raise e
 
 
 	def put_outbound_fetch_job(self, jobid, joburl):

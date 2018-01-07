@@ -2,9 +2,9 @@
 
 # source venv/bin/activate
 
-python3 -m rewrite.modules.yiff_party.yiff_scrape drain
-# python3 -m rewrite.modules.yiff_party.yiff_scrape no_namelist
-python3 -m rewrite.modules.yiff_party.yiff_scrape
+# python3 -m rewrite.modules.yiff_party.yiff_scrape drain
+python3 -m rewrite.modules.yiff_party.yiff_scrape no_namelist
+# python3 -m rewrite.modules.yiff_party.yiff_scrape
 
 
 while true;

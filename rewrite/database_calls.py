@@ -1,6 +1,7 @@
 
 import sys
 import multiprocessing
+import logging
 import contextlib
 import threading
 import sqlalchemy.exc
@@ -80,6 +81,8 @@ def release_session(session):
 	POOL.put(session)
 	# print("Returning db handle to pool. Handles available: %s" % (POOL.qsize(), ))
 
+tx_logger = logging.getLogger("Main.DbContext")
+
 @contextlib.contextmanager
 def context_sess():
 	sess = checkout_session()
@@ -90,20 +93,23 @@ def context_sess():
 		sess.commit()
 
 	except sqlalchemy.exc.InvalidRequestError:
-		print("InvalidRequest error!")
-		traceback.print_exc()
+		tx_logger.warning("context_sess() -> InvalidRequest error!")
+		for line in traceback.format_exc().split("\n"):
+			tx_logger.warning(line)
 		sess.rollback()
 		raise
 
 	except sqlalchemy.exc.OperationalError:
-		print("InvalidRequest error!")
-		traceback.print_exc()
+		tx_logger.warning("context_sess() -> InvalidRequest error!")
+		for line in traceback.format_exc().split("\n"):
+			tx_logger.warning(line)
 		sess.rollback()
 		raise
 
 	except sqlalchemy.exc.IntegrityError:
-		print("Integrity error!")
-		traceback.print_exc()
+		tx_logger.warning("context_sess() -> Integrity error!")
+		for line in traceback.format_exc().split("\n"):
+			tx_logger.warning(line)
 		sess.rollback()
 		raise
 
