@@ -135,6 +135,8 @@ class GetTumblr(rewrite.modules.scraper_base.ScraperBase):
 			self._updatePreviouslyRetreived(artist=orga, release_meta=pgurl, fqDlPath=filePath, seqNum=seq)
 			seq += 1
 
+		self._updatePreviouslyRetreived(artist=orga, release_meta=pgurl, state='complete')
+
 
 	# 	raise RuntimeError("How did this ever execute?")
 
