@@ -280,6 +280,10 @@ class RemoteExecClass(object):
 			'files' : files,
 		}
 
+	def getFileAndName_proxy(self, *args, **kwargs):
+		self.log.info("Call proxy: '%s', '%s'", args, kwargs)
+		return self.wg.getFileAndName(*args, **kwargs)
+
 	def fetch_file(self, aid, file):
 		self.log.info("Fetching attachment: %s -> %s", aid, file['url'])
 		file['bytes']     = 0
@@ -287,7 +291,7 @@ class RemoteExecClass(object):
 			# So yp provides pre-quoted, but WebGet auto-quotes, so we unquote, so we don't end up with
 			# double-quoted data.
 			urltmp = urllib.parse.unquote(file['url'])
-			filectnt, fname         = self.wg.getFileAndName(urltmp, addlHeaders={"Referer" : 'https://yiff.party/{}'.format(aid)})
+			filectnt, fname = self.getFileAndName_proxy(urltmp, addlHeaders={"Referer" : 'https://yiff.party/{}'.format(aid)})
 			self.log.info("Filename from request: %s", fname)
 			file['header_fn'] = fname
 			file['fdata']     = filectnt
@@ -337,7 +341,7 @@ class RemoteExecClass(object):
 		self.out_buffer = []
 
 
-	def fetch_files(self, aid, releases, have_urls, yield_chunk, partial_resp_interface):
+	def fetch_files(self, aid, releases, have_urls, yield_chunk, total_fetch_limit, partial_resp_interface):
 		self.log.info("Have %s posts", len(have_urls))
 		process_chunk = copy.deepcopy(releases)
 
@@ -386,13 +390,16 @@ class RemoteExecClass(object):
 				# Rate limiting.
 				time.sleep(60 * 15)
 
+			if total_fetch_limit and fetched > total_fetch_limit:
+				break
+
 		self.log.info("Finished fetch_files step.")
 		self.log.info("Skipped %s files, fetched %s files. %s files total (%s bytes).", skipped, fetched, total, fetched_bytes)
 
 		return process_chunk
 
 
-	def yp_get_content_for_artist(self, aid, have_urls, yield_chunk=16777216, partial_resp_interface=None, extra_meta=None):
+	def yp_get_content_for_artist(self, aid, have_urls, yield_chunk=16777216, total_fetch_limit=None, partial_resp_interface=None, extra_meta=None):
 
 		self.log.info("Getting content for artist: %s", aid)
 		self.log.info("partial_resp_interface: %s", partial_resp_interface)
@@ -413,7 +420,7 @@ class RemoteExecClass(object):
 
 		releases['extra_meta'] = extra_meta
 
-		releases = self.fetch_files(aid, releases, have_urls, yield_chunk, partial_resp_interface)
+		releases = self.fetch_files(aid, releases, have_urls, yield_chunk, total_fetch_limit, partial_resp_interface)
 		# else:
 		self.set_skipped(releases)
 		self.log.info("Content retreival finished.")

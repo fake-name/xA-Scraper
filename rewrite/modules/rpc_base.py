@@ -40,6 +40,7 @@ def buildjob(
 			additionalData = None,
 			postDelay      = 0,
 			unique_id      = None,
+			early_ack      = False,
 		):
 
 	job = {
@@ -53,6 +54,7 @@ def buildjob(
 			'postDelay'            : postDelay,
 			'serialize'            : True,
 			'response_routing_key' : 'lowrate_response',
+			'early_ack'            : early_ack,
 		}
 	if unique_id is not None:
 		job['unique_id'] = unique_id
@@ -156,7 +158,7 @@ class RpcMixin():
 
 		self.put_outbound_raw(raw_job)
 
-	def put_outbound_callable(self, jobid, serialized, meta={}, call_kwargs={}):
+	def put_outbound_callable(self, jobid, serialized, meta={}, call_kwargs={}, early_ack=False):
 		self.log.info("Dispatching new callable job")
 		call_kwargs_out = {'code_struct' : serialized}
 		for key, value in call_kwargs.items():
@@ -170,7 +172,8 @@ class RpcMixin():
 			args           = [],
 			kwargs         = call_kwargs_out,
 			additionalData = meta,
-			postDelay      = 0
+			postDelay      = 0,
+			early_ack      = early_ack,
 		)
 
 		self.put_outbound_raw(raw_job)

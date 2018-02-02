@@ -105,7 +105,7 @@ class GetYp(rewrite.modules.scraper_base.ScraperBase, rewrite.modules.rpc_base.R
 				if key in line and log_call:
 					log_call(line)
 
-	def put_job(self, remote_cls, call_kwargs=None, meta=None):
+	def put_job(self, remote_cls, call_kwargs=None, meta=None, early_ack=False):
 
 		if call_kwargs is None:
 			call_kwargs = {}
@@ -121,7 +121,7 @@ class GetYp(rewrite.modules.scraper_base.ScraperBase, rewrite.modules.rpc_base.R
 			self.check_open_rpc_interface()
 		else:
 			print("Putting job:", jid, call_kwargs)
-			self.put_outbound_callable(jid, scls, call_kwargs=call_kwargs, meta=meta)
+			self.put_outbound_callable(jid, scls, call_kwargs=call_kwargs, meta=meta, early_ack=early_ack)
 
 		return jid
 
@@ -492,12 +492,17 @@ class GetYp(rewrite.modules.scraper_base.ScraperBase, rewrite.modules.rpc_base.R
 		jid = self.put_job(
 			remote_cls      = yiff_remote.RemoteExecClass,
 			call_kwargs     = {
-					'mode'        : 'yp_get_content_for_artist',
-					'aid'         : arow.artist_name,
-					'have_urls'   : have,
-					'yield_chunk' : 1024 * 1024 * 64,
-					'extra_meta'  : {'aid' : aid},
+					'mode'              : 'yp_get_content_for_artist',
+					'aid'               : arow.artist_name,
+					'have_urls'         : have,
+					'yield_chunk'       : 1024 * 1024 * 64,
+
+					# Total chunk limit so things don't fetch for so long the VM rollover causes them to be reset.
+					'total_fetch_limit' : 1024 * 1024 * 2048,
+
+					'extra_meta'        : {'aid' : aid},
 				},
+			early_ack       = True,
 			)
 		self.job_map[jid] = aid
 		return jid
