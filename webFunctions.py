@@ -313,6 +313,8 @@ class WebGetRobust:
 
 		kwargs["returnMultiple"] = True
 
+		self.log.info("Call for getFileAndName -> '%s', '%s'", args, kwargs)
+
 		pgctnt, pghandle = self.getpage(*args, **kwargs)
 
 		info = pghandle.info()

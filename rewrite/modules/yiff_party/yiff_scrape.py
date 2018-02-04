@@ -38,7 +38,7 @@ def batch(iterable, n=1):
 	for ndx in range(0, l, n):
 		yield iterable[ndx:min(ndx + n, l)]
 
-PARALLEL_JOBS = 3
+PARALLEL_JOBS = 6
 
 class GetYp(rewrite.modules.scraper_base.ScraperBase, rewrite.modules.rpc_base.RpcMixin):
 
@@ -115,12 +115,12 @@ class GetYp(rewrite.modules.scraper_base.ScraperBase, rewrite.modules.rpc_base.R
 
 		jid = str(uuid.uuid4())
 
-		scls = self.serialize_class(remote_cls)
 		if 'drain' in sys.argv:
 			print("Consuming replies only")
 			self.check_open_rpc_interface()
 		else:
-			print("Putting job:", jid, call_kwargs)
+			scls = self.serialize_class(remote_cls)
+			# print("Putting job:", jid, call_kwargs)
 			self.put_outbound_callable(jid, scls, call_kwargs=call_kwargs, meta=meta, early_ack=early_ack)
 
 		return jid
@@ -138,7 +138,7 @@ class GetYp(rewrite.modules.scraper_base.ScraperBase, rewrite.modules.rpc_base.R
 
 	def process_response_items(self, jobids, expect_partials):
 		self.log.info("Waiting for remote response")
-		timeout = self.rpc_timeout_s
+		timeout = self.rpc_timeout_s * 12
 
 		assert isinstance(jobids, list)
 
@@ -190,7 +190,7 @@ class GetYp(rewrite.modules.scraper_base.ScraperBase, rewrite.modules.rpc_base.R
 						raise RpcExceptionError("RPC Call has no ret value. Probably encountered a remote exception: %s" % ret)
 
 			time.sleep(1)
-			print("\r`fetch_and_flush` sleeping for {}\r".format(str((timeout)).rjust(4)), end='', flush=True)
+			print("\r`fetch_and_flush` sleeping for {}\r".format(str((timeout)).rjust(7)), end='', flush=True)
 
 		raise RpcTimeoutError("No RPC Response within timeout period (%s sec)" % self.rpc_timeout_s)
 
@@ -479,7 +479,7 @@ class GetYp(rewrite.modules.scraper_base.ScraperBase, rewrite.modules.rpc_base.R
 		with self.db.context_sess() as sess:
 			arow = sess.query(self.db.ScrapeTargets).filter(self.db.ScrapeTargets.id == aid).one()
 
-		print(arow, arow.id, arow.site_name, arow.artist_name, arow.extra_meta)
+		# print(arow, arow.id, arow.site_name, arow.artist_name, arow.extra_meta)
 		have = []
 
 		for post in arow.posts:
@@ -498,7 +498,7 @@ class GetYp(rewrite.modules.scraper_base.ScraperBase, rewrite.modules.rpc_base.R
 					'yield_chunk'       : 1024 * 1024 * 64,
 
 					# Total chunk limit so things don't fetch for so long the VM rollover causes them to be reset.
-					'total_fetch_limit' : 1024 * 1024 * 2048,
+					'total_fetch_limit' : 1024 * 1024 * 1048 * 8,
 
 					'extra_meta'        : {'aid' : aid},
 				},
@@ -506,6 +506,24 @@ class GetYp(rewrite.modules.scraper_base.ScraperBase, rewrite.modules.rpc_base.R
 			)
 		self.job_map[jid] = aid
 		return jid
+
+	def go_test(self):
+		jid = self.put_job(
+			remote_cls      = yiff_remote.RemoteExecClass,
+			call_kwargs     = {
+					'mode'              : 'plain_web_get',
+					'requestedUrl'      : "http://www.google.com",
+					'extra_meta'        : {'aid' : None},
+				},
+			early_ack       = True,
+			)
+
+
+		for resp in self.process_response_items([jid], True):
+			self.log.info("Processing response chunk.")
+			self.process_retry(resp)
+			self.log.info("Response chunk processed.")
+		self.log.info("go_test has completed")
 
 	def do_fetch_by_aids(self, aids):
 
@@ -523,7 +541,9 @@ class GetYp(rewrite.modules.scraper_base.ScraperBase, rewrite.modules.rpc_base.R
 			raise ValueError("You need to specify a namespace!")
 
 		nl = self.getNameList(update_namelist)
-
+		if 'drain' in sys.argv:
+			nl = nl[:3]
+		# for chunk in [nl, ]:
 		for chunk in batch(nl, PARALLEL_JOBS):
 			try:
 				self.do_fetch_by_aids([aid for aid, _ in chunk])
@@ -611,6 +631,9 @@ if __name__ == '__main__':
 		# print(ret)
 		# ins.do_fetch_by_aid(8450)   # z
 		# dlPathBase, artPageUrl, artistName
+	elif 'test_get_filename' in sys.argv:
+		ins = GetYp()
+		ins.go_test()
 	else:
 		local_test()
 

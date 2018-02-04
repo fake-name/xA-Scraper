@@ -41,6 +41,7 @@ def buildjob(
 			postDelay      = 0,
 			unique_id      = None,
 			early_ack      = False,
+			serialize      = True,
 		):
 
 	job = {
@@ -52,7 +53,7 @@ def buildjob(
 			'jobid'                : jobid,
 			'dispatch_key'         : dispatchKey,
 			'postDelay'            : postDelay,
-			'serialize'            : True,
+			'serialize'            : serialize,
 			'response_routing_key' : 'lowrate_response',
 			'early_ack'            : early_ack,
 		}
@@ -169,18 +170,19 @@ class RpcMixin():
 			call           = 'callCode',
 			dispatchKey    = "rpc-system",
 			jobid          = jobid,
-			args           = [],
 			kwargs         = call_kwargs_out,
 			additionalData = meta,
 			postDelay      = 0,
 			early_ack      = early_ack,
+			serialize      = self.pluginName,
+
 		)
+		# print(raw_job)
 
 		self.put_outbound_raw(raw_job)
 
 	# Note: The imports in *this* file determine what's available when
 	# a rpc call is executed.
-
 	def serialize_class(self, tgt_class, exec_method='go'):
 		ret = {
 			'source'      : dill.source.getsource(tgt_class),

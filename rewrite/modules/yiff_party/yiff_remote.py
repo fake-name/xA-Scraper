@@ -39,7 +39,7 @@ class RemoteExecClass(object):
 	def __init__(self, wg=None):
 		self.logname = "Main.RemoteExec.Tester"
 		self.out_buffer = []
-
+		self.local_logger = logging.getLogger(self.logname)
 		self.wg = wg
 
 		self.__install_logproxy()
@@ -70,18 +70,23 @@ class RemoteExecClass(object):
 
 	def _debug(self, msg, *args):
 		tmp = self.logname + " [DEBUG] ->" + msg % args
+		self.local_logger.debug(tmp)
 		self.out_buffer.append(tmp)
 	def _info(self, msg, *args):
 		tmp = self.logname + " [INFO] ->" + msg % args
+		self.local_logger.info(tmp)
 		self.out_buffer.append(tmp)
 	def _error(self, msg, *args):
 		tmp = self.logname + " [ERROR] ->" + msg % args
+		self.local_logger.error(tmp)
 		self.out_buffer.append(tmp)
 	def _critical(self, msg, *args):
 		tmp = self.logname + " [CRITICAL] ->" + msg % args
+		self.local_logger.critical(tmp)
 		self.out_buffer.append(tmp)
 	def _warning(self, msg, *args):
 		tmp = self.logname + " [WARNING] ->" + msg % args
+		self.local_logger.warning(tmp)
 		self.out_buffer.append(tmp)
 
 
@@ -433,6 +438,8 @@ class RemoteExecClass(object):
 			return self.yp_get_names()
 		elif mode == "yp_get_content_for_artist":
 			return self.yp_get_content_for_artist(**kwargs)
+		elif mode == "plain_web_get":
+			return self.getFileAndName_proxy(**kwargs)
 		else:
 			self.log.error("Unknown mode: '%s'", mode)
 			return "Unknown mode: '%s' -> Kwargs: '%s'" % (mode, kwargs)
