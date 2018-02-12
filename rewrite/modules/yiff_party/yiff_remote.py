@@ -171,7 +171,8 @@ class RemoteExecClass(object):
 			post['id'] = postdiv['id']
 
 			post['time']  = postdiv.find(True, class_='post-time' ).get_text(strip=True)
-			post['title'] = list(postdiv.find("span", class_='card-title').stripped_strings)[0]
+			titles = list(postdiv.find("span", class_='card-title').stripped_strings)
+			post['title'] = titles[0] if titles else "Error: No Title"
 			post['body']  = postdiv.find("div",   class_='post-body' ).get_text(strip=True)
 
 			attachment_div = postdiv.find("div", class_='card-attachments')
