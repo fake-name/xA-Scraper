@@ -2,7 +2,7 @@
 import os.path
 import traceback
 import requests
-import webFunctions
+import WebRequest
 import uuid
 from settings import settings
 
@@ -129,7 +129,7 @@ def doFaCaptchaLogin():
 
 
 	# Flush cookies into file.
-	wg = webFunctions.WebGetRobust()
+	wg = WebRequest.WebGetRobust()
 	for cookie in request_sessions[session['uuid']].cookies:
 		wg.addCookie(cookie)
 	wg.syncCookiesFromFile()

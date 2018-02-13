@@ -3,7 +3,7 @@ import os
 import os.path
 import logging
 from settings import settings
-from webFunctions import WebGetRobust
+from WebRequest import WebGetRobust
 import threading
 import abc
 

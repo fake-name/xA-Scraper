@@ -38,7 +38,7 @@ def batch(iterable, n=1):
 	for ndx in range(0, l, n):
 		yield iterable[ndx:min(ndx + n, l)]
 
-PARALLEL_JOBS = 250
+PARALLEL_JOBS = 50
 
 class GetYp(rewrite.modules.scraper_base.ScraperBase, rewrite.modules.rpc_base.RpcMixin):
 
@@ -570,11 +570,11 @@ def signal_handler(dummy_signal, dummy_frame):
 		raise KeyboardInterrupt
 
 def local_test():
-	import webFunctions
+	import WebRequest
 	import bs4
 	import sys
 	print("Setup")
-	wg = webFunctions.WebGetRobust()
+	wg = WebRequest.WebGetRobust()
 	t2 = yiff_remote.RemoteExecClass(wg=wg)
 	print("Loading file")
 	with open(sys.argv[1], "r") as fp:
