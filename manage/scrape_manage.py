@@ -40,7 +40,12 @@ PLUGINS = {
 # }
 
 def do_plugin(plg):
-	plg.runScraper(namespace)
+	if hasattr(plg, "runScraper"):
+		plg.runScraper(namespace)
+	else:
+		print()
+		print("Missing run command:", plg)
+		print()
 	# instance.go(ctrlNamespace=namespace)
 
 def do_fetch(args):

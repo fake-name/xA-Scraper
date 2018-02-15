@@ -5,8 +5,11 @@ import queue
 import datetime
 import mprpc
 import logging
+import socket
 import dill
 import pprint
+import threading
+import multiprocessing
 
 from settings import settings
 import os
@@ -73,7 +76,7 @@ class RemoteJobInterface(log_base.LoggerMixin):
 			try:
 				# Cut-the-corners TCP Client:
 				mp_conf = {"use_bin_type":True}
-				self.rpc_client = mprpc.RPCClient(server_ip, server_port, pack_params=mp_conf)
+				self.rpc_client = mprpc.RPCClient(server_ip, server_port, pack_params=mp_conf, timeout=15)
 
 				self.check_ok()
 				return
@@ -85,6 +88,8 @@ class RemoteJobInterface(log_base.LoggerMixin):
 		try:
 			j = self.rpc_client.call('getJob', self.interfacename)
 			return j
+		except socket.timeout as e:
+			raise e
 		except Exception as e:
 			raise e
 
@@ -121,8 +126,40 @@ class RpcMixin():
 
 	def __init__(self):
 		super().__init__()
+		self.rpc_interfaces = {}
 		self.check_open_rpc_interface()
 		self.log.info("RPC Interface initialized")
+
+
+	@property
+	def rpc_interface(self):
+		'''
+		Create a unique RPC interface per-thread, and
+		don't share them.
+		'''
+
+		threadName = threading.current_thread().name
+		procName   = multiprocessing.current_process().name
+
+		thread_key = "{} - {}".format(threadName, procName)
+
+		if thread_key not in self.rpc_interfaces:
+			self.rpc_interfaces[thread_key] = RemoteJobInterface("XA-RPC-Fetcher", settings['rpc-server']['address'], settings['rpc-server']['port'])
+
+		return self.rpc_interfaces[thread_key]
+
+	def close_rpc_interface(self):
+		threadName = threading.current_thread().name
+		procName   = multiprocessing.current_process().name
+
+		thread_key = "{} - {}".format(threadName, procName)
+
+		if thread_key in self.rpc_interfaces:
+			self.rpc_interfaces.pop(thread_key)
+		else:
+			self.log.warning("Closing RPC interface from a thread that hasn't opened it!")
+
+
 
 	def put_outbound_raw(self, raw_job):
 		# Recycle the rpc interface if it ded
@@ -217,14 +254,16 @@ class RpcMixin():
 		except TypeError:
 			self.check_open_rpc_interface()
 			return None
+		except socket.timeout:
+			self.check_open_rpc_interface()
+			return None
 		except KeyError:
 			self.check_open_rpc_interface()
 			return None
 
 
 	def check_open_rpc_interface(self):
-		if not hasattr(self, "rpc_interface"):
-			self.rpc_interface = RemoteJobInterface("XA-RPC-Fetcher", settings['rpc-server']['address'], settings['rpc-server']['port'])
+
 		try:
 			if self.rpc_interface.check_ok():
 				return
@@ -241,6 +280,7 @@ class RpcMixin():
 				self.log.error("Failure when closing errored RPC interface")
 				for line in traceback.format_exc().split("\n"):
 					self.log.error(line)
-			self.rpc_interface = RemoteJobInterface("XA-RPC-Fetcher", settings['rpc-server']['address'], settings['rpc-server']['port'])
+			self.close_rpc_interface()
+			self.rpc_interface.check_ok()
 
 
