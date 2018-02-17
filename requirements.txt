@@ -46,7 +46,7 @@ mprpc==0.1.14
 sqlalchemy_jsonfield==0.7.0
 dill==0.2.7.1
 
-webrequest==0.0.14
+webrequest==0.0.15
 
 git+https://github.com/berkerpeksag/astor.git
 git+https://github.com/fake-name/ChromeController.git
