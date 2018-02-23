@@ -12,8 +12,8 @@ MarkupSafe==1.0
 ## oauthlib
 ## PasteDeploy
 pyramid==1.9.1
-sqlalchemy==1.2.2
-alembic==0.9.7
+sqlalchemy==1.2.4
+alembic==0.9.8
 python-tumblpy==1.1.4
 pytz==2018.3
 ## PyYAML
@@ -47,7 +47,7 @@ sqlalchemy_jsonfield==0.7.0
 dill==0.2.7.1
 tqdm
 
-webrequest==0.0.14
+webrequest==0.0.15
 
 git+https://github.com/berkerpeksag/astor.git
 git+https://github.com/fake-name/ChromeController.git
