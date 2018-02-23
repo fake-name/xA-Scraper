@@ -183,8 +183,7 @@ class GetDA(rewrite.modules.scraper_base.ScraperBase):
 
 		else:
 
-			regx3 = re.compile("http://.+/")							# Pull out filename only
-			fname = regx3.sub("" , imgurl)
+			fname = imgurl.split("/")[-1]
 			fname = fname.split("?")[0]
 			self.log.info("			Filename = " + fname)
 			self.log.info("			FileURL = " + imgurl)

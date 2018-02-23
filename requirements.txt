@@ -45,6 +45,7 @@ sqlalchemy-citext==1.3-0
 mprpc==0.1.14
 sqlalchemy_jsonfield==0.7.0
 dill==0.2.7.1
+tqdm
 
 webrequest==0.0.14
 
