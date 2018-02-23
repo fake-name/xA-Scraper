@@ -200,7 +200,10 @@ def upgrade():
 
 						loop = 1
 						base, ext = os.path.splitext(newp)
-						if os.path.exists(newp):
+
+						# Only insert number if the old and new items exist. If the source file
+						# is missing, assume the file has been moved, so don't bother.
+						if os.path.exists(newp) and os.path.exists(fsp):
 							while os.path.exists(newp):
 								newp = "%s (%d)%s" % (base, loop, ext)
 								loop += 1
@@ -218,7 +221,7 @@ def upgrade():
 							# already been moved, nothing to do.
 							pass
 						else:
-							print("Missing file: ", fsp, os.path.exists(fsp), os.path.exists(newp))
+							print("Missing file: ", fsp, resp, os.path.exists(fsp), os.path.exists(newp))
 						# print("Should move:", (fsp, newp, resp))
 
 	# ### end Alembic commands ###
