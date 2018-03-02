@@ -63,14 +63,18 @@ class GetPatreon(rewrite.modules.scraper_base.ScraperBase):
 
 		self.log.info("Not logged in. Doing login.")
 		login_data = {
-			"email"    : settings[self.settingsDictKey]['username'],
-			"password" : settings[self.settingsDictKey]['password'],
+			'type' : 'user',
+			'relationships' : {},
+			'attributes' : {
+					"email"    : settings[self.settingsDictKey]['username'],
+					"password" : settings[self.settingsDictKey]['password'],
+				}
 		}
 
-		current = self.get_json("/login", postData=login_data)
+		current = self.get_json("/login", postData=login_data, retries=1)
 
 		self.log.info("Login results: %s", current)
-		self.wg.syncCookiesFromFile()
+		self.wg._syncCookiesFromFile()
 
 		return self.checkCookie()
 
@@ -88,19 +92,24 @@ class GetPatreon(rewrite.modules.scraper_base.ScraperBase):
 		else:
 			apikey = ""
 
-		content = self.wg.getpage("https://api.patreon.com{endpoint}{api}".format(endpoint=endpoint, api=apikey),
-			addlHeaders={
-				"Accept"          : "application/json, text/plain, */*",
-				"Referer"         : "https://www.patreon.com/login",
-				"Origin"          : "https://www.patreon.com",
-				"Host"            : "api.patreon.com",
-				"Content-Type"    : "application/json; charset=UTF-8",
-				"Accept-Encoding" : "gzip, deflate",
-				"Pragma"          : "no-cache",
-				"Cache-Control"   : "no-cache",
-				},
-			postData = postData,
-			retryQuantity = retries)
+		try:
+			content = self.wg.getpage("https://api.patreon.com{endpoint}{api}".format(endpoint=endpoint, api=apikey),
+				addlHeaders={
+					"Accept"          : "application/json, text/plain, */*",
+					"Referer"         : "https://www.patreon.com/login",
+					"Origin"          : "https://www.patreon.com",
+					"Host"            : "api.patreon.com",
+					"Content-Type"    : "application/json; charset=UTF-8",
+					"Accept-Encoding" : "gzip, deflate",
+					"Pragma"          : "no-cache",
+					"Cache-Control"   : "no-cache",
+					},
+				postData = postData,
+				retryQuantity = retries)
+		except Exception as e:
+			# import pdb
+			# pdb.set_trace()
+			raise
 
 		if content is None:
 			self.log.error("Couldn't login! Please check username and password!")
