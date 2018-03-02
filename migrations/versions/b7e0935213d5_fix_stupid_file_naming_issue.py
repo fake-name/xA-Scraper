@@ -223,7 +223,7 @@ def upgrade():
 						else:
 							print("Missing file: ", fsp, resp, os.path.exists(fsp), os.path.exists(newp))
 						# print("Should move:", (fsp, newp, resp))
-
+	sess.commit()
 	# ### end Alembic commands ###
 
 

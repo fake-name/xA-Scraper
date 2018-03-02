@@ -211,10 +211,15 @@ if USE_POSTGRESQL:
 		database = settings['postgres']['database']
 		)
 else:
-	SQLALCHEMY_DATABASE_URI = 'sqlite://{db_path}'.format(db_path = settings['sqlite']['sqlite_db_path'])
+	SQLALCHEMY_DATABASE_URI = 'sqlite:///{db_path}'.format(db_path = settings['sqlite']['sqlite_db_path'])
 	print("Sqlite database path: '%s'" % SQLALCHEMY_DATABASE_URI)
 
-
+	db_dir, db_f = os.path.split(settings['sqlite']['sqlite_db_path'])
+	assert os.path.exists(db_dir), "Sqlite database dir ('%s') doesn't exist!" % (db_dir, )
+	assert os.path.isdir(db_dir),  "Sqlite directory ('%s') isn't a directory!" % (db_dir, )
+	if os.path.exists(settings['sqlite']['sqlite_db_path']):
+		assert not os.path.isdir(settings['sqlite']['sqlite_db_path']), "Sqlite database path ('%s') is currently occupied by a folder. Cannot create database!" % (
+			settings['sqlite']['sqlite_db_path'], )
 
 for key in settings.keys():
 	if not isinstance(settings[key], dict):
