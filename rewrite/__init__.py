@@ -65,7 +65,7 @@ class URLifyExtension(Extension):
 	def extendMarkdown(self, md, md_globals):
 		md.preprocessors.add('urlify', URLify(md), '_end')
 
-from flask_markdown import Markdown
+from flaskext.markdown import Markdown
 Markdown(app, safe_mode='escape', extensions=[URLifyExtension()])
 
 # ========================================================
