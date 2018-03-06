@@ -12,7 +12,7 @@ MarkupSafe==1.0
 ## oauthlib
 ## PasteDeploy
 pyramid==1.9.1
-sqlalchemy==1.2.4
+sqlalchemy==1.2.5
 alembic==0.9.8
 python-tumblpy==1.1.4
 pytz==2018.3
