@@ -132,7 +132,7 @@ def doFaCaptchaLogin():
 	wg = WebRequest.WebGetRobust()
 	for cookie in request_sessions[session['uuid']].cookies:
 		wg.addCookie(cookie)
-	wg.syncCookiesFromFile()
+	wg._syncCookiesFromFile()
 
 
 	return redirect(url_for("fa_manual_login"))
