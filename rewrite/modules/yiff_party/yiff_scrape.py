@@ -38,7 +38,7 @@ def batch(iterable, n=1):
 	for ndx in range(0, l, n):
 		yield iterable[ndx:min(ndx + n, l)]
 
-PARALLEL_JOBS = 50
+PARALLEL_JOBS = 20
 
 class GetYp(rewrite.modules.scraper_base.ScraperBase, rewrite.modules.rpc_base.RpcMixin):
 
@@ -544,16 +544,18 @@ class GetYp(rewrite.modules.scraper_base.ScraperBase, rewrite.modules.rpc_base.R
 		if 'drain' in sys.argv:
 			nl = nl[:3]
 		# for chunk in [nl, ]:
-		for chunk in batch(nl, PARALLEL_JOBS):
-			try:
-				self.do_fetch_by_aids([aid for aid, _ in chunk])
-			except Exception:
-				for line in traceback.format_exc().split("\n"):
-					self.log.error(line)
 
-			if not flags.namespace.run:
-				print("Exiting!")
-				return
+		for x in range(10000 if 'drain' in sys.argv else 1):
+			for chunk in batch(nl, PARALLEL_JOBS):
+				try:
+					self.do_fetch_by_aids([aid for aid, _ in chunk])
+				except Exception:
+					for line in traceback.format_exc().split("\n"):
+						self.log.error(line)
+
+				if not flags.namespace.run:
+					print("Exiting!")
+					return
 
 		self.log.info("YiffScrape has finished!")
 

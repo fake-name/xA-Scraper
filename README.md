@@ -12,7 +12,6 @@ This is a automated tool for scraping content from a number of art sites:
 - Tumblr art blogs
 - SoFurry
 - Weaslyl
-- Yiff Party (Requires additional RPC infrastructure)
 
 To Add:
 
