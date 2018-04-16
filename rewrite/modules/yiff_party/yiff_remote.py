@@ -387,7 +387,7 @@ class RemoteExecClass(object):
 					fetched_bytes += file['bytes']
 
 			self.log.info("Fetched %s bytes of data so far", fetched_bytes)
-			if fetched_bytes > yield_chunk:
+			if yield_chunk and fetched_bytes > yield_chunk:
 				self.log.info("Incrememtal return!")
 				self.push_partial_resp(process_chunk, partial_resp_interface)
 				process_chunk = copy.deepcopy(releases)
@@ -414,9 +414,10 @@ class RemoteExecClass(object):
 		# <function RpcHandler.partial_response.<locals>.partial_capture at 0x7fd4b260fd08>
 		if "partial_capture" in str(partial_resp_interface):
 			self.log.info("Partials interface!")
-
+		elif not yield_chunk:
+			self.log.info("No partials!")
 		else:
-			raise ValueError
+			raise ValueError("No partials interface!")
 
 		ok = self.yp_walk_to_entry()
 		if not ok:

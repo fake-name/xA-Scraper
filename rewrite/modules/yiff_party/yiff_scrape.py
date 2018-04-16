@@ -27,6 +27,7 @@ import flags
 from settings import settings
 
 from . import yiff_remote
+from . import local_exec
 
 class RpcTimeoutError(RuntimeError):
 	pass
@@ -54,6 +55,8 @@ class GetYp(rewrite.modules.scraper_base.ScraperBase, rewrite.modules.rpc_base.R
 	def __init__(self, *args, **kwargs):
 		super().__init__(*args, **kwargs)
 		self.job_map = {}
+
+		self.job_counter = 0
 
 	# # ---------------------------------------------------------------------------------------------------------------------------------------------------------
 	# # Giant bunch of stubs to shut up the abstract base class
@@ -126,25 +129,51 @@ class GetYp(rewrite.modules.scraper_base.ScraperBase, rewrite.modules.rpc_base.R
 		return jid
 
 	def __mark_id_complete(self, jobid):
+
 		if jobid in self.job_map:
-			with self.db.context_sess() as sess:
-				arow = sess.query(self.db.ScrapeTargets).filter(self.db.ScrapeTargets.id == self.job_map[jobid]).one()
-				self.log.info("Marking artist %s as fetched (id: %s)", arow.extra_meta['name'], arow.id)
-				arow.last_fetched = datetime.datetime.now()
-				sess.commit()
+			for x in range(50):
+				try:
+					with self.db.context_sess() as sess:
+						arow = sess.query(self.db.ScrapeTargets).filter(self.db.ScrapeTargets.id == self.job_map[jobid]).one()
+						self.log.info("Marking artist %s as fetched (id: %s)", arow.extra_meta['name'], arow.id)
+						arow.last_fetched = datetime.datetime.now()
+						sess.commit()
+					return
+
+				except sqlalchemy.exc.InvalidRequestError:
+					print("InvalidRequest error!")
+					sess.rollback()
+					traceback.print_exc()
+					if x > 10:
+						raise
+				except sqlalchemy.exc.OperationalError:
+					print("Operational error!")
+					sess.rollback()
+					if x > 10:
+						raise
+				except sqlalchemy.exc.IntegrityError:
+					print("Integrity error!")
+					traceback.print_exc()
+					sess.rollback()
+					if x > 10:
+						raise
 		else:
 			self.log.warning("Job id %s not in job_map. Do not know how to cross-correlate to mark complete response",
 				jobid)
 
-	def process_response_items(self, jobids, expect_partials):
-		self.log.info("Waiting for remote response")
+	def process_response_items(self, jobids, expect_partials, preload_rets = []):
+		self.log.info("Waiting for remote response (preloaded: %s)", len(preload_rets))
 		timeout = self.rpc_timeout_s * 12
 
 		assert isinstance(jobids, list)
 
-		while timeout:
+		while timeout or preload_rets:
 			timeout -= 1
-			ret = self.process_responses()
+			if preload_rets:
+				self.log.info("Have preloaded item. Using.")
+				ret = preload_rets.pop(0)
+			else:
+				ret = self.process_responses()
 			if ret:
 
 				if ('jobid' in ret and ret['jobid'] in jobids) or expect_partials:
@@ -194,7 +223,42 @@ class GetYp(rewrite.modules.scraper_base.ScraperBase, rewrite.modules.rpc_base.R
 
 		raise RpcTimeoutError("No RPC Response within timeout period (%s sec)" % self.rpc_timeout_s)
 
-	def blocking_remote_call(self, remote_cls, call_kwargs, meta=None, expect_partials=False):
+	def __blocking_dispatch_call_local(self, remote_cls, call_kwargs, meta=None, expect_partials=False):
+		self.log.info("Dispatching new callable job to local executor")
+
+		print("Kwargs:", call_kwargs)
+		call_kwargs_out = {}
+		# call_kwargs_out = {'code_struct' : serialized}
+		for key, value in call_kwargs.items():
+			call_kwargs_out[key] = value
+		# job = {
+		# 		'call'                 : 'callCode',
+		# 		'module'               : 'RemoteExec',
+		# 		'args'                 : (),
+		# 		'kwargs'               : call_kwargs_out,
+		# 		'extradat'             : meta,
+		# 		'dispatch_key'         : "rpc-system",
+		# 		'response_routing_key' : 'response'
+		# 	}
+
+		scls = self.serialize_class(remote_cls)
+
+		instance = local_exec.PluginInterface_RemoteExec()
+		resp_tup = instance.call_code(code_struct=scls, **call_kwargs_out)
+		jid = self.job_counter
+		self.job_counter += 1
+		cont_proxy = {
+			'jobid' : jid,
+			'ret'   : resp_tup
+		}
+
+		ret = self.process_response_items([jid], expect_partials, preload_rets=[cont_proxy])
+		if not expect_partials:
+			ret = next(ret)
+		return ret
+
+
+	def __blocking_dispatch_call_remote(self, remote_cls, call_kwargs, meta=None, expect_partials=False):
 
 		jobid = self.put_job(remote_cls, call_kwargs, meta)
 		ret = self.process_response_items([jobid], expect_partials)
@@ -203,8 +267,17 @@ class GetYp(rewrite.modules.scraper_base.ScraperBase, rewrite.modules.rpc_base.R
 		return ret
 
 
-	def fetch_update_names(self):
-		namelist = self.blocking_remote_call(yiff_remote.RemoteExecClass, call_kwargs={'mode' : 'yp_get_names'})
+	def blocking_dispatch_call(self, remote_cls, call_kwargs, meta=None, expect_partials=False, local=False):
+		if local:
+			return self.__blocking_dispatch_call_local(remote_cls=remote_cls, call_kwargs=call_kwargs, meta=meta, expect_partials=expect_partials)
+		else:
+			# raise RuntimeError
+			return self.__blocking_dispatch_call_remote(remote_cls=remote_cls, call_kwargs=call_kwargs, meta=meta, expect_partials=expect_partials)
+
+
+	def fetch_update_names(self, local=False):
+		namelist = self.blocking_dispatch_call(yiff_remote.RemoteExecClass, call_kwargs={'mode' : 'yp_get_names'}, local=local)
+
 		new     = 0
 		updated = 0
 
@@ -240,9 +313,9 @@ class GetYp(rewrite.modules.scraper_base.ScraperBase, rewrite.modules.rpc_base.R
 
 		self.log.info("Had %s new names, %s with changes since last update.", new, updated)
 
-	def getNameList(self, update_namelist):
+	def getNameList(self, update_namelist, local=False):
 		if update_namelist:
-			self.fetch_update_names()
+			self.fetch_update_names(local=local)
 
 		with self.db.context_sess() as sess:
 			res = sess.query(self.db.ScrapeTargets)                                                                \
@@ -474,7 +547,7 @@ class GetYp(rewrite.modules.scraper_base.ScraperBase, rewrite.modules.rpc_base.R
 
 		self.log.error("Failure in process_retry, out of attempts!")
 
-	def trigger_fetch(self, aid):
+	def trigger_fetch(self, aid, local):
 
 		with self.db.context_sess() as sess:
 			arow = sess.query(self.db.ScrapeTargets).filter(self.db.ScrapeTargets.id == aid).one()
@@ -489,23 +562,45 @@ class GetYp(rewrite.modules.scraper_base.ScraperBase, rewrite.modules.rpc_base.R
 						have.append(file.file_meta)
 
 		self.log.info("Have %s items.", len(have))
-		jid = self.put_job(
-			remote_cls      = yiff_remote.RemoteExecClass,
-			call_kwargs     = {
+
+		if local:
+			self.job_map[self.job_counter] = aid
+			ret = self.__blocking_dispatch_call_local(
+				remote_cls=yiff_remote.RemoteExecClass,
+				call_kwargs = {
 					'mode'              : 'yp_get_content_for_artist',
 					'aid'               : arow.artist_name,
 					'have_urls'         : have,
-					'yield_chunk'       : 1024 * 1024 * 64,
+					'yield_chunk'       : 1024 * 1024 * 64 if not local else None,
 
 					# Total chunk limit so things don't fetch for so long the VM rollover causes them to be reset.
-					'total_fetch_limit' : 1024 * 1024 * 1048 * 8,
+					'total_fetch_limit' : 1024 * 1024 * 1048 * 8 if not local else None,
 
 					'extra_meta'        : {'aid' : aid},
 				},
-			early_ack       = True,
-			)
-		self.job_map[jid] = aid
-		return jid
+				expect_partials=True)
+
+			for resp in ret:
+				self.process_retry(resp)
+			return None
+		else:
+			jid = self.put_job(
+				remote_cls      = yiff_remote.RemoteExecClass,
+				call_kwargs     = {
+						'mode'              : 'yp_get_content_for_artist',
+						'aid'               : arow.artist_name,
+						'have_urls'         : have,
+						'yield_chunk'       : 1024 * 1024 * 64 if not local else None,
+
+						# Total chunk limit so things don't fetch for so long the VM rollover causes them to be reset.
+						'total_fetch_limit' : 1024 * 1024 * 1048 * 8 if not local else None,
+
+						'extra_meta'        : {'aid' : aid},
+					},
+				early_ack       = True,
+				)
+			self.job_map[jid] = aid
+			return jid
 
 	def go_test(self):
 		jid = self.put_job(
@@ -525,9 +620,13 @@ class GetYp(rewrite.modules.scraper_base.ScraperBase, rewrite.modules.rpc_base.R
 			self.log.info("Response chunk processed.")
 		self.log.info("go_test has completed")
 
-	def do_fetch_by_aids(self, aids):
+	def do_fetch_by_aids(self, aids, local):
 
-		jobids = [self.trigger_fetch(aid) for aid in aids]
+		jobids = [self.trigger_fetch(aid, local) for aid in aids]
+
+		if not any(jobids):
+			self.log.warning("No jobid resps?")
+			return
 
 		for resp in self.process_response_items(jobids, True):
 			self.log.info("Processing response chunk.")
@@ -536,19 +635,19 @@ class GetYp(rewrite.modules.scraper_base.ScraperBase, rewrite.modules.rpc_base.R
 		self.log.info("do_fetch_by_aids has completed")
 
 
-	def go(self, ctrlNamespace=None, update_namelist=True):
+	def go(self, ctrlNamespace=None, update_namelist=True, local=False):
 		if ctrlNamespace is None:
 			raise ValueError("You need to specify a namespace!")
 
-		nl = self.getNameList(update_namelist)
+		nl = self.getNameList(update_namelist, local)
 		if 'drain' in sys.argv:
 			nl = nl[:3]
 		# for chunk in [nl, ]:
 
 		for x in range(10000 if 'drain' in sys.argv else 1):
-			for chunk in batch(nl, PARALLEL_JOBS):
+			for chunk in batch(nl, PARALLEL_JOBS if not local else 1):
 				try:
-					self.do_fetch_by_aids([aid for aid, _ in chunk])
+					self.do_fetch_by_aids([aid for aid, _ in chunk], local)
 				except Exception:
 					for line in traceback.format_exc().split("\n"):
 						self.log.error(line)
@@ -593,12 +692,8 @@ def local_test():
 	pprint.pprint(("R2:", r2))
 	pprint.pprint(("R2:", r3))
 
-if __name__ == '__main__':
-
+def run_remote():
 	import multiprocessing
-	import logSetup
-	import sys
-	logSetup.initLogging()
 
 	manager = multiprocessing.managers.SyncManager()
 	manager.start()
@@ -608,31 +703,60 @@ if __name__ == '__main__':
 	signal.signal(signal.SIGINT, signal_handler)
 
 	print(sys.argv)
-	if len(sys.argv) == 1 or 'drain' in sys.argv or 'no_namelist' in sys.argv:
-		ins = GetYp()
-		# ins.getCookie()
-		print(ins)
-		print("Instance: ", ins)
+	ins = GetYp()
+	# ins.getCookie()
+	print(ins)
+	print("Instance: ", ins)
 
-		update_nl = True
-		if "no_namelist" in sys.argv:
-			update_nl = False
-		if "drain" in sys.argv:
-			update_nl = False
-		if not update_nl:
-			print("Not fetching new names from site!")
+	update_nl = True
+	if "no_namelist" in sys.argv:
+		update_nl = False
+	if "drain" in sys.argv:
+		update_nl = False
+	if not update_nl:
+		print("Not fetching new names from site!")
 
-		# ins.go(ctrlNamespace=flags.namespace, update_namelist=True)
-		ins.go(ctrlNamespace=flags.namespace, update_namelist=update_nl)
-		# ret = ins.do_fetch_by_aid(3745)
-		# ret = ins.do_fetch_by_aid(5688)
-		# ret = ins.do_fetch_by_aid(5071)
-		# ret = ins.do_fetch_by_aid(8178)
-		# ret = ins.do_fetch_by_aid(5881)
-		# ret = ins.do_fetch_by_aid()
-		# print(ret)
-		# ins.do_fetch_by_aid(8450)   # z
-		# dlPathBase, artPageUrl, artistName
+	# ins.go(ctrlNamespace=flags.namespace, update_namelist=True)
+	ins.go(ctrlNamespace=flags.namespace, update_namelist=update_nl)
+
+
+def run_local():
+	import multiprocessing
+
+	manager = multiprocessing.managers.SyncManager()
+	manager.start()
+	flags.namespace = manager.Namespace()
+	flags.namespace.run = True
+
+	signal.signal(signal.SIGINT, signal_handler)
+
+	print(sys.argv)
+	ins = GetYp()
+	# ins.getCookie()
+	print(ins)
+	print("Instance: ", ins)
+
+	update_nl = True
+	if "no_namelist" in sys.argv:
+		update_nl = False
+	if "drain" in sys.argv:
+		update_nl = False
+	if not update_nl:
+		print("Not fetching new names from site!")
+
+	# ins.go(ctrlNamespace=flags.namespace, update_namelist=True)
+	ins.go(ctrlNamespace=flags.namespace, update_namelist=update_nl, local=True)
+
+if __name__ == '__main__':
+
+	import sys
+	import logSetup
+	logSetup.initLogging()
+
+	if 'local' in sys.argv:
+		run_local()
+	elif len(sys.argv) == 1 or 'drain' in sys.argv or 'no_namelist' in sys.argv:
+		run_remote()
 	elif 'test_get_filename' in sys.argv:
 		ins = GetYp()
 		ins.go_test()
