@@ -143,19 +143,20 @@ class GetYp(rewrite.modules.scraper_base.ScraperBase, rewrite.modules.rpc_base.R
 				except sqlalchemy.exc.InvalidRequestError:
 					print("InvalidRequest error!")
 					sess.rollback()
-					traceback.print_exc()
 					if x > 10:
+						traceback.print_exc()
 						raise
 				except sqlalchemy.exc.OperationalError:
 					print("Operational error!")
 					sess.rollback()
 					if x > 10:
+						traceback.print_exc()
 						raise
 				except sqlalchemy.exc.IntegrityError:
 					print("Integrity error!")
-					traceback.print_exc()
 					sess.rollback()
 					if x > 10:
+						traceback.print_exc()
 						raise
 		else:
 			self.log.warning("Job id %s not in job_map. Do not know how to cross-correlate to mark complete response",
