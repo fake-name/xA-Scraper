@@ -12,6 +12,7 @@ import pprint
 from settings import settings
 
 import rewrite.modules.scraper_base
+from rewrite.modules import exceptions
 
 class LoginFailure(Exception):
 	pass
@@ -258,6 +259,8 @@ class GetPatreon(rewrite.modules.scraper_base.ScraperBase):
 			for tagmeta in post_content['relationships']['user_defined_tags']['data']:
 				tags.append(tagmeta['id'].split(";")[-1])
 
+		if 'current_user_can_view' in post_content and not post_content['current_user_can_view']:
+			raise exceptions.CannotAccessException("You can't view that content!")
 
 		# if not 'content' in post_info:
 		pprint.pprint(post_content)

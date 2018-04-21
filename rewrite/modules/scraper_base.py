@@ -377,6 +377,11 @@ class ScraperBase(module_base.ModuleBase, metaclass=abc.ABCMeta):
 			try:
 				ret = self._getArtPage(*args, **kwargs)
 				return ret
+			except exceptions.ContentRemovedException as e:
+				return self.build_page_ret(status="Failed", fqDlPath=None, pageTitle="Error: %s" % e)
+			except exceptions.CannotAccessException as e:
+				return self.build_page_ret(status="Failed", fqDlPath=None, pageTitle="Error: %s" % e)
+
 			except exceptions.RetryException:
 				pass
 

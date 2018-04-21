@@ -10,6 +10,10 @@ class FetchFailedException(ScraperException):
 	pass
 
 
+class ContentRemovedException(ScraperException):
+	pass
+class CannotAccessException(ScraperException):
+	pass
 class AccountDisabledException(ScraperException):
 	pass
 

@@ -158,14 +158,15 @@ class GetFA(rewrite.modules.scraper_base.ScraperBase, util.captcha2upload.Captch
 
 		pageCtnt = self.wg.getpage(artPageUrl)
 
-
+		if 'The submission you are trying to find is not in our database.' in pageCtnt:
+			raise exceptions.ContentRemovedException("Item has been removed")
 
 		imgurl = self._getContentUrlFromPage(pageCtnt)
 
 		if not imgurl:
 			self.log.error("OH NOES!!! No image on page: %s" % artPageUrl)
+			raise exceptions.ContentRemovedException("No image found on page: %s" % artPageUrl)
 
-			return self.build_page_ret(status="Failed", fqDlPath=None)								# Return Fail
 
 
 		if not "http:" in imgurl:						# Fa is for some bizarre reason, leaving the 'http:' off some of their URLs
