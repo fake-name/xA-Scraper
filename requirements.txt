@@ -4,7 +4,7 @@ beautifulsoup4==4.6.0
 CherryPy==15.0.0
 colorama==0.3.9
 future==0.16.0
-httpretty==0.8.14
+httpretty==0.9.4
 lxml==4.2.1
 Mako==1.0.7
 MarkupSafe==1.0
