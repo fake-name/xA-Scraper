@@ -4,6 +4,7 @@ import os.path
 import traceback
 import re
 import bs4
+import time
 import dateparser
 import urllib.request
 import flags
@@ -241,6 +242,10 @@ class GetFA(rewrite.modules.scraper_base.ScraperBase, util.captcha2upload.Captch
 
 
 			self.log.info("Successfully got: " + imgurl)
+
+			self.log.info("Sleeping to avoid rate-limiting")
+			time.sleep(5)
+
 			return self.build_page_ret(status="Succeeded", fqDlPath=[filePath], pageDesc=pageDesc, pageTitle=pageTitle, postTags=postTags, postTime=postTime)
 
 		raise RuntimeError("How did this ever execute?")
@@ -301,7 +306,7 @@ class GetFA(rewrite.modules.scraper_base.ScraperBase, util.captcha2upload.Captch
 			while 1:
 
 				if not flags.run:
-					break
+					return []
 
 				turl = galleryUrlBase % (artist, pageNo)
 				self.log.info("Getting = " + turl)
@@ -323,7 +328,32 @@ class GetFA(rewrite.modules.scraper_base.ScraperBase, util.captcha2upload.Captch
 
 				pageNo += 1
 
+				self.log.info("Sleeping to avoid rate-limiting")
+				time.sleep(5)
+
 
 		self.log.info("Found %s links" % (len(ret)))
 
 		return ret
+
+
+if __name__ == '__main__':
+	print("Testing!")
+	import logSetup
+	logSetup.initLogging()
+
+
+	import multiprocessing.managers
+	import logSetup
+	logSetup.initLogging()
+
+	manager = multiprocessing.managers.SyncManager()
+	manager.start()
+	namespace = manager.Namespace()
+	namespace.run=True
+
+
+	ins = GetFA()
+	have_cookie = ins.checkCookie()
+	print('have_cookie', have_cookie)
+	ins.go(ctrlNamespace=namespace)
