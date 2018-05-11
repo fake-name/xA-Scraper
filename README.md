@@ -29,6 +29,7 @@ it before now.
 
 Dependencies:
 
+ - Linux
  - Postgres >= 9.3 or Sqlite
  - CherryPy
  - Pyramid
@@ -67,6 +68,10 @@ add or modify them.
 
 
 ## Notes:  
+
+ - There have been reports that things are actively broken on non-linux platforms. Realistically, 
+ all development is done on a Ubuntu 16.04 LTS install, and running on anything else is at 
+ your own risk.
 
  - The Yiff-Party scraper requires significant external infrastructure, as it currently depends on
 threading it's fetch requests through my [autotriever](https://github.com/fake-name/AutoTriever)
