@@ -39,7 +39,15 @@ PLUGINS = {
 
 # }
 
-def do_plugin(plg):
+def do_plugin(requested_name):
+	plg = None
+	for plg_cls, plg_name in PLUGINS.values():
+		if plg_name == requested_name:
+			plg = plg_cls
+
+	if plg is None:
+		print("Cannot find plugin for name %s!" % requested_name)
+
 	if hasattr(plg, "runScraper"):
 		plg.runScraper(namespace)
 	else:
@@ -71,7 +79,7 @@ def do_fetch(args):
 def do_fetch_all():
 
 	processes = [
-			multiprocessing.Process(target=do_plugin, name='run-'+plg_name, args=(plg, ))
+			multiprocessing.Process(target=do_plugin, name='run-'+plg_name, args=(plg_name, ))
 		for
 			plg, plg_name in PLUGINS.values()
 	]
