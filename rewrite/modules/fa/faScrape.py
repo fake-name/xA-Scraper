@@ -27,7 +27,7 @@ class GetFA(rewrite.modules.scraper_base.ScraperBase, util.captcha2upload.Captch
 
 	numThreads = 1
 
-
+	sleep_time = 6
 
 	# ---------------------------------------------------------------------------------------------------------------------------------------------------------
 	# Cookie Management
@@ -157,20 +157,30 @@ class GetFA(rewrite.modules.scraper_base.ScraperBase, util.captcha2upload.Captch
 
 		self.log.info("Getting page %s", artPageUrl)
 
-		pageCtnt = self.wg.getpage(artPageUrl)
+		try:
+
+			pageCtnt = self.wg.getpage(artPageUrl)
+		except Exception as e:
+			self.log.info("Sleeping %s seconds to avoid rate-limiting", self.sleep_time)
+			time.sleep(self.sleep_time)
+			raise e
+
 
 		if 'The submission you are trying to find is not in our database.' in pageCtnt:
+			self.log.warning("Content has been removed!")
+			self.log.info("Sleeping %s seconds to avoid rate-limiting", self.sleep_time)
+			time.sleep(self.sleep_time)
 			raise exceptions.ContentRemovedException("Item has been removed")
 
 		imgurl = self._getContentUrlFromPage(pageCtnt)
 
 		if not imgurl:
-			self.log.error("OH NOES!!! No image on page: %s" % artPageUrl)
+			self.log.error("OH NOES!!! No image on page: %s", artPageUrl)
 			raise exceptions.ContentRemovedException("No image found on page: %s" % artPageUrl)
 
 
 
-		if not "http:" in imgurl:						# Fa is for some bizarre reason, leaving the 'http:' off some of their URLs
+		if not "http:" in imgurl:
 			imgurl = "http:%s" % imgurl
 
 		fileTypeRe = re.compile(r".+\.")
@@ -204,6 +214,8 @@ class GetFA(rewrite.modules.scraper_base.ScraperBase, util.captcha2upload.Captch
 
 		if self._checkFileExists(filePath):
 			self.log.info("Exists, skipping...")
+			self.log.info("Sleeping %s seconds to avoid rate-limiting", self.sleep_time)
+			time.sleep(self.sleep_time)
 			return self.build_page_ret(status="Exists", fqDlPath=[filePath], pageDesc=pageDesc, pageTitle=pageTitle, postTags=postTags, postTime=postTime)
 		else:
 
@@ -243,8 +255,8 @@ class GetFA(rewrite.modules.scraper_base.ScraperBase, util.captcha2upload.Captch
 
 			self.log.info("Successfully got: " + imgurl)
 
-			self.log.info("Sleeping to avoid rate-limiting")
-			time.sleep(5)
+			self.log.info("Sleeping %s seconds to avoid rate-limiting", self.sleep_time)
+			time.sleep(self.sleep_time)
 
 			return self.build_page_ret(status="Succeeded", fqDlPath=[filePath], pageDesc=pageDesc, pageTitle=pageTitle, postTags=postTags, postTime=postTime)
 
@@ -328,9 +340,8 @@ class GetFA(rewrite.modules.scraper_base.ScraperBase, util.captcha2upload.Captch
 
 				pageNo += 1
 
-				self.log.info("Sleeping to avoid rate-limiting")
-				time.sleep(5)
-
+				self.log.info("Sleeping %s seconds to avoid rate-limiting", self.sleep_time)
+				time.sleep(self.sleep_time)
 
 		self.log.info("Found %s links" % (len(ret)))
 

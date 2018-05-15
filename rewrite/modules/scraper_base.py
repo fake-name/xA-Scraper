@@ -455,6 +455,7 @@ class ScraperBase(module_base.ModuleBase, metaclass=abc.ABCMeta):
 
 
 				self.log.info("Pages for %s remaining = %s", artist, len(newArt))
+
 				if ctrlNamespace.run is False:
 					break
 
