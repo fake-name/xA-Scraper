@@ -94,7 +94,7 @@ class GetFA(rewrite.modules.scraper_base.ScraperBase, util.captcha2upload.Captch
 
 		if reResult:
 			imgurl = reResult.group(1)
-			self.log.info("Found direct download URL : %s" % imgurl)
+			self.log.info("Found direct download URL : %s", imgurl)
 			return imgurl
 
 
@@ -104,7 +104,7 @@ class GetFA(rewrite.modules.scraper_base.ScraperBase, util.captcha2upload.Captch
 
 		if reResult:
 			imgurl = reResult.group(1)
-			self.log.info("Found Image URL : %s" % imgurl)
+			self.log.info("Found Image URL : %s", imgurl)
 
 			return imgurl
 
@@ -114,7 +114,7 @@ class GetFA(rewrite.modules.scraper_base.ScraperBase, util.captcha2upload.Captch
 		if reResult:
 			imgurl = reResult.group(1)
 
-			self.log.info("Found Flash URL : %s" % imgurl)
+			self.log.info("Found Flash URL : %s", imgurl)
 			return imgurl
 
 		return False
@@ -180,7 +180,7 @@ class GetFA(rewrite.modules.scraper_base.ScraperBase, util.captcha2upload.Captch
 
 
 
-		if not "http:" in imgurl:
+		if "http:" not in imgurl:
 			imgurl = "http:%s" % imgurl
 
 		fileTypeRe = re.compile(r".+\.")
@@ -189,9 +189,9 @@ class GetFA(rewrite.modules.scraper_base.ScraperBase, util.captcha2upload.Captch
 		fname = fileNameRe.sub("" , imgurl)
 		ftype = fileTypeRe.sub("" , fname)					# Pull out filename only
 
-		self.log.info("			Filename = " + fname)
-		self.log.info("			File Type = " + ftype)
-		self.log.info("			FileURL  = " + imgurl)
+		self.log.info("			Filename = %s", fname)
+		self.log.info("			File Type = %s", ftype)
+		self.log.info("			FileURL  = %s", imgurl)
 
 
 		try:
@@ -200,7 +200,7 @@ class GetFA(rewrite.modules.scraper_base.ScraperBase, util.captcha2upload.Captch
 			self.log.info("			postTags  = %s", postTags)
 			self.log.info("			postTime  = %s", postTime)
 
-		except:
+		except Exception:
 			print("file path issue")
 
 			traceback.print_exc()
@@ -222,8 +222,8 @@ class GetFA(rewrite.modules.scraper_base.ScraperBase, util.captcha2upload.Captch
 			imgdat = self.wg.getpage(imgurl)							# Request Image
 
 			if imgdat == "Failed":
-				self.log.error("cannot get image %s" % imgurl)
-				self.log.error("source gallery page: %s" % artPageUrl)
+				self.log.error("cannot get image %s", imgurl)
+				self.log.error("source gallery page: %s", artPageUrl)
 				return self.build_page_ret(status="Failed", fqDlPath=None)
 
 			errs = 0
