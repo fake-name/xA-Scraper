@@ -1,5 +1,5 @@
 APScheduler==3.5.1
-Babel==2.5.3
+Babel==2.6.0
 beautifulsoup4==4.6.0
 CherryPy==15.0.0
 colorama==0.3.9
