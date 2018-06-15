@@ -47,7 +47,7 @@ sqlalchemy_jsonfield==0.7.0
 dill==0.2.7.1
 tqdm==4.23.4
 
-webrequest==0.0.39
+webrequest==0.0.40
 
 git+https://github.com/berkerpeksag/astor.git
 git+https://github.com/fake-name/ChromeController.git
