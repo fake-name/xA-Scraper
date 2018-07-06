@@ -44,9 +44,8 @@ class GetDA(rewrite.modules.scraper_base.ScraperBase):
 
 		login_page = 'https://www.deviantart.com/users/login'
 
-		prepage = self.wg.getpage(login_page)
+		soup = self.wg.getSoup(login_page)
 		# print prepage
-		soup = bs4.BeautifulSoup(prepage, "lxml")
 		form = soup.find("form", action=login_page)
 		if not form:
 			raise rewrite.modules.exceptions.AccountDisabledException("DA Scraper is bot-blocked. Please log in manually from your IP to un-wedge.")

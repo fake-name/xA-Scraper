@@ -22,7 +22,7 @@ class ModuleBase(rewrite.status_monitor.StatusMixin, metaclass=abc.ABCMeta):
 	def pluginName(self):
 		return None
 
-
+	custom_ua = None
 
 	def __init__(self):
 		print("Starting up")
@@ -31,7 +31,7 @@ class ModuleBase(rewrite.status_monitor.StatusMixin, metaclass=abc.ABCMeta):
 
 
 		self.log = logging.getLogger("Main.%s" % self.pluginName)
-		self.wg = WebGetRobust()
+		self.wg = WebGetRobust(custom_ua=self.custom_ua)
 
 		print("Starting up?")
 

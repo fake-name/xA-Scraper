@@ -6,6 +6,7 @@ import datetime
 import pytz
 import dateutil.parser
 import bs4
+import WebRequest
 import urllib.parse
 import json
 import pprint
@@ -32,6 +33,11 @@ class GetPatreon(rewrite.modules.scraper_base.ScraperBase):
 
 	numThreads = 1
 
+	custom_ua = [('User-Agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:61.0) Gecko/20100101 Firefox/61.0'),
+				 ('Accept-Language', 'en-US'),
+				 ('Accept', 'application/xml, application/xhtml+xml, text/html;q=0.9,  text/plain;q=0.8, image/png, */*;q=0.5'),
+				 ('Accept-Encoding', 'deflate,sdch,gzip')]
+
 	# Stubbed functions
 	_getGalleries = None
 	_getTotalArtCount = None
@@ -42,6 +48,8 @@ class GetPatreon(rewrite.modules.scraper_base.ScraperBase):
 
 	def __init__(self, *args, **kwargs):
 		super().__init__(*args, **kwargs)
+
+
 
 
 	def checkCookie(self):
@@ -71,11 +79,13 @@ class GetPatreon(rewrite.modules.scraper_base.ScraperBase):
 					"password" : settings[self.settingsDictKey]['password'],
 				}
 		}
+		try:
+			current = self.get_json("/login", postData=login_data, retries=1)
 
-		current = self.get_json("/login", postData=login_data, retries=1)
-
-		self.log.info("Login results: %s", current)
-		self.wg._syncCookiesFromFile()
+			self.log.info("Login results: %s", current)
+		finally:
+			self.log.info("Flushing cookies unconditionally.")
+			self.wg.saveCookies()
 
 		return self.checkCookie()
 
