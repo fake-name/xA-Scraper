@@ -9,6 +9,7 @@ import bs4
 import WebRequest
 import urllib.parse
 import json
+import time
 import pprint
 from settings import settings
 
@@ -70,6 +71,9 @@ class GetPatreon(rewrite.modules.scraper_base.ScraperBase):
 	def getCookie(self):
 		if self.checkCookie()[0]:
 			return True, "Already logged in"
+
+		self.log.info("Trying to avoid rate limiting!")
+		time.sleep(5)
 
 		self.log.info("Not logged in. Doing login.")
 		login_data = {
