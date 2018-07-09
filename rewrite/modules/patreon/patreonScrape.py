@@ -49,7 +49,8 @@ class GetPatreon(rewrite.modules.scraper_base.ScraperBase):
 	def __init__(self, *args, **kwargs):
 		super().__init__(*args, **kwargs)
 
-
+		# This is.... kind of horrible.
+		self.wg.errorOutCount = 1
 
 
 	def checkCookie(self):
