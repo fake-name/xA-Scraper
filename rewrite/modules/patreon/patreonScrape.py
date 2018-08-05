@@ -269,6 +269,13 @@ class GetPatreon(rewrite.modules.scraper_base.ScraperBase):
 		post_content = post['data']
 		post_info = post_content['attributes']
 
+		if 'current_user_can_view' in post_info and post_info['current_user_can_view'] is False:
+			self.log.warning("You apparently cannot view post %s. Ignoring.", postId)
+			fail = {
+				'status' : ''
+				}
+			return fail
+
 		tags = []
 		if 'user_defined_tags' in post_content['relationships']:
 			for tagmeta in post_content['relationships']['user_defined_tags']['data']:
@@ -392,21 +399,29 @@ class GetPatreon(rewrite.modules.scraper_base.ScraperBase):
 			else:
 				newArt = []
 
+			with open("artist_items.json", "wb") as fp:
+				json.dump(newArt, fp)
+
+			return
+
 			while len(newArt) > 0:
 				postid = newArt.pop()
+				postid_s = json.dumps(postid)
 				try:
 					ret = self._fetch_retrier(postid, artist_name)
 
 					assert isinstance(ret, dict)
 					assert 'status'     in ret
-					assert 'dl_path'    in ret
-					assert 'page_desc'  in ret
-					assert 'page_title' in ret
-					assert 'post_time'  in ret
-					assert 'post_tags'  in ret
 
 
 					if ret['status'] == "Succeeded" or ret['status'] == "Exists":
+
+						assert 'dl_path'    in ret
+						assert 'page_desc'  in ret
+						assert 'page_title' in ret
+						assert 'post_time'  in ret
+						assert 'post_tags'  in ret
+
 						assert isinstance(ret['dl_path'], list)
 						seq = 0
 						for item in ret['dl_path']:
@@ -425,7 +440,7 @@ class GetPatreon(rewrite.modules.scraper_base.ScraperBase):
 					elif ret['status'] == "Ignore":  # Used for compound pages (like Pixiv's manga pages), where the page has multiple sub-pages that are managed by the plugin
 						self.log.info("Ignoring root URL, since it has child-pages.")
 					else:
-						self._updateUnableToRetrieve(artist_undecoded, postid)
+						self._updateUnableToRetrieve(artist_undecoded, postid_s)
 
 				except urllib.error.URLError:  # WebGetRobust throws urlerrors
 					self.log.error("Page Retrieval failed!")
@@ -571,7 +586,7 @@ if __name__ == '__main__':
 	namespace.run=True
 
 
-	ins = GetPatreon()
+	# ins = GetPatreon()
 	# nl = ins.checkCookie()
 	# nl = ins.getCookie()
 	# nl = ins.getNameList()
@@ -592,5 +607,3 @@ if __name__ == '__main__':
 	# for artist in nl:
 	# 	print(artist)
 	# print(nl)
-
-

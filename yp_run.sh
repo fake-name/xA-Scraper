@@ -11,5 +11,5 @@ while true;
 do
     python3 -m rewrite.modules.yiff_party.yiff_scrape local
     echo "Server 'python3 -m rewrite.modules.yiff_party.yiff_scrape drain' crashed with exit code $?.  Respawning.." >&2
-    sleep 1
+    sleep 300
 done;

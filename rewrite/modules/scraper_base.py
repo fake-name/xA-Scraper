@@ -415,13 +415,13 @@ class ScraperBase(module_base.ModuleBase, metaclass=abc.ABCMeta):
 
 					assert isinstance(ret, dict)
 					assert 'status'     in ret
-					assert 'dl_path'    in ret
-					assert 'page_desc'  in ret
-					assert 'page_title' in ret
-					assert 'post_time'  in ret
 
 
 					if ret['status'] == "Succeeded" or ret['status'] == "Exists":
+						assert 'dl_path'    in ret
+						assert 'page_desc'  in ret
+						assert 'page_title' in ret
+						assert 'post_time'  in ret
 						assert isinstance(ret['dl_path'], list)
 						seq = 0
 						for item in ret['dl_path']:
