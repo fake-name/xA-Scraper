@@ -81,6 +81,7 @@ class GetDA(rewrite.modules.scraper_base.ScraperBase):
 	# ---------------------------------------------------------------------------------------------------------------------------------------------------------
 
 	def _getContentUrlFromSoup(self, soupIn):
+		# print(soupIn)
 
 		link = soupIn.find('a',  { "class" : "dev-page-download" })
 		if link:							# Try for DDL (Works for flash and most stories too)
@@ -168,6 +169,12 @@ class GetDA(rewrite.modules.scraper_base.ScraperBase):
 		pageSoup = self.wg.getSoup(artPageUrl)
 
 
+		if pageSoup.find(class_='matureoption'):
+			self.log.critical("You seem to not be logged on (or have mature content disabled)?")
+			raise rewrite.modules.exceptions.RetryException("You seem to not be logged on (or have mature content disabled)?")
+
+
+
 		imgurl = self._getContentUrlFromSoup(pageSoup)
 		pageDesc, pageTitle, postTags, postTime = self._getContentDescriptionTitleFromSoup(pageSoup)
 
@@ -178,7 +185,7 @@ class GetDA(rewrite.modules.scraper_base.ScraperBase):
 
 
 		if imgurl == "Prose":
-			return self.build_page_ret(status="Exists", fqDlPath=[], pageDesc=pageDesc, pageTitle=pageTitle, postTags=postTags, postTime=postTime)
+			return self.build_page_ret(status="Prose", fqDlPath=[], pageDesc=pageDesc, pageTitle=pageTitle, postTags=postTags, postTime=postTime)
 
 		else:
 
@@ -293,14 +300,30 @@ class GetDA(rewrite.modules.scraper_base.ScraperBase):
 
 if __name__ == '__main__':
 
+	import multiprocessing.managers
 	import logSetup
 	logSetup.initLogging()
 
+	manager = multiprocessing.managers.SyncManager()
+	manager.start()
+	namespace = manager.Namespace()
+	namespace.run=True
+
+
+
 	ins = GetDA()
-	have_cookie = ins.checkCookie()
+	have_cookie, message = ins.checkCookie()
 	print('have_cookie', have_cookie)
-	# ins.getCookie()
+	if not have_cookie:
+		ins.getCookie()
+
+
+	# ins.go(ctrlNamespace=namespace)
+
 	# print(ins)
 	# print("Instance: ", ins)
 	# dlPathBase, artPageUrl, artistName
 	# ins._getArtPage("xxxx", 'http://samus9450.deviantart.com/art/SAMUS-ZERO-SUIT-SEXY-3-603835374', 'testtt')
+	ins.getArtist('testtt', ctrlNamespace=namespace)
+
+

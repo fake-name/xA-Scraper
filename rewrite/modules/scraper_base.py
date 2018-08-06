@@ -77,7 +77,7 @@ class ScraperBase(module_base.ModuleBase, metaclass=abc.ABCMeta):
 	def build_page_ret(self, status, fqDlPath, pageDesc=None, pageTitle=None, postTime=None, postTags=None):
 
 		assert isinstance(fqDlPath, (list, type(None))), "Wat? Item: %s, type: %s" % (fqDlPath, type(fqDlPath))
-		assert status in ['Succeeded', 'Exists', 'Ignore', 'Failed', 'Deleted']
+		assert status in ['Succeeded', 'Exists', 'Ignore', 'Failed', 'Deleted', 'Prose']
 		assert isinstance(pageDesc,  (str, type(None))), "Wat? Item: %s, type: %s" % (pageDesc,  type(pageDesc))
 		assert isinstance(pageTitle, (str, type(None))), "Wat? Item: %s, type: %s" % (pageTitle, type(pageTitle))
 
@@ -417,7 +417,24 @@ class ScraperBase(module_base.ModuleBase, metaclass=abc.ABCMeta):
 					assert 'status'     in ret
 
 
-					if ret['status'] == "Succeeded" or ret['status'] == "Exists":
+					if ret['status'] == "Prose":
+						assert 'dl_path'    in ret
+						assert 'page_desc'  in ret
+						assert 'page_title' in ret
+						assert 'post_time'  in ret
+						assert isinstance(ret['dl_path'], list)
+						seq = 0
+						self._updatePreviouslyRetreived(
+								artist       = artist,
+								state        = 'complete',
+								release_meta = pageURL,
+								fqDlPath     = None,
+								pageDesc     = ret['page_desc'],
+								pageTitle    = ret['page_title'],
+								addTime      = ret['post_time'],
+								postTags     = ret['post_tags'],
+							)
+					elif ret['status'] == "Succeeded" or ret['status'] == "Exists":
 						assert 'dl_path'    in ret
 						assert 'page_desc'  in ret
 						assert 'page_title' in ret
@@ -426,15 +443,15 @@ class ScraperBase(module_base.ModuleBase, metaclass=abc.ABCMeta):
 						seq = 0
 						for item in ret['dl_path']:
 							self._updatePreviouslyRetreived(
-									artist=artist,
-									state='complete',
-									release_meta=pageURL,
-									fqDlPath=item,
-									pageDesc=ret['page_desc'],
-									pageTitle=ret['page_title'],
-									seqNum=seq,
-									addTime=ret['post_time'],
-									postTags=ret['post_tags'],
+									artist       = artist,
+									state        = 'complete',
+									release_meta = pageURL,
+									fqDlPath     = item,
+									pageDesc     = ret['page_desc'],
+									pageTitle    = ret['page_title'],
+									seqNum       = seq,
+									addTime      = ret['post_time'],
+									postTags     = ret['post_tags'],
 								)
 							seq += 1
 					elif ret['status'] == "Ignore":  # Used for compound pages (like Pixiv's manga pages), where the page has multiple sub-pages that are managed by the plugin
