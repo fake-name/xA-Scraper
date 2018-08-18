@@ -1,7 +1,7 @@
-APScheduler==3.5.1
+APScheduler==3.5.3
 Babel==2.6.0
-beautifulsoup4==4.6.1
-CherryPy==17.0.0
+beautifulsoup4==4.6.3
+CherryPy==17.3.0
 colorama==0.3.9
 future==0.16.0
 httpretty==0.9.5
@@ -47,7 +47,7 @@ sqlalchemy_jsonfield==0.7.1
 dill==0.2.8.2
 tqdm==4.24.0
 
-webrequest==0.0.44
+webrequest==0.0.46
 
 git+https://github.com/berkerpeksag/astor.git
 git+https://github.com/fake-name/ChromeController.git
