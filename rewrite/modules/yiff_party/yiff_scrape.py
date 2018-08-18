@@ -643,6 +643,18 @@ class GetYp(rewrite.modules.scraper_base.ScraperBase, rewrite.modules.rpc_base.R
 		nl = self.getNameList(update_namelist, local)
 		if 'drain' in sys.argv:
 			nl = nl[:3]
+
+		nl = [
+					(aid, aname)
+				for
+					aid, aname
+				in
+					nl
+				if
+					aname.lower()
+				not in
+					settings[self.settingsDictKey]['masked-users']
+					]
 		# for chunk in [nl, ]:
 
 		for x in range(10000 if 'drain' in sys.argv else 1):
