@@ -7,6 +7,7 @@ import datetime
 import time
 import urllib.request
 
+import WebRequest
 import bs4
 
 import flags
@@ -35,10 +36,17 @@ class GetDA(rewrite.modules.scraper_base.ScraperBase):
 		userinfo			=	re.search(r"<Cookie userinfo=[\_\%0-9a-z\-]*? for \.deviantart\.com/>", "%s" % self.wg.cj, re.IGNORECASE)
 
 		if authCookie and authSecureCookie and userinfo:
-			return True, "Have DA Cookies:\n	%s\n	%s\n	%s" % (authCookie.group(0), authSecureCookie.group(0), userinfo.group(0))
+			if self._is_logged_in():
+				return True, "Have DA Cookies:\n	%s\n	%s\n	%s" % (authCookie.group(0), authSecureCookie.group(0), userinfo.group(0))
 		# print authCookie, authSecureCookie
 		return False, "Do not have DA login Cookies"
 
+	def _is_logged_in(self):
+		soup = self.wg.getSoup("https://www.deviantart.com/")
+
+		user_1 = soup.find('span', class_='username')
+
+		return user_1 and settings["da"]["username"].lower() in user_1.get_text(strip=True).lower()
 
 	def getCookie(self):
 
@@ -48,7 +56,9 @@ class GetDA(rewrite.modules.scraper_base.ScraperBase):
 		# print prepage
 		form = soup.find("form", action=login_page)
 		if not form:
-			raise rewrite.modules.exceptions.AccountDisabledException("DA Scraper is bot-blocked. Please log in manually from your IP to un-wedge.")
+			with open("Bad page.html", "w") as fp:
+				fp.write(soup.prettify())
+			raise rewrite.modules.exceptions.CannotAccessException("DA Scraper is bot-blocked. Please log in manually from your IP to un-wedge.")
 		items = form.find_all("input")
 		logDict = {}
 		for item in items:
@@ -75,6 +85,13 @@ class GetDA(rewrite.modules.scraper_base.ScraperBase):
 		else:
 			return True, "Logged In"
 
+
+	# ---------------------------------------------------------------------------------------------------------------------------------------------------------
+	# Utility bits
+	# ---------------------------------------------------------------------------------------------------------------------------------------------------------
+
+	def _checkLoginFromSoup(self, soup):
+		pass
 
 	# ---------------------------------------------------------------------------------------------------------------------------------------------------------
 	# Individual page scraping
@@ -171,7 +188,7 @@ class GetDA(rewrite.modules.scraper_base.ScraperBase):
 
 		if pageSoup.find(class_='matureoption'):
 			self.log.critical("You seem to not be logged on (or have mature content disabled)?")
-			raise rewrite.modules.exceptions.RetryException("You seem to not be logged on (or have mature content disabled)?")
+			raise rewrite.modules.exceptions.NotLoggedInException("You seem to not be logged on (or have mature content disabled)?")
 
 
 
@@ -180,8 +197,12 @@ class GetDA(rewrite.modules.scraper_base.ScraperBase):
 
 		if not imgurl:
 			self.log.critical("OH NOES!!! No image on page = %s", artPageUrl)
-			self.getCookie()
-			raise rewrite.modules.exceptions.RetryException("Image missing?")
+			if not self._checkLoginFromSoup(pageSoup):
+				# If we've not logged in, relogin.
+				raise rewrite.modules.exceptions.NotLoggedInException("Image missing?")
+
+			raise rewrite.modules.exceptions.CannotFindContentException("Image missing?")
+
 
 
 		if imgurl == "Prose":
@@ -261,7 +282,14 @@ class GetDA(rewrite.modules.scraper_base.ScraperBase):
 
 	def _getTotalArtCount(self, artist):
 		basePage = "http://%s.deviantart.com/" % artist
-		page = self.wg.getSoup(basePage)
+		try:
+			page = self.wg.getSoup(basePage)
+		except WebRequest.FetchFailureError as e:
+			if e.err_code == 404:
+				raise rewrite.modules.exceptions.AccountDisabledException("Account seems to have been removed!")
+			else:
+				raise rewrite.modules.exceptions.CannotAccessException("Failed to access page for artist %s. HTTP Error %s!" % (artist, e.err_code))
+
 		div = page.find("div", class_="pbox pppbox")
 		if not div:
 			raise rewrite.modules.exceptions.AccountDisabledException("Could not retreive artist item quantity!")
@@ -318,12 +346,13 @@ if __name__ == '__main__':
 		ins.getCookie()
 
 
-	# ins.go(ctrlNamespace=namespace)
+
+	ins.go(ctrlNamespace=namespace)
 
 	# print(ins)
 	# print("Instance: ", ins)
 	# dlPathBase, artPageUrl, artistName
 	# ins._getArtPage("xxxx", 'http://samus9450.deviantart.com/art/SAMUS-ZERO-SUIT-SEXY-3-603835374', 'testtt')
-	ins.getArtist('testtt', ctrlNamespace=namespace)
+	# ins.getArtist('testtt', ctrlNamespace=namespace)
 
 

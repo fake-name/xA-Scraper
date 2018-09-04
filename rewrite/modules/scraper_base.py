@@ -342,11 +342,7 @@ class ScraperBase(module_base.ModuleBase, metaclass=abc.ABCMeta):
 
 	def _load_art(self, artist):
 		aid = self._artist_name_to_rid(artist)
-		try:
-			totalArt = self._getTotalArtCount(artist)
-		except exceptions.AccountDisabledException:
-			return []
-
+		totalArt = self._getTotalArtCount(artist)
 		artPages = self._getGalleries(artist)
 
 		if totalArt is None:
@@ -381,8 +377,12 @@ class ScraperBase(module_base.ModuleBase, metaclass=abc.ABCMeta):
 				return self.build_page_ret(status="Failed", fqDlPath=None, pageTitle="Error: %s" % e)
 			except exceptions.CannotAccessException as e:
 				return self.build_page_ret(status="Failed", fqDlPath=None, pageTitle="Error: %s" % e)
+			except exceptions.CannotFindContentException as e:
+				return self.build_page_ret(status="Failed", fqDlPath=None, pageTitle="Error: %s" % e)
 
-			except exceptions.RetryException:
+			except exceptions.NotLoggedInException:
+				self.log.error("You are not logged in? Checking and re-logging in.")
+				self.getCookie()
 				pass
 
 		self.log.error("Failed to fetch content with args: '%s', kwargs: '%s'", args, kwargs)
@@ -480,6 +480,10 @@ class ScraperBase(module_base.ModuleBase, metaclass=abc.ABCMeta):
 			self.log.info("Successfully retreived content for artist %s", artist)
 
 			return False
+		except exceptions.AccountDisabledException:
+			self.log.error("Artist seems to have disabled their account!")
+			return False
+
 		except:
 			self.log.error("Exception when retreiving artist %s", artist)
 			self.log.error("%s", traceback.format_exc())

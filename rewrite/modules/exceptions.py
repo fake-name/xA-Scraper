@@ -5,8 +5,12 @@ class ScraperException(RuntimeError):
 
 class RetryException(ScraperException):
 	pass
+class NotLoggedInException(ScraperException):
+	pass
 
 class FetchFailedException(ScraperException):
+	pass
+class CannotFindContentException(ScraperException):
 	pass
 
 
