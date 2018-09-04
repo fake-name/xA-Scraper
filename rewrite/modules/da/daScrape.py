@@ -265,7 +265,7 @@ class GetDA(rewrite.modules.scraper_base.ScraperBase):
 						self.log.error(traceback.format_exc())
 
 
-				self.log.info("Successfully got: " + imgurl)
+				self.log.info("Successfully got: '%s'", imgurl)
 
 				# return "Succeeded", filePath, pageDesc, pageTitle									# Return Success
 				return self.build_page_ret(status="Succeeded", fqDlPath=[filePath], pageDesc=pageDesc, pageTitle=pageTitle, postTags=postTags, postTime=postTime)
@@ -289,6 +289,15 @@ class GetDA(rewrite.modules.scraper_base.ScraperBase):
 				raise rewrite.modules.exceptions.AccountDisabledException("Account seems to have been removed!")
 			else:
 				raise rewrite.modules.exceptions.CannotAccessException("Failed to access page for artist %s. HTTP Error %s!" % (artist, e.err_code))
+
+		group_entry = page.find("a", href="#super-secret-why")
+
+		if group_entry and "Group" in group_entry.get_text():
+			self.log.error("You seem to have accidentally added a DA Group (%s) to the scrape targets!", artist)
+			raise rewrite.modules.exceptions.AccountDisabledException("You seem to have accidentally added a DA Group to the scrape targets!")
+
+
+
 
 		div = page.find("div", class_="pbox pppbox")
 		if not div:
