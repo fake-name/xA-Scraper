@@ -226,34 +226,17 @@ class GetFA(rewrite.modules.scraper_base.ScraperBase, util.captcha2upload.Captch
 				self.log.error("source gallery page: %s", artPageUrl)
 				return self.build_page_ret(status="Failed", fqDlPath=None)
 
-			errs = 0
-			imgFile = None
+			# For text, the URL fetcher returns decoded strings, rather then bytes.
+			# Therefore, if the file is a string type, we encode it with utf-8
+			# so we can write it to a file.
+			if isinstance(imgdat, str):
+				imgdat = imgdat.encode(encoding='UTF-8')
 
-			while not imgFile:
-				try:
-					# For text, the URL fetcher returns decoded strings, rather then bytes.
-					# Therefore, if the file is a string type, we encode it with utf-8
-					# so we can write it to a file.
-					if isinstance(imgdat, str):
-						imgdat = imgdat.encode(encoding='UTF-8')
+			filePath = self.save_file(filePath, imgdat)
+			if not filePath:
+				return self.build_page_ret(status="Failed", fqDlPath=None)
 
-					imgFile = open(filePath, "wb")						# Open file for saving image (Binary)
-					imgFile.write(imgdat)							# Write Image to File
-					imgFile.close()
-				except IOError:
-					try:
-						imgFile.close()
-					except:
-						pass
-					errs += 1
-					self.log.critical("Error attempting to save image file - %s" % filePath)
-					if errs > 3:
-						self.log.critical("Could not open file for writing!")
-						raise
-
-
-
-			self.log.info("Successfully got: " + imgurl)
+			self.log.info("Successfully got: '%s'",  imgurl)
 
 			self.log.info("Sleeping %s seconds to avoid rate-limiting", self.sleep_time)
 			time.sleep(self.sleep_time)

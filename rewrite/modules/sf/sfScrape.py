@@ -233,38 +233,17 @@ class GetSf(rewrite.modules.scraper_base.ScraperBase):
 					imName = imName[1:-1]
 
 
-				errs = 0
-				fp = None
 
-				while not fp:
-					try:
-						print("Filepath:", filePath)
-						print("imName:", imName)
-						fname = filePath + " - " + imName
-						# For text, the URL fetcher returns decoded strings, rather then bytes.
-						# Therefore, if the file is a string type, we encode it with utf-8
-						# so we can write it to a file.
-						if isinstance(imgdat, str):
-							imgdat = imgdat.encode(encoding='UTF-8')
+				# For text, the URL fetcher returns decoded strings, rather then bytes.
+				# Therefore, if the file is a string type, we encode it with utf-8
+				# so we can write it to a file.
+				if isinstance(imgdat, str):
+					imgdat = imgdat.encode(encoding='UTF-8')
 
-						fp = open(fname, "wb")								# Open file for saving image (Binary)
-						fp.write(imgdat)						# Write Image to File
-						fp.close()
+				filePath = self.save_file(filePath, imgdat)
+				if not filePath:
+					return self.build_page_ret(status="Failed", fqDlPath=None)
 
-
-						self.log.info("Successfully got: %s", imageURL)
-						return self.build_page_ret(status="Succeeded", fqDlPath=[fname], pageDesc=itemCaption, pageTitle=itemTitle, postTags=itemTags, postTime=postTime)
-
-					except IOError:
-						try:
-							fp.close()
-						except:
-							pass
-						errs += 1
-						self.log.critical("Error attempting to save image file - %s", fname)
-						if errs > 3:
-							self.log.critical("Could not open file for writing!")
-							break
 
 		return self.build_page_ret(status="Failed", fqDlPath=None)
 

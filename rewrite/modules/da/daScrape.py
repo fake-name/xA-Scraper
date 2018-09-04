@@ -231,39 +231,15 @@ class GetDA(rewrite.modules.scraper_base.ScraperBase):
 					self.log.error("cannot get image")
 					return self.build_page_ret(status="Failed", fqDlPath=None)
 
-				errs = 0
-				fp = None
+				# For text, the URL fetcher returns decoded strings, rather then bytes.
+				# Therefore, if the file is a string type, we encode it with utf-8
+				# so we can write it to a file.
+				if isinstance(imgdat, str):
+					imgdat = imgdat.encode(encoding='UTF-8')
 
-				while not fp:
-					try:
-						# For text, the URL fetcher returns decoded strings, rather then bytes.
-						# Therefore, if the file is a string type, we encode it with utf-8
-						# so we can write it to a file.
-						if isinstance(imgdat, str):
-							imgdat = imgdat.encode(encoding='UTF-8')
-
-						fp = open(filePath, "wb")								# Open file for saving image (Binary)
-						fp.write(imgdat)
-						fp.close()
-					except IOError:
-						try:
-							fp.close()
-						except Exception:
-							pass
-						errs += 1
-						self.log.critical("Error attempting to save image file - %s", filePath)
-						if errs > 3:
-							self.log.critical("Could not open file for writing!")
-							return self.build_page_ret(status="Failed", fqDlPath=None)
-
-
-					except Exception:
-						self.log.error("Error saving image - what?")
-						self.log.error("Source URL: '%s'", artPageUrl)
-						self.log.error(type(imgdat))
-
-						self.log.error(traceback.format_exc())
-
+				filePath = self.save_file(filePath, imgdat)
+				if not filePath:
+					return self.build_page_ret(status="Failed", fqDlPath=None)
 
 				self.log.info("Successfully got: '%s'", imgurl)
 

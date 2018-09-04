@@ -12,6 +12,85 @@ from settings import settings
 from rewrite.modules import module_base
 from rewrite.modules import exceptions
 
+
+def makeFilenameSafe(inStr):
+
+	# FUCK YOU SMART-QUOTES.
+	inStr = inStr.replace("“",  " ") \
+				 .replace("”",  " ")
+
+	inStr = inStr.replace("%20", " ") \
+				 .replace("<",  " ") \
+				 .replace(">",  " ") \
+				 .replace(":",  " ") \
+				 .replace("\"", " ") \
+				 .replace("/",  " ") \
+				 .replace("\\", " ") \
+				 .replace("|",  " ") \
+				 .replace("?",  " ") \
+				 .replace("*",  " ") \
+				 .replace('"', " ")
+
+	# zero-width space bullshit (goddammit unicode)
+	inStr = inStr.replace("\u2009",  " ") \
+				 .replace("\u200A",  " ") \
+				 .replace("\u200B",  " ") \
+				 .replace("\u200C",  " ") \
+				 .replace("\u200D",  " ") \
+				 .replace("\uFEFF",  " ")
+
+	# Collapse all the repeated spaces down.
+	while inStr.find("  ")+1:
+		inStr = inStr.replace("  ", " ")
+
+
+	# inStr = inStr.rstrip(".")  # Windows file names can't end in dot. For some reason.
+	# Fukkit, disabling. Just run on linux.
+
+	inStr = inStr.rstrip("! ")   # Clean up trailing exclamation points
+	inStr = inStr.strip(" ")    # And can't have leading or trailing spaces
+
+	return inStr
+
+def insertCountIfFileExistsAndIsDifferent(fqFName, file_bytes):
+
+	# If the file exists, check if we've already fetched it.
+	if os.path.exists(fqFName):
+		with open(fqFName, "rb") as fp:
+			if fp.read() == file_bytes:
+				return fqFName
+
+	base, ext = os.path.splitext(fqFName)
+	loop = 1
+	while os.path.exists(fqFName):
+		fqFName = "%s - (%d)%s" % (base, loop, ext)
+		if os.path.exists(fqFName):
+			with open(fqFName, "rb") as fp:
+				if fp.read() == file_bytes:
+					return fqFName
+
+		loop += 1
+
+	return fqFName
+
+
+def prep_check_fq_filename(fqfilename):
+	fqfilename = os.path.abspath(fqfilename)
+
+	filepath, fileN = os.path.split(fqfilename)
+	fileN = makeFilenameSafe(fileN)
+
+	# Create the target container directory (if needed)
+	if not os.path.exists(filepath):
+		os.makedirs(filepath, exist_ok=True)    # Hurray for race conditions!
+
+	assert os.path.isdir(filepath)
+
+	fqfilename = os.path.join(filepath, fileN)
+
+	return fqfilename
+
+
 class ScraperBase(module_base.ModuleBase, metaclass=abc.ABCMeta):
 
 	# Abstract class (must be subclassed)
@@ -105,6 +184,40 @@ class ScraperBase(module_base.ModuleBase, metaclass=abc.ABCMeta):
 		}
 		return ret
 
+
+
+	def save_file(self, fqfilename, file_content):
+
+		fqfilename = prep_check_fq_filename(fqfilename)
+		filepath, fileN = os.path.split(fqfilename)
+		self.log.info("Complete filepath: %s", fqfilename)
+
+		chop = len(fileN)-4
+
+		assert isinstance(file_content, (bytes, bytearray)), "save_file() requires the file_content be bytes!"
+
+		fqfilename = insertCountIfFileExistsAndIsDifferent(fqfilename, file_content)
+
+		while 1:
+			try:
+				with open(fqfilename, "wb") as fp:
+					fp.write(file_content)
+
+				return fqfilename
+
+			except (IOError, OSError):
+				chop = chop - 1
+				filepath, fileN = os.path.split(fqfilename)
+
+				fileN = fileN[:chop]+fileN[-4:]
+				self.log.warning("Truncating file length to %s characters and re-encoding.", chop)
+				fileN = fileN.encode('utf-8','ignore').decode('utf-8')
+				fileN = makeFilenameSafe(fileN)
+				fqfilename = os.path.join(filepath, fileN)
+				fqfilename = insertCountIfFileExistsAndIsDifferent(fqfilename, file_content)
+
+
+		return None
 
 	# ---------------------------------------------------------------------------------------------------------------------------------------------------------
 	# DB Management
