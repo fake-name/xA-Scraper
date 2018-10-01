@@ -243,9 +243,18 @@ class GetPatreon(rewrite.modules.scraper_base.ScraperBase):
 
 		return fqpath
 
+
+
 	# TODO: Implement this
 	def fetch_video_embed(self, post_content):
+		self.log.warning("Embedded video. Plz complain on github about this!")
 		return None
+
+	def _handle_embed(self, embed_info):
+		self.log.warning("Embedded external content. Plz complain on github about this!")
+		self.log.warning("Include the above json-like output so I can see what I need to do.")
+		return []
+
 
 	def _getContentUrlFromPage(self, soup):
 
@@ -317,7 +326,13 @@ class GetPatreon(rewrite.modules.scraper_base.ScraperBase):
 				fpath = self.save_attachment(artistName, postId, dat_struct)
 				files.append(fpath)
 
+			if 'embed' in post_info and post_info['embed']:
+				for item in self._handle_embed(post_info['embed']):
+					files.append(fpath)
 
+
+			# if 'image' in post_info and post_info['image']:
+			# 	Whould I
 
 
 		except urllib.error.URLError:
