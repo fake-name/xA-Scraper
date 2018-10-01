@@ -399,10 +399,10 @@ class GetPatreon(rewrite.modules.scraper_base.ScraperBase):
 			else:
 				newArt = []
 
-			with open("artist_items.json", "wb") as fp:
-				json.dump(newArt, fp)
+			# with open("artist_items.json", "wb") as fp:
+			# 	json.dump(newArt, fp)
 
-			return
+			# return
 
 			while len(newArt) > 0:
 				postid = newArt.pop()
