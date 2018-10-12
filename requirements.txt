@@ -5,7 +5,7 @@ CherryPy==18.0.1
 colorama==0.4.0
 future==0.16.0
 httpretty==0.9.5
-lxml==4.2.4
+lxml==4.2.5
 Mako==1.0.7
 MarkupSafe==1.0
 ## natsort
