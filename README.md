@@ -40,12 +40,16 @@ Dependencies:
 The backend can either use a local sqlite database (which has poor performance, particularly
 when cold, but is *very* easy to set up), or a full postgresql instance.
 
+Configuration is done via a file named `settings.py` which must be placed in the
+repository root. `settings.base.py` is an example config to work from. 
+In general, you will probably want to copy `settings.base.py` to `settings.py`, and then 
+add your various usernames/password/database-config.
+
 DB Backend is selected via the `USE_POSTGRESQL` parameter in `settings.py`. 
 
 If using postgre, DB setup is left to the user. xA-Scraper requires it's own database, 
 and the ability to make IP-based connections to the hosting PG instance. The connection 
-information, DB name, and client name must be set by copying settings.base.py to `settings.py`,
-and updating the appropriate strings. 
+information, DB name, and client name must be set in `settings.py`.
 
 When using sqlite, you just have to specify the path to where you want the sqlite db to
 be located (or you can use the default, which is `./sqlite_db.db`).
