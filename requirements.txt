@@ -15,7 +15,7 @@ pyramid==1.10
 sqlalchemy==1.2.13
 alembic==1.0.2
 python-tumblpy==1.1.4
-pytz==2018.5
+pytz==2018.7
 ## PyYAML
 ## repoze.lru
 requests==2.19.1
