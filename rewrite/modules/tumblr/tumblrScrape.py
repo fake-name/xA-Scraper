@@ -5,9 +5,11 @@ import traceback
 import urllib.parse
 import concurrent.futures
 import datetime
+import signal
 from settings import settings
 from tumblpy import Tumblpy
 
+import flags
 import rewrite.modules.scraper_base
 
 
@@ -280,4 +282,45 @@ class GetTumblr(rewrite.modules.scraper_base.ScraperBase):
 
 		finally:
 			self.updateRunningStatus(self.settingsDictKey, False)
+
+
+def mgr_init():
+	signal.signal(signal.SIGINT, signal.SIG_IGN)
+	print('initialized manager')
+
+def signal_handler(dummy_signal, dummy_frame):
+	if flags.namespace.run:
+		flags.namespace.run = False
+		print("Telling threads to stop")
+	else:
+		print("Multiple keyboard interrupts. Raising")
+		raise KeyboardInterrupt
+
+def run_local():
+	import multiprocessing
+
+	manager = multiprocessing.managers.SyncManager()
+	manager.start()
+	flags.namespace = manager.Namespace()
+	flags.namespace.run = True
+
+	signal.signal(signal.SIGINT, signal_handler)
+
+	print(sys.argv)
+	ins = GetTumblr()
+	# ins.getCookie()
+	print(ins)
+	print("Instance: ", ins)
+
+	# ins.go(ctrlNamespace=flags.namespace, update_namelist=True)
+	ins.go(ctrlNamespace=flags.namespace)
+
+
+if __name__ == '__main__':
+
+	import sys
+	import logSetup
+	logSetup.initLogging()
+
+	run_local()
 

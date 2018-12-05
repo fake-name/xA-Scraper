@@ -44,13 +44,13 @@ JOBS = [
 	(ibs.GetIb,      settings["ib"]["runInterval"],   "ib"),
 	(pxs.GetPX,      settings["px"]["runInterval"],   "px"),
 	(sfs.GetSf,      settings["sf"]["runInterval"],   "sf"),
-	(tus.GetTumblr,  settings["tum"]["runInterval"], "tum"),
 	(pts.GetPatreon, settings["pat"]["runInterval"], "pat"),
 	(Nopper,         settings["yp"]["runInterval"],  "yp"),
 ]
 
 
 JOBS_DISABLED = [
+	(tus.GetTumblr,  settings["tum"]["runInterval"], "tum"),
 	(ass.GetAs,      settings["as"]["runInterval"],   "as"),
 	(yps.GetYp,      settings["yp"]["runInterval"],  "yp"),
 ]
@@ -132,7 +132,7 @@ def go(managedNamespace):
 				},
 				'apscheduler.executors.default': {
 					'class': 'apscheduler.executors.pool:ThreadPoolExecutor',
-					'max_workers': '5'
+					'max_workers': '10'
 				},
 				'apscheduler.job_defaults.coalesce': 'true',
 				'apscheduler.job_defaults.max_instances': '1',
