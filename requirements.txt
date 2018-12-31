@@ -20,7 +20,7 @@ pytz==2018.7
 ## repoze.lru
 requests==2.21.0
 requests-oauthlib==1.0.0
-six==1.11.0
+six==1.12.0
 ## translationstring
 tzlocal==1.5.1
 ## venusian
