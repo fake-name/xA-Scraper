@@ -1,6 +1,4 @@
 
-from settings import settings
-from settings import SQLALCHEMY_DATABASE_URI  as C_SQLALCHEMY_DATABASE_URI
 
 
 import os
@@ -12,11 +10,12 @@ import string
 import random
 random.seed()
 
+from settings import SQLALCHEMY_DATABASE_URI  as C_SQLALCHEMY_DATABASE_URI
+
 if len(sys.argv) > 1 and "debug" in sys.argv:
 	SQLALCHEMY_ECHO = True
 
 
-REFETCH_INTERVAL = datetime.timedelta(days=7*3)
 
 basedir = os.path.abspath(os.path.dirname(__file__))
 
@@ -32,7 +31,7 @@ class BaseConfig(object):
 	SQLALCHEMY_DATABASE_URI = C_SQLALCHEMY_DATABASE_URI
 	SQLALCHEMY_MIGRATE_REPO = os.path.join(basedir, 'db_repository')
 
-	CSRF_ENABLED = True
+	CSRF_ENABLED     = True
 	WTF_CSRF_ENABLED = True
 
 
@@ -45,20 +44,14 @@ class BaseConfig(object):
 	SEND_FILE_MAX_AGE_DEFAULT = 60*60*12
 
 	# pagination
-	TAGS_PER_PAGE = 50
-	GENRES_PER_PAGE = 50
-	SERIES_PER_PAGE = 50
-
 	POSTS_PER_PAGE = 250
-	MAX_SEARCH_RESULTS = 50
 
-	FEED_ITEMS_PER_PAGE = 150
 	SQLALCHEMY_TRACK_MODIFICATIONS = False
 
 
 	# flask-assets
 	# ------------
-	ASSETS_DEST = 'rewrite/static'
+	ASSETS_DEST = 'xascraper/static'
 
 	# The WTF protection doesn't have to persist across
 	# execution sessions, since that'll break any

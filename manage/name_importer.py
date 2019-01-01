@@ -8,9 +8,9 @@ import urllib.parse
 import traceback
 import os
 
-from rewrite import db
-from rewrite import database
-import rewrite.modules.tumblr.tumblrScrape
+from xascraper import db
+from xascraper import database
+import xascraper.modules.tumblr.tumblrScrape
 
 from .scrape_manage import PLUGINS
 from . import cli_utils
@@ -18,7 +18,7 @@ from . import cli_utils
 from settings import settings
 
 
-class NameImporter(rewrite.modules.tumblr.tumblrScrape.GetTumblr):
+class NameImporter(xascraper.modules.tumblr.tumblrScrape.GetTumblr):
 
 	log = logging.getLogger("Main.NameImporter")
 

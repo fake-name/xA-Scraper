@@ -1,0 +1,353 @@
+
+import os
+import os.path
+import traceback
+import re
+import bs4
+import time
+import dateparser
+import urllib.request
+import flags
+from settings import settings
+import urllib.parse
+
+import util.captcha2upload
+import xascraper.modules.scraper_base
+from xascraper.modules import exceptions
+
+class GetFA(xascraper.modules.scraper_base.ScraperBase, util.captcha2upload.CaptchaSolverMixin):
+
+	settingsDictKey = "fa"
+	pluginName = "FaGet"
+
+	urlBase = "http://www.furaffinity.net/"
+
+
+	ovwMode = "Check Files"
+
+	numThreads = 1
+
+	sleep_time = 6
+
+	# ---------------------------------------------------------------------------------------------------------------------------------------------------------
+	# Cookie Management
+	# ---------------------------------------------------------------------------------------------------------------------------------------------------------
+
+	def checkCookie(self):
+
+		userID = re.search(r"<Cookie a=[0-9a-f\-]*? for \.furaffinity\.net/>", "%s" % self.wg.cj)
+		sessionID = re.search(r"<Cookie b=[0-9a-f\-]*? for \.furaffinity\.net/>", "%s" % self.wg.cj)
+		if userID and sessionID:
+			return True, "Have FA Cookies:\n	%s\n	%s" % (userID.group(0), sessionID.group(0))
+
+		return False, "Do not have FA login Cookies"
+
+
+	def getCookie(self):
+
+		if self.checkCookie()[0] is True:
+			self.log.warn("Do not need to log in!")
+			return "Logged In"
+
+
+		balance = self.captcha_solver.getbalance()
+		self.log.info("Captcha balance: %s", balance)
+
+		login_pg    = self.wg.getpage('https://www.furaffinity.net/login/')
+		captcha_img = self.wg.getpage('https://www.furaffinity.net/captcha.jpg')
+
+		with open("img.jpg", "wb") as fp:
+			fp.write(captcha_img)
+
+		self.log.info("Solving captcha. Please wait")
+		captcha_result = self.captcha_solver.solve(filedata=captcha_img, filename='captcha.jpg')
+		self.log.info("Captcha solving service result: %s", captcha_result)
+		values = {
+			'action'               : 'login',
+			'name'                 : settings['fa']['username'],
+			'pass'                 : settings['fa']['password'],
+			'g-recaptcha-response' : "",
+			'use_old_captcha'      : 1,
+			'captcha'              : captcha_result,
+			'login'                : 'Login to FurAffinity',
+		}
+
+
+		pagetext = self.wg.getpage('https://www.furaffinity.net/login/?url=/', postData = values)
+
+		if self.checkCookie()[0] is True:
+			return "Logged In"
+		else:
+			return "Login Failed"
+
+
+	# ---------------------------------------------------------------------------------------------------------------------------------------------------------
+	# Individual page scraping
+	# ---------------------------------------------------------------------------------------------------------------------------------------------------------
+
+	def _getContentUrlFromPage(self, pgIn):
+
+		# TODO: Proper page parsing, rather then regexes
+
+		regx1 = re.compile(r'[\"\']((?:https:)?//d\.facdn\.net\/[^\'\"]*?)[\"\']>\s?Download\s?</a>')
+		reResult = regx1.search(pgIn)
+
+		if reResult:
+			imgurl = reResult.group(1)
+			self.log.info("Found direct download URL : %s", imgurl)
+			return imgurl
+
+
+		regx2 = re.compile('var full_url *?= [\'\"]([^\'\"]*?)[\"\']')							# Extract Image location from javascript
+		reResult = regx2.search(pgIn)
+
+
+		if reResult:
+			imgurl = reResult.group(1)
+			self.log.info("Found Image URL : %s", imgurl)
+
+			return imgurl
+
+		regx2 = re.compile(r'<param name="movie" *?value=[\'\"]([^\s\'\"]*?)[\"\']')
+
+		reResult = regx2.search(pgIn)
+		if reResult:
+			imgurl = reResult.group(1)
+
+			self.log.info("Found Flash URL : %s", imgurl)
+			return imgurl
+
+		return False
+
+
+	def _getContentDescriptionTitleFromSoup(self, soup):
+
+		pageDesc = ""
+		pageTitle = ""
+		commentaryTd = soup.find("td", attrs={"valign":"top", "align":"left", "class":"alt1", "width":"70%"})
+		if commentaryTd:
+
+			# Pull out all the items in the commentary <td>
+			# print("Commentary = ", commentaryTd)
+
+			for item in commentaryTd.children:
+				content = str(item).rstrip().lstrip()
+				pageDesc += content
+
+
+		titleCont = soup.find("td", attrs={"valign":"top", "align":"left", "class":"cat", "width":"70%"})
+		if titleCont and "- by" in titleCont.text:
+			pageTitle = titleCont.find("b").text.rstrip().lstrip()
+			pageTitle = str(pageTitle)
+
+		datespan = soup.find('span', class_='popup_date')
+		postTime = dateparser.parse(datespan['title'])
+
+		tagdiv = soup.find('div', id='keywords')
+		if tagdiv:
+			tags = tagdiv.find_all("a")
+			tags = [tag.get_text().strip() for tag in tags]
+		else:
+			tags = []
+
+		return pageDesc, pageTitle, tags, postTime
+
+
+	def _getArtPage(self, dlPathBase, artPageUrl, artistName):
+
+		self.log.info("Getting page %s", artPageUrl)
+
+		try:
+
+			pageCtnt = self.wg.getpage(artPageUrl)
+		except Exception as e:
+			self.log.info("Sleeping %s seconds to avoid rate-limiting", self.sleep_time)
+			time.sleep(self.sleep_time)
+			raise e
+
+
+		if 'The submission you are trying to find is not in our database.' in pageCtnt:
+			self.log.warning("Content has been removed!")
+			self.log.info("Sleeping %s seconds to avoid rate-limiting", self.sleep_time)
+			time.sleep(self.sleep_time)
+			raise exceptions.ContentRemovedException("Item has been removed")
+
+		imgurl = self._getContentUrlFromPage(pageCtnt)
+
+		if not imgurl:
+			self.log.error("OH NOES!!! No image on page: %s", artPageUrl)
+			raise exceptions.ContentRemovedException("No image found on page: %s" % artPageUrl)
+
+
+
+		if "http:" not in imgurl:
+			imgurl = "http:%s" % imgurl
+
+		fileTypeRe = re.compile(r".+\.")
+		fileNameRe = re.compile(r".+/")						# Pull out filename only
+
+		fname = fileNameRe.sub("" , imgurl)
+		ftype = fileTypeRe.sub("" , fname)					# Pull out filename only
+
+		self.log.info("			Filename = %s", fname)
+		self.log.info("			File Type = %s", ftype)
+		self.log.info("			FileURL  = %s", imgurl)
+
+
+		try:
+			filePath = os.path.join(dlPathBase, fname)
+			pageDesc, pageTitle, postTags, postTime = self._getContentDescriptionTitleFromSoup(bs4.BeautifulSoup(pageCtnt, "lxml"))
+			self.log.info("			postTags  = %s", postTags)
+			self.log.info("			postTime  = %s", postTime)
+
+		except Exception:
+			print("file path issue")
+
+			traceback.print_exc()
+
+			self.log.error("file path issue")
+			self.log.error("%s", artPageUrl)
+			self.log.error("%s", traceback.format_exc())
+			self.log.exception("Error with path joining")
+			return self.build_page_ret(status="Failed", fqDlPath=None)
+
+
+		if self._checkFileExists(filePath):
+			self.log.info("Exists, skipping...")
+			self.log.info("Sleeping %s seconds to avoid rate-limiting", self.sleep_time)
+			time.sleep(self.sleep_time)
+			return self.build_page_ret(status="Exists", fqDlPath=[filePath], pageDesc=pageDesc, pageTitle=pageTitle, postTags=postTags, postTime=postTime)
+		else:
+
+			imgdat = self.wg.getpage(imgurl)							# Request Image
+
+			if imgdat == "Failed":
+				self.log.error("cannot get image %s", imgurl)
+				self.log.error("source gallery page: %s", artPageUrl)
+				return self.build_page_ret(status="Failed", fqDlPath=None)
+
+			# For text, the URL fetcher returns decoded strings, rather then bytes.
+			# Therefore, if the file is a string type, we encode it with utf-8
+			# so we can write it to a file.
+			if isinstance(imgdat, str):
+				imgdat = imgdat.encode(encoding='UTF-8')
+
+			filePath = self.save_file(filePath, imgdat)
+			if not filePath:
+				return self.build_page_ret(status="Failed", fqDlPath=None)
+
+			self.log.info("Successfully got: '%s'",  imgurl)
+
+			self.log.info("Sleeping %s seconds to avoid rate-limiting", self.sleep_time)
+			time.sleep(self.sleep_time)
+
+			return self.build_page_ret(status="Succeeded", fqDlPath=[filePath], pageDesc=pageDesc, pageTitle=pageTitle, postTags=postTags, postTime=postTime)
+
+		raise RuntimeError("How did this ever execute?")
+
+	# ---------------------------------------------------------------------------------------------------------------------------------------------------------
+	# Gallery Scraping
+	# ---------------------------------------------------------------------------------------------------------------------------------------------------------
+
+	def _getTotalArtCount(self, artist):
+		basePage = "http://www.furaffinity.net/user/%s/" % artist
+		page = self.wg.getSoup(basePage)
+		pgstr = str(page)
+		if 'has voluntarily disabled access to their account and all of its contents.' in pgstr:
+			self.log.warning("Disabled account!")
+			return 0
+		if 'This user cannot be found.' in pgstr:
+			self.log.warning("Account not found!")
+			raise exceptions.AccountDisabledException("Could not retreive artist item quantity!")
+
+		tds = page.find("td", align="right", text="Statistics")
+
+		stats = tds.parent.parent.text
+		for line in stats.splitlines():
+			line = line.rstrip(" 	").lstrip(" 	")
+			if "Submissions: " in line:
+
+				num = line.split(":")[-1]
+				return int(num)
+
+		raise exceptions.AccountDisabledException("Could not retreive artist item quantity!")
+
+
+	def _getItemsOnPage(self, inSoup):
+
+		links = set()
+		pageContainers = inSoup("figure", id=re.compile(r"sid-\d+"))
+
+		for item in pageContainers:
+			link = urllib.parse.urljoin(self.urlBase, item.find("a")["href"])
+			links.add(link)
+
+		return links
+
+
+	def _getGalleries(self, artist):
+
+		galleries = ["http://www.furaffinity.net/gallery/%s/%s/",     # Format is "..../{artist-name}/{page-no}/"
+					"http://www.furaffinity.net/scraps/%s/%s/"]
+
+
+
+		ret = set()								# Declare array of links
+
+
+		for galleryUrlBase in galleries:
+			print("Retreiving gallery", galleryUrlBase)
+			pageNo = 1
+			while 1:
+
+				if not flags.run:
+					return []
+
+				turl = galleryUrlBase % (artist, pageNo)
+				self.log.info("Getting = " + turl)
+				pageSoup = self.wg.getSoup(turl)							# Request Image
+				if pageSoup == "Failed":
+					self.log.error("Cannot get Page: %s" % turl)
+					break
+
+				if 'has voluntarily disabled access to their account and all of its contents.' in str(pageSoup):
+					self.log.warning("Disabled account!")
+					return ret
+
+				new = self._getItemsOnPage(pageSoup)
+				if len(new) == 0 or flags.run == False:
+					self.log.info("No more images. At end of gallery.")
+					break
+				ret |= new
+				self.log.info("Retreived gallery page with %s links. Total links so far %s.", len(new), len(ret))
+
+				pageNo += 1
+
+				self.log.info("Sleeping %s seconds to avoid rate-limiting", self.sleep_time)
+				time.sleep(self.sleep_time)
+
+		self.log.info("Found %s links" % (len(ret)))
+
+		return ret
+
+
+if __name__ == '__main__':
+	print("Testing!")
+	import logSetup
+	logSetup.initLogging()
+
+
+	import multiprocessing.managers
+	import logSetup
+	logSetup.initLogging()
+
+	manager = multiprocessing.managers.SyncManager()
+	manager.start()
+	namespace = manager.Namespace()
+	namespace.run=True
+
+
+	ins = GetFA()
+	have_cookie = ins.checkCookie()
+	print('have_cookie', have_cookie)
+	ins.go(ctrlNamespace=namespace)

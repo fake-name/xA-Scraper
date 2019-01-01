@@ -10,21 +10,21 @@ import multiprocessing
 import multiprocessing.managers
 import threading
 import logSetup
-import rewrite.status_monitor
+import xascraper.status_monitor
 
 from apscheduler.schedulers.background import BackgroundScheduler
 
-import rewrite.modules.da.daScrape as das
-import rewrite.modules.fa.faScrape as fas
-import rewrite.modules.hf.hfScrape as hfs
-import rewrite.modules.px.pxScrape as pxs
-import rewrite.modules.wy.wyScrape as wys
-import rewrite.modules.ib.ibScrape as ibs
-import rewrite.modules.sf.sfScrape as sfs
-import rewrite.modules.artstation.asScrape as ass
-import rewrite.modules.tumblr.tumblrScrape as tus
-import rewrite.modules.patreon.patreonScrape as pts
-import rewrite.modules.yiff_party.yiff_scrape as yps
+import xascraper.modules.da.daScrape as das
+import xascraper.modules.fa.faScrape as fas
+import xascraper.modules.hf.hfScrape as hfs
+import xascraper.modules.px.pxScrape as pxs
+import xascraper.modules.wy.wyScrape as wys
+import xascraper.modules.ib.ibScrape as ibs
+import xascraper.modules.sf.sfScrape as sfs
+import xascraper.modules.artstation.asScrape as ass
+import xascraper.modules.tumblr.tumblrScrape as tus
+import xascraper.modules.patreon.patreonScrape as pts
+import xascraper.modules.yiff_party.yiff_scrape as yps
 
 from settings import settings
 import cherrypy
@@ -34,28 +34,29 @@ class Nopper():
 	def __init__(self):
 		pass
 	def go(self, *args, **kwargs):
+		print("Empty job looping!")
 		pass
 
 JOBS = [
-	(das.GetDA,      settings["da"]["runInterval"],   "da"),
-	(fas.GetFA,      settings["fa"]["runInterval"],   "fa"),
-	(hfs.GetHF,      settings["hf"]["runInterval"],   "hf"),
-	(wys.GetWy,      settings["wy"]["runInterval"],   "wy"),
-	(ibs.GetIb,      settings["ib"]["runInterval"],   "ib"),
-	(pxs.GetPX,      settings["px"]["runInterval"],   "px"),
-	(sfs.GetSf,      settings["sf"]["runInterval"],   "sf"),
+	(das.GetDA,      settings["da" ]["runInterval"],  "da"),
+	(fas.GetFA,      settings["fa" ]["runInterval"],  "fa"),
+	(hfs.GetHF,      settings["hf" ]["runInterval"],  "hf"),
+	(wys.GetWy,      settings["wy" ]["runInterval"],  "wy"),
+	(ibs.GetIb,      settings["ib" ]["runInterval"],  "ib"),
+	(pxs.GetPX,      settings["px" ]["runInterval"],  "px"),
+	(sfs.GetSf,      settings["sf" ]["runInterval"],  "sf"),
+	(tus.GetTumblr,  settings["tum"]["runInterval"], "tum"),
 	(pts.GetPatreon, settings["pat"]["runInterval"], "pat"),
-	(Nopper,         settings["yp"]["runInterval"],  "yp"),
+	(Nopper,                                     30,  "yp"),
 ]
 
 
 JOBS_DISABLED = [
-	(tus.GetTumblr,  settings["tum"]["runInterval"], "tum"),
-	(ass.GetAs,      settings["as"]["runInterval"],   "as"),
+	(ass.GetAs,      settings["as"]["runInterval"],  "as"),
 	(yps.GetYp,      settings["yp"]["runInterval"],  "yp"),
 ]
 
-import rewrite
+import xascraper
 
 
 def runScraper(scraper_class, managed_namespace):
@@ -65,7 +66,7 @@ def runScraper(scraper_class, managed_namespace):
 
 def runServer():
 
-	cherrypy.tree.graft(rewrite.app, "/")
+	cherrypy.tree.graft(xascraper.app, "/")
 
 	# Unsubscribe the default server
 	cherrypy.server.unsubscribe()
@@ -112,7 +113,7 @@ def go(managedNamespace):
 	print("Go()")
 
 
-	resetter = rewrite.status_monitor.StatusResetter()
+	resetter = xascraper.status_monitor.StatusResetter()
 	resetter.resetRunState()
 
 	# statusMgr = manage.statusDbManager.StatusResource()
@@ -125,14 +126,13 @@ def go(managedNamespace):
 		print("Not starting scheduler due to debug mode!")
 		sched = None
 	else:
-
 		sched = BackgroundScheduler({
 				'apscheduler.jobstores.default': {
 					'type': 'memory'
 				},
 				'apscheduler.executors.default': {
-					'class': 'apscheduler.executors.pool:ThreadPoolExecutor',
-					'max_workers': '10'
+					'class': 'apscheduler.executors.pool:ProcessPoolExecutor',
+					'max_workers': '5'
 				},
 				'apscheduler.job_defaults.coalesce': 'true',
 				'apscheduler.job_defaults.max_instances': '1',
@@ -142,14 +142,17 @@ def go(managedNamespace):
 		sched.start()
 		print("Scheduler is running!")
 
+	print("Launching server process")
 	server_process.start()
 	loopCtr = 0
+
+	print("Entering idle loop.")
 	while managedNamespace.run:
 		time.sleep(0.1)
-
 		# if loopCtr % 100 == 0:
 		# 	for job in sched.get_jobs():
-		# 		statusMgr.updateNextRunTime(job.name, job.next_run_time.timestamp())
+		# 		print("Job: ", job.name, job.next_run_time.timestamp())
+		# 		# statusMgr.updateNextRunTime(job.name, job.next_run_time.timestamp())
 		loopCtr += 1
 
 	if sched:

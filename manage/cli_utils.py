@@ -7,8 +7,8 @@ import psycopg2
 import urllib.parse
 import traceback
 
-from rewrite import db
-from rewrite import database
+from xascraper import db
+from xascraper import database
 
 from settings import settings
 

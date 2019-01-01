@@ -15,8 +15,8 @@ import sqlalchemy.exc
 from sqlalchemy.orm import joinedload
 from sqlalchemy import func
 
-import rewrite.database as db
-import rewrite.status_monitor
+import xascraper.database as db
+import xascraper.status_monitor
 
 def move_delete_files(sess, from_p, to_p):
 
@@ -48,7 +48,7 @@ def move_delete_files(sess, from_p, to_p):
 
 def reset_run_state():
 
-	resetter = rewrite.status_monitor.StatusResetter()
+	resetter = xascraper.status_monitor.StatusResetter()
 	resetter.resetRunState()
 
 def move_delete_tags(sess, from_p, to_p):

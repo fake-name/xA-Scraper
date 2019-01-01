@@ -18,7 +18,7 @@ fileConfig(config.config_file_name)
 from flask import current_app
 # target_metadata = current_app.extensions['migrate'].db.metadata
 config.set_main_option('sqlalchemy.url', current_app.config.get('SQLALCHEMY_DATABASE_URI'))
-from rewrite import database
+from xascraper import database
 target_metadata = database.Base.metadata
 # other values from the config, defined by the needs of env.py,
 # can be acquired:
