@@ -32,9 +32,34 @@ def getResponse(message, error=False, shouldReload=True):
 
 def change_artist_name(params):
 	# ImmutableMultiDict([('mode', 'change-artist-name'), ('id', '1395'), ('aName', 'bor')])
+	assert 'mode'       in params
+	assert params['mode']   == 'change-artist-name', "Wrong Mode?"
+
+	assert 'id'        in params
+	assert 'aName'     in params
+
+	assert params['id'],                  "Artist id cannot be empty"
+	assert params['aName'].strip(),                  "Artist name cannot be empty"
+
+	try:
+		aid = int(params['id'])
+	except ValueError:
+		assert False, "Artist id not an integer?"
+
+	have_item = db.session.query(database.ScrapeTargets)                      \
+		.filter(database.ScrapeTargets.id == params['id'])         \
+		.scalar()
+
+	assert have_item, "No artist for ID?"
+	old_name = have_item.artist_name
+	new_name = params['aName'].strip()
+	have_item.artist_name = new_name
+	db.session.commit()
 
 
-	return getResponse("Not implemented yet", error=True)
+	return getResponse("Updated artist from name '%s' to name '%s' for site '%s'." %
+		(old_name, new_name, have_item.site_name),
+		error=False)
 
 	# return getResponse("Succeeded", error=False)
 
@@ -57,7 +82,7 @@ def add_artist_name(params):
 
 	have_item = db.session.query(database.ScrapeTargets)                      \
 		.filter(database.ScrapeTargets.site_name == params['site'])         \
-		.filter(database.ScrapeTargets.artist_name == params['artistName']) \
+		.filter(database.ScrapeTargets.artist_name.ilike(params['artistName'])) \
 		.scalar()
 
 	if have_item:

@@ -45,17 +45,19 @@ JOBS = [
 	(ibs.GetIb,      settings["ib" ]["runInterval"],  "ib"),
 	(pxs.GetPX,      settings["px" ]["runInterval"],  "px"),
 	(sfs.GetSf,      settings["sf" ]["runInterval"],  "sf"),
-	(tus.GetTumblr,  settings["tum"]["runInterval"], "tum"),
 	(pts.GetPatreon, settings["pat"]["runInterval"], "pat"),
 	(Nopper,                                     30,  "yp"),
 ]
 
 
 JOBS_DISABLED = [
-	(ass.GetAs,      settings["as"]["runInterval"],  "as"),
-	(yps.GetYp,      settings["yp"]["runInterval"],  "yp"),
+	(ass.GetAs,      settings["as" ]["runInterval"],  "as"),
+	(yps.GetYp,      settings["yp" ]["runInterval"],  "yp"),
+	(tus.GetTumblr,  settings["tum"]["runInterval"], "tum"),
+	(tus.GetTumblr,  settings["ng" ]["runInterval"],  "ng"),
 ]
 
+# Yeah, this has to be after the job init. Sigh.
 import xascraper
 
 
