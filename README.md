@@ -12,6 +12,7 @@ This is a automated tool for scraping content from a number of art sites:
 - Tumblr art blogs
 - SoFurry
 - Weaslyl
+- Newgrounds art galleries
 
 To Add:
 

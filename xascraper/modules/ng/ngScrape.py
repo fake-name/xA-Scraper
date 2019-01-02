@@ -24,6 +24,15 @@ class GetNg(xascraper.modules.scraper_base.ScraperBase):
 
 	numThreads = 1
 
+
+	def __init__(self):
+		super().__init__()
+
+		# So newgrounds is really flaky about serving content sometimes, not sure why.
+		# Anways, turn up the retries (and the delay on failure) because of that.
+		self.wg.retryDelay = 15
+		self.wg.errorOutCount  = 3
+
 	# # ---------------------------------------------------------------------------------------------------------------------------------------------------------
 	# # Cookie Management
 	# # ---------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -101,25 +110,28 @@ class GetNg(xascraper.modules.scraper_base.ScraperBase):
 
 	def _getContentUrlFromPage(self, soup):
 
-		dlBar = soup.find('ul', id='detail-actions')
+		dlBar = soup.find('div', class_='image-enlarged')
 
+		if dlBar:
+			img = dlBar.img
+			if img and img.get("src", None):
+				return img.get("src")
 
-		dummy, dlLink, dummy = dlBar.find_all('li')
-		if 'Download' in dlLink.get_text():
-			itemUrl = urllib.parse.urljoin(self.urlBase, dlLink.a['href'])
+		direct_image = soup.find("img", itemprop="image")
+		if direct_image:
+			if direct_image and direct_image.get("src", None):
+				return direct_image.get("src")
 
-			return itemUrl
 
 		raise ValueError("Wat?")
 
 	def _extractTitleDescription(self, soup):
-		title = soup.find('h2', id='detail-bar-title')
+		title = soup.find('h2', itemprop='name')
 		title = title.get_text().strip()
 
-		descContainer = soup.find('div', id='detail-description')
-		desc = descContainer.find('div', class_='formatted-content')
+		desc = soup.find('div', id='author_comments')
 
-		tags = soup.find('div', class_='di-tags')
+		tags = soup.find('dd', class_='tags')
 
 		# Horrible hack using ** to work around the fact that 'class' is a reserved keyword
 		tagDiv = soup.new_tag('div', **{'class' : 'tags'})
@@ -136,9 +148,12 @@ class GetNg(xascraper.modules.scraper_base.ScraperBase):
 		desc.append(tagDiv)
 		desc = str(desc.prettify())
 
-		datestr = soup.find("p", class_='date')
-		dstr = datestr.get_text()
+
+		date_meta = soup.find("meta", itemprop='datePublished')
+		dstr = date_meta.get("content")
 		dval = dateparser.parse(dstr).replace(tzinfo=None)
+
+
 		return title, desc, dval
 
 	def _getArtPage(self, dlPathBase, artPageUrl, artistName):
@@ -147,27 +162,32 @@ class GetNg(xascraper.modules.scraper_base.ScraperBase):
 
 
 		imageURL = self._getContentUrlFromPage(soup)
+
+		# Cache busting? Anyways, trim it off, so we don't
+		# fetch dupe images.
+		imageURL = imageURL.split("?")[0]
+
 		itemTitle, itemCaption, itemDate = self._extractTitleDescription(soup)
 
 		if not imageURL:
-			self.log.error("OH NOES!!! No image on page = " + artPageUrl)
+			self.log.error("OH NOES!!! No image on page = %s", artPageUrl)
 			raise ValueError("No image found!")
 
 		urlPath = urllib.parse.urlparse(imageURL).path
 		fName = urlPath.split("/")[-1]
 
 		if not fName:
-			self.log.error("OH NOES!!! No filename for image on page = " + artPageUrl)
+			self.log.error("OH NOES!!! No filename for image on page = %s", artPageUrl)
 			raise ValueError("No filename found!")
 
 
 		filePath = os.path.join(dlPathBase, fName)
 
-		self.log.info("			Filename			= %s", fName)
-		self.log.info("			Page Image Title	= %s", itemTitle)
-		self.log.info("			FileURL				= %s", imageURL)
-		self.log.info("			dlPath				= %s", filePath)
-		self.log.info("			timestamp			= %s", itemDate)
+		self.log.info("			Filename         = %s", fName)
+		self.log.info("			Page Image Title = %s", itemTitle)
+		self.log.info("			FileURL          = %s", imageURL)
+		self.log.info("			dlPath           = %s", filePath)
+		self.log.info("			timestamp        = %s", itemDate)
 
 		if self._checkFileExists(filePath):
 			self.log.info("Exists, skipping...")

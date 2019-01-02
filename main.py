@@ -21,6 +21,7 @@ import xascraper.modules.px.pxScrape as pxs
 import xascraper.modules.wy.wyScrape as wys
 import xascraper.modules.ib.ibScrape as ibs
 import xascraper.modules.sf.sfScrape as sfs
+import xascraper.modules.ng.ngScrape as ngs
 import xascraper.modules.artstation.asScrape as ass
 import xascraper.modules.tumblr.tumblrScrape as tus
 import xascraper.modules.patreon.patreonScrape as pts
@@ -47,6 +48,7 @@ JOBS = [
 	(sfs.GetSf,      settings["sf" ]["runInterval"],  "sf"),
 	(pts.GetPatreon, settings["pat"]["runInterval"], "pat"),
 	(Nopper,                                     30,  "yp"),
+	(ngs.GetNg,      settings["ng" ]["runInterval"],  "ng"),
 ]
 
 
@@ -54,7 +56,6 @@ JOBS_DISABLED = [
 	(ass.GetAs,      settings["as" ]["runInterval"],  "as"),
 	(yps.GetYp,      settings["yp" ]["runInterval"],  "yp"),
 	(tus.GetTumblr,  settings["tum"]["runInterval"], "tum"),
-	(tus.GetTumblr,  settings["ng" ]["runInterval"],  "ng"),
 ]
 
 # Yeah, this has to be after the job init. Sigh.
@@ -133,7 +134,7 @@ def go(managedNamespace):
 					'type': 'memory'
 				},
 				'apscheduler.executors.default': {
-					'class': 'apscheduler.executors.pool:ProcessPoolExecutor',
+					'class': 'apscheduler.executors.pool:ThreadPoolExecutor',
 					'max_workers': '5'
 				},
 				'apscheduler.job_defaults.coalesce': 'true',
