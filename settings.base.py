@@ -198,6 +198,15 @@ settings = {
 
 		'user-url'        : "%s-None"
 	},
+	"ng" : # Newgrounds
+	{
+		"runInterval"     : 60*60*48,   # every 24 hours
+
+		"shortName"       : "ng",
+		"username"        : "<username>",
+		"password"        : "<password>",
+		"dlDirName"       : "NewGrounds",
+	}
 
 }
 
