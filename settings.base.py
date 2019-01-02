@@ -201,6 +201,7 @@ settings = {
 	"ng" : # Newgrounds
 	{
 		"runInterval"     : 60*60*48,   # every 24 hours
+		'user-url'        : "https://%s.newgrounds.com/art",
 
 		"shortName"       : "ng",
 		"username"        : "<username>",

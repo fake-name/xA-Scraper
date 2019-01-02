@@ -130,6 +130,9 @@ class GetNg(xascraper.modules.scraper_base.ScraperBase):
 		title = title.get_text().strip()
 
 		desc = soup.find('div', id='author_comments')
+		if not desc:
+			desc = soup.new_tag('div')
+			desc.string = "No description!"
 
 		tags = soup.find('dd', class_='tags')
 
@@ -140,10 +143,11 @@ class GetNg(xascraper.modules.scraper_base.ScraperBase):
 		tagHeader.append('Tags:')
 		tagDiv.append(tagHeader)
 
-		for tag in tags.find_all('a'):
-			new = soup.new_tag('div', **{'class' : 'tag'})
-			new.append(tag.get_text())
-			tagDiv.append(new)
+		if tags:
+			for tag in tags.find_all('a'):
+				new = soup.new_tag('div', **{'class' : 'tag'})
+				new.append(tag.get_text())
+				tagDiv.append(new)
 
 		desc.append(tagDiv)
 		desc = str(desc.prettify())
@@ -206,7 +210,7 @@ class GetNg(xascraper.modules.scraper_base.ScraperBase):
 			if not filePath:
 				return self.build_page_ret(status="Failed", fqDlPath=None)
 
-			self.log.info("Successfully got: %s" % imageURL)
+			self.log.info("Successfully got: %s", imageURL)
 			return self.build_page_ret(status="Succeeded", fqDlPath=[filePath], pageDesc=itemCaption, pageTitle=itemTitle, postTime=itemDate)
 
 	# 	raise RuntimeError("How did this ever execute?")
