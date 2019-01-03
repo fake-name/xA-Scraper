@@ -51,8 +51,18 @@ class GetDA(xascraper.modules.scraper_base.ScraperBase):
 	def getCookie(self):
 
 		login_page = 'https://www.deviantart.com/users/login'
+		try:
+			soup = self.wg.getSoup(login_page)
+		except WebRequest.FetchFailureError as err:
+			with open("Failed da login %s.html" % time.time(), "wb") as fp:
+				fp.write(err.err_content)
+			self.log.error("Failed to get login page?")
+			self.log.error("Fetch failure reason: %s", err.err_reason)
+			self.log.error("Fetch failure code: %s", err.err_code)
+			return False, "Login Failed"
 
-		soup = self.wg.getSoup(login_page)
+
+
 		# print prepage
 		form = soup.find("form", action=login_page)
 		if not form:

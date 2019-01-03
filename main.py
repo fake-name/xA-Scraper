@@ -5,13 +5,16 @@ import time
 
 import sys
 import flags
+import datetime
 import signal
 import multiprocessing
 import multiprocessing.managers
 import threading
+import logging
 import logSetup
 import xascraper.status_monitor
 
+import apscheduler.events
 from apscheduler.schedulers.background import BackgroundScheduler
 
 import xascraper.modules.da.daScrape as das
@@ -30,31 +33,34 @@ import xascraper.modules.yiff_party.yiff_scrape as yps
 from settings import settings
 import cherrypy
 
+
+log = logging.getLogger("Main.Runtime")
+
 class Nopper():
 	pluginName = "Nop Job"
 	def __init__(self):
-		pass
+		self.log = logging.getLogger("Main.Nop-Job")
+
 	def go(self, *args, **kwargs):
-		print("Empty job looping!")
-		pass
+		self.log.info("Empty job looping!")
 
 JOBS = [
-	(das.GetDA,      settings["da" ]["runInterval"],  "da"),
-	(fas.GetFA,      settings["fa" ]["runInterval"],  "fa"),
-	(hfs.GetHF,      settings["hf" ]["runInterval"],  "hf"),
-	(wys.GetWy,      settings["wy" ]["runInterval"],  "wy"),
-	(ibs.GetIb,      settings["ib" ]["runInterval"],  "ib"),
-	(pxs.GetPX,      settings["px" ]["runInterval"],  "px"),
-	(sfs.GetSf,      settings["sf" ]["runInterval"],  "sf"),
+	(fas.GetFA,      settings[ "fa"]["runInterval"],  "fa"),
+	(hfs.GetHF,      settings[ "hf"]["runInterval"],  "hf"),
+	(wys.GetWy,      settings[ "wy"]["runInterval"],  "wy"),
+	(ibs.GetIb,      settings[ "ib"]["runInterval"],  "ib"),
+	(pxs.GetPX,      settings[ "px"]["runInterval"],  "px"),
+	(sfs.GetSf,      settings[ "sf"]["runInterval"],  "sf"),
 	(pts.GetPatreon, settings["pat"]["runInterval"], "pat"),
-	(Nopper,                                     30,  "yp"),
-	(ngs.GetNg,      settings["ng" ]["runInterval"],  "ng"),
+	# (Nopper,                                     30, "nop"),
+	(das.GetDA,      settings[ "da"]["runInterval"],  "da"),
+	(ngs.GetNg,      settings[ "ng"]["runInterval"],  "ng"),
 ]
 
 
 JOBS_DISABLED = [
-	(ass.GetAs,      settings["as" ]["runInterval"],  "as"),
-	(yps.GetYp,      settings["yp" ]["runInterval"],  "yp"),
+	(ass.GetAs,      settings[ "as"]["runInterval"],  "as"),
+	(yps.GetYp,      settings[ "yp"]["runInterval"],  "yp"),
 	(tus.GetTumblr,  settings["tum"]["runInterval"], "tum"),
 ]
 
@@ -63,7 +69,7 @@ import xascraper
 
 
 def runScraper(scraper_class, managed_namespace):
-	print("Scheduler executing class: ", scraper_class)
+	log.info("Scheduler executing class: %s", scraper_class)
 	instance = scraper_class()
 	instance.go(ctrlNamespace=managed_namespace)
 
@@ -97,23 +103,53 @@ def serverProcess(managedNamespace):
 	while managedNamespace.serverRun:
 		time.sleep(0.1)
 
-	print("Stopping server.")
+	log.info("Stopping server.")
 	cherrypy.engine.exit()
-	print("Server stopped")
+	log.info("Server stopped")
 
 
 def scheduleJobs(sched, managedNamespace):
 
-
+	# start = datetime.datetime.now() + datetime.timedelta(minutes=1)
 	for scraperClass, interval, name in JOBS:
-		print(scraperClass, interval)
+		# log.info(scraperClass, interval)
 		sched.add_job(runScraper, trigger='interval', seconds=interval, start_date='2014-1-4 0:00:00', name=name, args=(scraperClass, managedNamespace,))
+		# sched.add_job(runScraper, trigger='interval', seconds=interval, start_date=start, name=name, args=(scraperClass, managedNamespace,))
+		# start = start  + datetime.timedelta(minutes=60)
 	# sched.add_interval_job(printWat, seconds=10, start_date='2014-1-1 01:00')
 
+JOB_MAP = {
+		apscheduler.events.EVENT_SCHEDULER_STARTED  : "EVENT_SCHEDULER_STARTED",
+		apscheduler.events.EVENT_SCHEDULER_SHUTDOWN : "EVENT_SCHEDULER_SHUTDOWN",
+		apscheduler.events.EVENT_SCHEDULER_PAUSED   : "EVENT_SCHEDULER_PAUSED",
+		apscheduler.events.EVENT_SCHEDULER_RESUMED  : "EVENT_SCHEDULER_RESUMED",
+		apscheduler.events.EVENT_EXECUTOR_ADDED     : "EVENT_EXECUTOR_ADDED",
+		apscheduler.events.EVENT_EXECUTOR_REMOVED   : "EVENT_EXECUTOR_REMOVED",
+		apscheduler.events.EVENT_JOBSTORE_ADDED     : "EVENT_JOBSTORE_ADDED",
+		apscheduler.events.EVENT_JOBSTORE_REMOVED   : "EVENT_JOBSTORE_REMOVED",
+		apscheduler.events.EVENT_ALL_JOBS_REMOVED   : "EVENT_ALL_JOBS_REMOVED",
+		apscheduler.events.EVENT_JOB_ADDED          : "EVENT_JOB_ADDED",
+		apscheduler.events.EVENT_JOB_REMOVED        : "EVENT_JOB_REMOVED",
+		apscheduler.events.EVENT_JOB_MODIFIED       : "EVENT_JOB_MODIFIED",
+		apscheduler.events.EVENT_JOB_SUBMITTED      : "EVENT_JOB_SUBMITTED",
+		apscheduler.events.EVENT_JOB_MAX_INSTANCES  : "EVENT_JOB_MAX_INSTANCES",
+		apscheduler.events.EVENT_JOB_EXECUTED       : "EVENT_JOB_EXECUTED",
+		apscheduler.events.EVENT_JOB_ERROR          : "EVENT_JOB_ERROR",
+		apscheduler.events.EVENT_JOB_MISSED         : "EVENT_JOB_MISSED",
+		apscheduler.events.EVENT_ALL                : "EVENT_ALL",
+	}
 
+def job_evt_listener(event):
+	if event.exception:
+		log.info('Job crashed: %s', event.job_id)
+		log.info('Traceback: %s', event.traceback)
+
+	else:
+
+		log.info('Job event code: %s, job: %s', JOB_MAP[event.code], event.job_id)
 
 def go(managedNamespace):
-	print("Go()")
+	log.info("Go()")
 
 
 	resetter = xascraper.status_monitor.StatusResetter()
@@ -123,10 +159,9 @@ def go(managedNamespace):
 	managedNamespace.run = True
 	managedNamespace.serverRun = True
 
-
 	server_process = multiprocessing.Process(target=serverProcess, args=(managedNamespace,))
 	if "debug" in sys.argv:
-		print("Not starting scheduler due to debug mode!")
+		log.info("Not starting scheduler due to debug mode!")
 		sched = None
 	else:
 		sched = BackgroundScheduler({
@@ -135,21 +170,30 @@ def go(managedNamespace):
 				},
 				'apscheduler.executors.default': {
 					'class': 'apscheduler.executors.pool:ThreadPoolExecutor',
-					'max_workers': '5'
+					'max_workers'                              : 5
 				},
-				'apscheduler.job_defaults.coalesce': 'true',
-				'apscheduler.job_defaults.max_instances': '1',
+				'apscheduler.job_defaults.coalesce'            : True,
+				'apscheduler.job_defaults.max_instances'       : 1,
+				'apscheduler.job_defaults.misfire_grace_time ' : 60 * 60 * 2,
 			})
 
+
+		logging.getLogger('apscheduler').setLevel(logging.DEBUG)
+		sched.add_listener(job_evt_listener,
+				apscheduler.events.EVENT_JOB_EXECUTED |
+				apscheduler.events.EVENT_JOB_ERROR    |
+				apscheduler.events.EVENT_JOB_MISSED   |
+				apscheduler.events.EVENT_JOB_MAX_INSTANCES
+			)
 		scheduleJobs(sched, managedNamespace)
 		sched.start()
-		print("Scheduler is running!")
+		log.info("Scheduler is running!")
 
-	print("Launching server process")
+	log.info("Launching server process")
 	server_process.start()
 	loopCtr = 0
 
-	print("Entering idle loop.")
+	log.info("Entering idle loop.")
 	while managedNamespace.run:
 		time.sleep(0.1)
 		# if loopCtr % 100 == 0:
@@ -160,19 +204,20 @@ def go(managedNamespace):
 
 	if sched:
 		sched.shutdown()
+	log.info("Joining on web thread.")
 	server_process.join()
 
 def mgr_init():
 	signal.signal(signal.SIGINT, signal.SIG_IGN)
-	print('initialized manager')
+	log.info('initialized manager')
 
 def signal_handler(dummy_signal, dummy_frame):
 	if flags.namespace.run:
 		flags.namespace.run = False
 		flags.namespace.serverRun = False
-		print("Telling threads to stop")
+		log.info("Telling threads to stop")
 	else:
-		print("Multiple keyboard interrupts. Raising")
+		log.info("Multiple keyboard interrupts. Raising")
 		raise KeyboardInterrupt
 
 if __name__ == "__main__":
