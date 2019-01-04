@@ -113,7 +113,16 @@ def scheduleJobs(sched, managedNamespace):
 	# start = datetime.datetime.now() + datetime.timedelta(minutes=1)
 	for scraperClass, interval, name in JOBS:
 		# log.info(scraperClass, interval)
-		sched.add_job(runScraper, trigger='interval', seconds=interval, start_date='2014-1-4 0:00:00', name=name, args=(scraperClass, managedNamespace,))
+		sched.add_job(runScraper,
+				trigger            = 'interval',
+				seconds            = interval,
+				start_date         = '2014-1-4 0:00:00',
+				name               = name,
+				args               = (scraperClass, managedNamespace,),
+				coalesce           = True,
+				max_instances      = 1,
+				misfire_grace_time = 60 * 60 * 2,
+			)
 		# sched.add_job(runScraper, trigger='interval', seconds=interval, start_date=start, name=name, args=(scraperClass, managedNamespace,))
 		# start = start  + datetime.timedelta(minutes=60)
 	# sched.add_interval_job(printWat, seconds=10, start_date='2014-1-1 01:00')
