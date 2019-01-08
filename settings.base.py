@@ -3,6 +3,15 @@ USE_POSTGRESQL = False
 import os.path
 import os
 
+
+# Convenience functions to make intervals clearer.
+def days(num):
+	return 60*60*24*num
+def hours(num):
+	return 60*60*num
+def minutes(num):
+	return 60*num
+
 settings = {
 
 	# Web logins go here.
@@ -72,7 +81,7 @@ settings = {
 	{
 		"username"        : "your_username",
 		"password"        : "your_password",
-		"runInterval"     : 60*60*24*2,
+		"runInterval"     : days(2),
 		"dlDirName"       : "DeviantArt",
 		"shortName"       : "da",
 
@@ -82,7 +91,7 @@ settings = {
 	{
 		"username"        : "your_username",
 		"password"        : "your_password",
-		"runInterval"     : 60*60*24*3,   # every 72 hours
+		"runInterval"     : days(3),
 		"dlDirName"       : "Fur Affinity",
 		"shortName"       : "fa",
 
@@ -92,7 +101,7 @@ settings = {
 	{
 		"username"        : "your_username",
 		"password"        : "your_password",
-		"runInterval"     : 60*60*24*2,   # every 36 hours
+		"runInterval"     : days(2),   # every 36 hours
 		"dlDirName"       : "Hentai Foundry",
 		"shortName"       : "hf",
 
@@ -102,7 +111,7 @@ settings = {
 	{
 		"username"        : "your_username",
 		"password"        : "your_password",
-		"runInterval"     : 60*60*24*2,
+		"runInterval"     : days(2),
 		"dlDirName"       : "Pixiv",
 		"shortName"       : "px",
 
@@ -113,7 +122,7 @@ settings = {
 	{
 		"username"        : "your_username",
 		"password"        : "your_password",
-		"runInterval"     : 60*60*24*2,
+		"runInterval"     : days(2),
 		"dlDirName"       : "InkBunny",
 		"shortName"       : "ib",
 
@@ -124,7 +133,7 @@ settings = {
 	{
 		"username"        : "your_username",
 		"password"        : "your_password",
-		"runInterval"     : 60*60*24*2,
+		"runInterval"     : days(2),
 		"dlDirName"       : "Weasyl",
 		"shortName"       : "wy",
 
@@ -134,7 +143,7 @@ settings = {
 	"as" :  # Artstation
 	{
 		# No password here.
-		"runInterval"     : 60*60*24*2,
+		"runInterval"     : days(2),
 		"dlDirName"       : "ArtStation",
 		"shortName"       : "as",
 
@@ -146,7 +155,7 @@ settings = {
 	{
 		"username"        : "your_username",
 		"password"        : "your_password",
-		"runInterval"     : 60*60*24*2,
+		"runInterval"     : days(2),
 		"dlDirName"       : "SoFurry",
 		"shortName"       : "sf",
 
@@ -163,7 +172,7 @@ settings = {
 		'token'           : 'tumblr_garbage',
 		'token_secret'    : 'tumblr_garbage',
 
-		"runInterval"     : 60*60*24*2,
+		"runInterval"     : days(2),
 		"dlDirName"       : "Tumblr",
 		"shortName"       : "tum",
 		'user-url'        : "http://%s.tumblr.com/"
@@ -174,15 +183,15 @@ settings = {
 	{
 		"username"        : "your_username",
 		"password"        : "your_password",
-		"runInterval"     : 60*60*24*2
+		"runInterval"     : days(2)
 	},
 
 
-	"yp" :  # SoFurry
+	"yp" :  # yiff Party
 	{
 		"dlDirName"       : "YiffParty",
 		"shortName"       : "yp",
-		"runInterval"     : 60*60*24*2,   # every 24 hours
+		"runInterval"     : days(2),
 
 		'user-url'        : "%s-None"
 	},
@@ -207,7 +216,18 @@ settings = {
 		"username"        : "<username>",
 		"password"        : "<password>",
 		"dlDirName"       : "NewGrounds",
-	}
+	},
+
+	"ay" : # Aryion
+	{
+		"runInterval"     : 60*60*48,   # every 24 hours
+		'user-url'        : "https://aryion.com/g4/user/%s",
+
+		"shortName"       : "ay",
+		"username"        : "<username>",
+		"password"        : "<password>",
+		"dlDirName"       : "Aryion",
+	},
 
 }
 

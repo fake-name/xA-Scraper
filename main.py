@@ -25,6 +25,7 @@ import xascraper.modules.wy.wyScrape as wys
 import xascraper.modules.ib.ibScrape as ibs
 import xascraper.modules.sf.sfScrape as sfs
 import xascraper.modules.ng.ngScrape as ngs
+import xascraper.modules.ay.ayScrape as ays
 import xascraper.modules.artstation.asScrape as ass
 import xascraper.modules.tumblr.tumblrScrape as tus
 import xascraper.modules.patreon.patreonScrape as pts
@@ -44,6 +45,18 @@ class Nopper():
 	def go(self, *args, **kwargs):
 		self.log.info("Empty job looping!")
 
+def check_keys(kl):
+	for keyn in kl:
+		if not keyn in settings:
+			raise RuntimeError("You're missing the setting parameters for the site "
+				+ "'%s'. Check if you need to update your settings due to added scrapers."
+				 % (keyn, ))
+
+
+check_keys(["fa", "hf", "wy", "ib", "px", "sf","pat", "da", "ng", "ay", "as", "yp","tum"])
+
+
+
 JOBS = [
 	(fas.GetFA,      settings[ "fa"]["runInterval"],  "fa"),
 	(hfs.GetHF,      settings[ "hf"]["runInterval"],  "hf"),
@@ -59,6 +72,7 @@ JOBS = [
 
 
 JOBS_DISABLED = [
+	(ays.GetAy,      settings[ "ay"]["runInterval"],  "ay"),
 	(ass.GetAs,      settings[ "as"]["runInterval"],  "as"),
 	(yps.GetYp,      settings[ "yp"]["runInterval"],  "yp"),
 	(tus.GetTumblr,  settings["tum"]["runInterval"], "tum"),

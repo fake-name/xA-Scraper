@@ -50,7 +50,7 @@ def watched_names():
 
 	# We pre-populate with the active plugin keys.
 	# This needs to be maintained for added plugins.
-	skeys = [key for key in watched_sorted.keys()] + [tmp[-1] for tmp in main.JOBS]
+	skeys = [key for key in watched_sorted.keys()] + [tmp[-1] for tmp in main.JOBS] + [tmp[-1] for tmp in main.JOBS_DISABLED]
 	skeys = list(set(skeys))
 
 	skeys.sort()
