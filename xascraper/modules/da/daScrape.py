@@ -52,9 +52,9 @@ class GetDA(xascraper.modules.scraper_base.ScraperBase):
 
 		login_page = 'https://www.deviantart.com/users/login'
 		try:
-			soup = self.wg.getSoup(login_page)
+			soup = self.wg.getSoup(login_page, retryQuantity = 0)
 		except WebRequest.FetchFailureError as err:
-			with open("Failed da login %s.html" % time.time(), "wb") as fp:
+			with open("%s - Failed da login.html" % time.time(), "wb") as fp:
 				fp.write(err.err_content)
 			self.log.error("Failed to get login page?")
 			self.log.error("Fetch failure reason: %s", err.err_reason)
@@ -87,7 +87,27 @@ class GetDA(xascraper.modules.scraper_base.ScraperBase):
 
 		time.sleep(5)
 
-		pagetext = self.wg.getpage(login_page, postData = logDict, addlHeaders={'Referer':login_page})
+		try:
+			pagetext = self.wg.getpage(login_page, postData = logDict, addlHeaders={'Referer':login_page}, retryQuantity = 0)
+		except WebRequest.FetchFailureError as err:
+			failtime = time.time()
+			with open("%s - Login failure source.html" % (failtime, ), "w") as fp:
+				fp.write(soup.prettify())
+			with open("%s - Login failure content.html" % (failtime, ), "w") as fp:
+				fp.write(err.err_content.decode("utf-8"))
+
+			self.log.error("Failed to post to login page?")
+			self.log.error("Fetch failure reason: %s", err.err_reason)
+			self.log.error("Fetch failure code: %s", err.err_code)
+
+			ctnt = WebRequest.as_soup(err.err_content)
+			newurl = urllib.parse.urljoin(login_page, ctnt.a['href'])
+			next_page = self.wg.getpage(newurl, addlHeaders={'Referer':login_page}, retryQuantity = 0)
+
+			with open("%s - Login failure refered_to.html" % (failtime, ), "w") as fp:
+				fp.write(next_page)
+
+			return False, "Login Failed"
 
 		# print pagetext
 		if re.search("The username or password you entered was incorrect", pagetext):
