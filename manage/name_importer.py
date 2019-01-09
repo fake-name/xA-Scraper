@@ -70,7 +70,7 @@ class NameImporter(xascraper.modules.tumblr.tumblrScrape.GetTumblr):
 	def checkInsertName(self, site, name):
 		have_item = db.session.query(database.ScrapeTargets)    \
 			.filter(database.ScrapeTargets.site_name == site)   \
-			.filter(database.ScrapeTargets.artist_name == name) \
+			.filter(database.ScrapeTargets.artist_name.ilike(name)) \
 			.scalar()
 
 		if have_item:

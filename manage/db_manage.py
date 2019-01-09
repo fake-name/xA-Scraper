@@ -95,7 +95,7 @@ def consolidate_artist(sess, from_r, to_r):
 		try:
 			release.artist_id = to_r.id
 			sess.commit()
-			print("Replaced ID")
+			print("Replaced ID on release '%s'" % (release.id, ))
 		except sqlalchemy.exc.IntegrityError:
 			sess.rollback()
 

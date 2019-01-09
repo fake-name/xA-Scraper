@@ -12,6 +12,13 @@ import multiprocessing.managers
 import threading
 import logging
 import logSetup
+
+
+# Shut up fucking annoying psycopg2 vomit every exec.
+import warnings
+warnings.filterwarnings("ignore", category=UserWarning, module='psycopg2')
+
+
 import xascraper.status_monitor
 
 import apscheduler.events

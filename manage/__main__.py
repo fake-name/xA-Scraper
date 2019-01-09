@@ -6,6 +6,11 @@ import multiprocessing
 import flags
 import signal
 
+
+# Shut up fucking annoying psycopg2 vomit every exec.
+import warnings
+warnings.filterwarnings("ignore", category=UserWarning, module='psycopg2')
+
 from . import name_importer
 from .scrape_manage import do_fetch_all
 from .scrape_manage import do_fetch
