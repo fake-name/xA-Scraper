@@ -37,7 +37,11 @@ class GetFA(xascraper.modules.scraper_base.ScraperBase, util.captcha2upload.Capt
 
 		userID = re.search(r"<Cookie a=[0-9a-f\-]*? for \.furaffinity\.net/>", "%s" % self.wg.cj)
 		sessionID = re.search(r"<Cookie b=[0-9a-f\-]*? for \.furaffinity\.net/>", "%s" % self.wg.cj)
-		if userID and sessionID:
+		if not (userID and sessionID):
+			return False, "Do not have FA login Cookies"
+
+		settings_page = self.wg.getpage('http://www.furaffinity.net/controls/user-settings/')
+		if '<a id="my-username" href="' in settings_page:
 			return True, "Have FA Cookies:\n	%s\n	%s" % (userID.group(0), sessionID.group(0))
 
 		return False, "Do not have FA login Cookies"
@@ -255,7 +259,10 @@ class GetFA(xascraper.modules.scraper_base.ScraperBase, util.captcha2upload.Capt
 		pgstr = str(page)
 		if 'has voluntarily disabled access to their account and all of its contents.' in pgstr:
 			self.log.warning("Disabled account!")
-			return 0
+			raise exceptions.AccountDisabledException("Could not retreive artist item quantity!")
+		if 'The page you are trying to reach has been deactivated by the owner.' in pgstr:
+			self.log.warning("Disabled account!")
+			raise exceptions.AccountDisabledException("Could not retreive artist item quantity!")
 		if 'This user cannot be found.' in pgstr:
 			self.log.warning("Account not found!")
 			raise exceptions.AccountDisabledException("Could not retreive artist item quantity!")
@@ -351,3 +358,4 @@ if __name__ == '__main__':
 	have_cookie = ins.checkCookie()
 	print('have_cookie', have_cookie)
 	ins.go(ctrlNamespace=namespace)
+
