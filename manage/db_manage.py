@@ -1,6 +1,7 @@
 
 
 import flags
+import tqdm
 import os.path
 
 import logSetup
@@ -117,7 +118,7 @@ def db_name_clean():
 		artists = sess.query(db.ScrapeTargets).all()
 
 		amap = {}
-		for artist in artists:
+		for artist in tqdm.tqdm(artists):
 			akey = (artist.site_name, artist.artist_name.lower().strip())
 			if akey in amap:
 				print("Duplicate: ", akey)
