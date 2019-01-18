@@ -80,6 +80,8 @@ def add_artist_name(params):
 	assert params['site'] in allowed_modes, "Site %s not in available modes: %s" % (params['site'], allowed_modes)
 
 
+	params['artistName'] = params['artistName'].strip()
+
 	have_item = db.session.query(database.ScrapeTargets)                      \
 		.filter(database.ScrapeTargets.site_name == params['site'])         \
 		.filter(database.ScrapeTargets.artist_name.ilike(params['artistName'])) \

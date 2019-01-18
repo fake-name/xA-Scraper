@@ -39,7 +39,13 @@ from settings import settings
 
 class CaptchaSolverMixin:
 	def __init__(self):
-		self.captcha_solver = CaptchaUpload(key=settings['captcha']['2Captcha-API-key'], log=logging.getLogger("Main.CaptchaSolver"))
+		if (settings['captcha']['2Captcha-API-key'] and
+			settings['captcha']['2Captcha-API-key'] != '<key goes here>' and
+			len(settings['captcha']['2Captcha-API-key']) == 32):
+			self.captcha_solver = CaptchaUpload(key=settings['captcha']['2Captcha-API-key'], log=logging.getLogger("Main.CaptchaSolver"))
+		else:
+			self.log.warning("No 2Captcha API key found (or key not valid). Cannot do automated captcha solving!")
+			self.captcha_solver = None
 
 class CaptchaUpload:
 	def __init__(self, key, log=None, waittime=None):
