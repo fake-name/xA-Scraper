@@ -1,6 +1,7 @@
 
 
 import flags
+import traceback
 import os.path
 
 import logSetup
@@ -61,7 +62,10 @@ def do_fetch(args):
 		keys = list(PLUGINS.keys())
 		keys.sort()
 		for key in keys:
-			do_plugin(key)
+			try:
+				do_plugin(key)
+			except Exception as e:
+				traceback.print_exc()
 	else:
 		for plgname in args:
 			if not plgname in PLUGINS:
