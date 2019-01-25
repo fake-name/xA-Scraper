@@ -80,29 +80,28 @@ def add_artist_name(params):
 	assert params['site'] in allowed_modes, "Site %s not in available modes: %s" % (params['site'], allowed_modes)
 
 
-	params['artistName'] = params['artistName'].strip()
 
 	have_item = db.session.query(database.ScrapeTargets)                      \
 		.filter(database.ScrapeTargets.site_name == params['site'])         \
-		.filter(database.ScrapeTargets.artist_name.ilike(params['artistName'])) \
+		.filter(database.ScrapeTargets.artist_name.ilike(params['artistName'].strip())) \
 		.scalar()
 
 	if have_item:
 		db.session.commit()
 		return getResponse("Error: Artist '%s' for site '%s' already fetched!" %
-			(params['site'], params['artistName']),
+			(params['site'], params['artistName'].strip()),
 			error=True)
 
 	new = database.ScrapeTargets(
 		site_name   = params['site'],
-		artist_name = params['artistName'],
+		artist_name = params['artistName'].strip(),
 		)
 
 	db.session.add(new)
 	db.session.commit()
 
 	return getResponse("Added artist '%s' for site '%s'." %
-		(params['site'], params['artistName']),
+		(params['site'], params['artistName'].strip()),
 		error=False)
 
 
