@@ -7,7 +7,7 @@ future==0.17.1
 httpretty==0.9.6
 lxml==4.3.3
 Mako==1.0.9
-MarkupSafe==1.1.0
+MarkupSafe==1.1.1
 ## natsort
 ## oauthlib
 ## PasteDeploy
