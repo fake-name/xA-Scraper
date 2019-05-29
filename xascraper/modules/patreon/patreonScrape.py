@@ -297,10 +297,11 @@ class GetPatreon(xascraper.modules.scraper_base.ScraperBase):
 		pprint.pprint(post_content)
 
 		ret = {
-			'page_desc'  : post_info['content'],
-			'page_title' : post_info['title'],
-			'post_time'  : dateutil.parser.parse(post_info['published_at']).replace(tzinfo=None),
-			'post_tags'  : tags,
+			'page_desc'   : post_info['content'],
+			'page_title'  : post_info['title'],
+			'post_time'   : dateutil.parser.parse(post_info['published_at']).replace(tzinfo=None),
+			'post_tags'   : tags,
+			'post_embeds' : [],
 		}
 
 		# print("Post:")
@@ -319,7 +320,9 @@ class GetPatreon(xascraper.modules.scraper_base.ScraperBase):
 			if 'post_type' in post_info and post_info['post_type'] == 'video_embed':
 				# print("Post video_embed")
 				fpath = self.fetch_video_embed(post_info)
-				files.append(fpath)
+				if fpath:
+					files.append(fpath)
+				ret['post_embeds'].append(post_info)
 
 			for aid, dat_struct in attachments.items():
 				# print("Post attachments")
@@ -329,10 +332,9 @@ class GetPatreon(xascraper.modules.scraper_base.ScraperBase):
 			if 'embed' in post_info and post_info['embed']:
 				for item in self._handle_embed(post_info['embed']):
 					files.append(fpath)
+				ret['post_embeds'].append(post_info['embed'])
 
 
-			# if 'image' in post_info and post_info['image']:
-			# 	Whould I
 
 
 		except urllib.error.URLError:
@@ -341,12 +343,15 @@ class GetPatreon(xascraper.modules.scraper_base.ScraperBase):
 
 		ctnt_soup = bs4.BeautifulSoup(post_info['content'], 'lxml')
 		for img in ctnt_soup.find_all("img", src=True):
-
 			furl = img['src']
 			fparsed = urllib.parse.urlparse(furl)
 			fname = fparsed.path.split("/")[-1]
 			fpath = self.save_image(artistName, postId, fname, furl)
 			files.append(fpath)
+
+		# Youtube etc are embedded as iframes.
+		for ifr in ctnt_soup.find_all("iframe", src=True):
+			ret['post_embeds'].append(ifr['src'])
 
 
 		if len(files):
@@ -361,6 +366,8 @@ class GetPatreon(xascraper.modules.scraper_base.ScraperBase):
 
 		# pprint.pprint(ret)
 		return ret
+
+
 	def _getArtPage(self, post_meta, artistName):
 		item_type, postid = post_meta
 
@@ -419,6 +426,10 @@ class GetPatreon(xascraper.modules.scraper_base.ScraperBase):
 
 			# return
 
+
+			embeds = []
+
+
 			while len(newArt) > 0:
 				postid = newArt.pop()
 				postid_s = json.dumps(postid)
@@ -428,6 +439,8 @@ class GetPatreon(xascraper.modules.scraper_base.ScraperBase):
 					assert isinstance(ret, dict)
 					assert 'status'     in ret
 
+					if 'post_embeds' in ret:
+						embeds.extend(ret['post_embeds'])
 
 					if ret['status'] == "Succeeded" or ret['status'] == "Exists":
 
@@ -474,12 +487,24 @@ class GetPatreon(xascraper.modules.scraper_base.ScraperBase):
 			self._updateLastFetched(artist_undecoded)
 			self.log.info("Successfully retreived content for artist %s", artist_name)
 
+			if embeds:
+				self.log.info("Dumping item embeds to pyson file")
+				self.save_embeds(artist_name, embeds)
+
 			return False
 		except:
 			self.log.error("Exception when retreiving artist %s", artist_name)
 			self.log.error("%s", traceback.format_exc())
 			return True
 
+
+
+	def save_embeds(self, aname, filecontent):
+		fdir = self.get_save_dir(aname)
+		fqpath = os.path.join(fdir, 'post-embeds.pyson')
+		with open(fqpath, "wb") as fp:
+			fstr = pprint.pformat(filecontent)
+			fp.write(fstr.encode("utf-8"))
 
 
 	# 	raise RuntimeError("How did this ever execute?")
