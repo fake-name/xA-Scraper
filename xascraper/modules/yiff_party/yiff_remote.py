@@ -106,7 +106,7 @@ class RemoteExecClass(object):
 	# User-facing type things
 	# # ------------------------------------------------------------------------
 
-	def yp_walk_to_entry(self):
+	def yp_walk_to_entry_old(self):
 		gateway = 'https://8ch.net/fur/res/22069.html'
 		step1 = self.wg.getpage(gateway)
 		self.log.debug("Step 1")
@@ -128,6 +128,7 @@ class RemoteExecClass(object):
 			self.log.debug("Step 3")
 		else:
 			step3 = step2
+			step3 = self.wg.getpage('https://yiff.party/intermission', postData=params)
 
 		if 'You have no favourite creators!' in step3:
 			self.log.info("Reached home page!")
@@ -145,11 +146,23 @@ class RemoteExecClass(object):
 				self.log.error("	%s", line)
 			return False
 
+	def yp_walk_to_entry(self):
+		step3 = self.wg.getpage('https://yiff.party/')
+		if 'You have no favourite creators!' in step3:
+			self.log.info("Reached home page!")
+			return True
+		else:
+			self.log.error("Failed to reach home page!")
+			self.log.error("Step 3")
+			for line in step3.split("\n"):
+				self.log.error("	%s", line)
+			return False
+
 	def yp_get_names(self):
 		self.log.info("Getting available artist names!")
 		ok = self.yp_walk_to_entry()
 		if ok:
-			data = self.wg.getpage('https://yiff.party/creators2.json', addlHeaders={"Referer" : 'https://yiff.party/'})
+			data = self.wg.getpage('https://yiff.party/json/creators.json?_={}'.format(int(time.time() * 1000)), addlHeaders={"Referer" : 'https://yiff.party/'})
 			return json.loads(data)
 		else:
 			return None
