@@ -1,0 +1,21 @@
+<!-- extend base layout -->
+{% extends "__base.html" %}
+{% import "_block_paginate.html" as paginator %}
+{% import "_block_releases.html" as block_releases %}
+
+
+
+
+
+
+
+
+{% block content %}
+	{% include '_block_flash.html' %}
+	{{ block_releases.render_releases("Aggregate Releases", data.items, source_list)}}
+	{{ paginator.render_pagination(data) }}
+
+{% endblock %}
+
+
+

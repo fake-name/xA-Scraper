@@ -1,0 +1,40 @@
+<!-- extend base layout -->
+{% extends "__base.html" %}
+{% import "_block_paginate.html" as paginator %}
+{% import "_block_releases.html" as block_releases %}
+
+
+
+
+
+
+
+{% block content %}
+	{% include '_block_flash.html' %}
+
+		<div>
+			<div class="contentdiv">
+				<div style="margin-top: 10px;">
+					<h2>Manual FA login due to captcha douchiness.</h2>
+				</div>
+
+				{% if 'a' in request_sessions[session['uuid']].cookies and 'b' in request_sessions[session['uuid']].cookies %}
+					You appear to have a FA login cookie!
+				{% else %}
+					<form method="POST" action="/doFaCaptchaLogin">
+						<input type="text" name="username" placeholder="Username" value="{{settings['fa']['username']}}"><br>
+						<input type="password" name="password" placeholder="Password" value="{{settings['fa']['password']}}"><br>
+						<img src="/faCaptchaImage"><br>
+						<input type="text" name="captcha" placeholder="Captcha text"><br>
+						<button type="submit">Login</button>
+					</form>
+				{% endif %}
+
+			</div>
+
+		</div>
+
+
+{% endblock %}
+
+

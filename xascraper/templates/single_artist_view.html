@@ -1,0 +1,96 @@
+<!-- extend base layout -->
+{% extends "__base.html" %}
+{% import "_block_paginate.html" as paginator %}
+{% import "_block_releases.html" as block_releases %}
+
+
+
+
+
+
+
+{% macro render_artist_items(release_data, source_list) %}
+	<div id="contentChunk">
+
+			{% for row in release_data %}
+				<div class='release-block subdiv'>
+					<h4>{{row.title if row.title else "No Title!"}}</h4>
+
+					{% if row.files%}
+						<div>
+							{% for img_file in row.files %}
+								<div>
+									<img src='/images/byid/{{img_file.id}}', style='max-width: 100%' />
+								</div>
+							{% endfor %}
+						</div>
+					{% endif %}
+					<div class="padded"><a href='{{row.release_meta}}'>[release]</a> <a href="{{source_list[row.artist.site_name]['user-url'] % row.artist.artist_name}}">[src]</a></div>
+					<div class="padded">{{row.content | safe}}</div>
+					<div class="padded">
+						{% for tag in row.tags %}
+							<div class='tag'>{{tag.tag}}</div>
+						{% endfor %}
+					</div>
+					<div class="padded">{{terse_ago(row.addtime)}}</div>
+				</div>
+			{% endfor %}
+
+	</div>
+{% endmacro %}
+
+
+
+
+{% block content %}
+	{% include '_block_flash.html' %}
+
+	{% if data.items %}
+		<div>
+			<div style="margin-top: 10px;">
+				<h2>
+				Releases for {{data.items[0].artist.artist_name | title}} from {{data.items[0].artist.site_name | title}}</h2>
+			</div>
+
+			{{ render_artist_items(data.items, source_list)}}
+		</div>
+
+		{{ paginator.render_pagination(data) }}
+	{% else %}
+		<div>
+			<div style="margin-top: 10px;">
+				<h2>
+				No releases!</h2>
+			</div>
+
+		</div>
+
+	{% endif %}
+
+{% endblock %}
+
+{% block footer %}
+
+
+	<script type="text/javascript">
+
+		console.log($('div#contentChunk'));
+		console.log($('div#contentChunk table'));
+
+		$('div#contentChunk').infiniteScroll({
+
+			history: false,
+			path : "div.nav a#nextPage", // selector for the NEXT link (to page 2)
+			append: 'div.release-block',
+
+		});
+
+		$('div.nav').hide();
+
+		// $('div#contentChunk table').infiniteScroll('resume');
+	</script>
+
+
+{% endblock %}
+
+

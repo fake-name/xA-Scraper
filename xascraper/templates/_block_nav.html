@@ -1,0 +1,47 @@
+
+<div class="statusdiv">
+
+	<div class="statediv navId">
+		<strong>Navigation:</strong><br />
+		<ul>
+			<li><a href="/">Index</a>
+			<hr>
+			<li><a href="errLists">Error Lists</a>
+
+			{% for key in source_list %}
+				<li><a href="/errLists?db={{key}}">{{key.upper()}} Errors</a>
+			{% endfor %}
+			<hr>
+			{% for key in source_list %}
+				<li><a href="/source/by-site/{{key}}">{{key.upper()}} Artists</a>
+			{% endfor %}
+			<hr>
+			<li><a href='/fa-manual-login'>Manual FA Login</a>
+			<hr>
+			<li><a href="/watched-names">Monitored Names</a>
+		</ul>
+	</div>
+	<div class="statediv">
+		<strong>Status:</strong>
+	</div>
+	<br>
+
+	<!--
+	{% for key in source_list %}
+
+		<div class="statediv ${key}Id">
+			<strong>{{key | upper}}:</strong><br />
+			Have: ${succeed}<br />
+			Errs: ${errs}
+			<hr>
+			NextRun: ${nextRuns[key]}<br />
+			Running: ${runState[key]}<br />
+			RunTime: ${runTime[key]}<br />
+			LastRun: ${lastRun[key]}<br />
+
+		</div>
+	{% endfor %}
+
+	-->
+
+</div>
