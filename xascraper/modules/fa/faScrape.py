@@ -93,7 +93,7 @@ class GetFA(xascraper.modules.scraper_base.ScraperBase, util.captcha2upload.Capt
 
 		# TODO: Proper page parsing, rather then regexes
 
-		regx1 = re.compile(r'[\"\']((?:https:)?//d\.facdn\.net\/[^\'\"]*?)[\"\']>\s?Download\s?</a>')
+		regx1 = re.compile(r'[\"\']((?:https:)?//d\.facdn\.net\/[^\'\"]*?\w)[\"\']>\s?Download\s?</a>')
 		reResult = regx1.search(pgIn)
 
 		if reResult:
