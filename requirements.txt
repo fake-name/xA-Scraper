@@ -44,7 +44,7 @@ flask_migrate==2.4.0
 sqlalchemy-citext==1.3-0
 mprpc==0.1.17
 sqlalchemy_jsonfield==0.8.0
-dill==0.2.9
+dill==0.3.0
 tqdm==4.35.0
 python-magic
 webrequest==0.0.58
