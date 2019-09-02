@@ -50,7 +50,7 @@ class GetNg(xascraper.modules.scraper_base.ScraperBase):
 	def get_target(self):
 			self.log.info("Getting Entrance Cookie")
 			soup = self.wg.getSoup(self.urlBase)
-			if '/passport/mode/iframe' not in soup:
+			if '/passport/mode/iframe' not in str(soup):
 				self.log.warning("No login iframe? Maybe logged in?")
 				return False
 			soup = self.wg.getSoup('https://www.newgrounds.com/passport/mode/iframe', addlHeaders={'referer':self.urlBase})
