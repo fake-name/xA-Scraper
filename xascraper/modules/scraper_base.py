@@ -6,6 +6,8 @@ import concurrent.futures
 import datetime
 import urllib.error
 import abc
+import mimetypes
+import magic
 import sqlalchemy.exc
 from settings import settings
 
@@ -51,6 +53,15 @@ def makeFilenameSafe(inStr):
 	inStr = inStr.strip(" ")    # And can't have leading or trailing spaces
 
 	return inStr
+
+def insertExtIfNeeded(fqFName, file_bytes):
+	root, ext = os.path.splitext(fqfilename)
+	mime = magic.from_buffer(imageContent, mime=True)
+	should_ext = mimetypes.guess_extension(mime)
+	if ext != should_ext:
+		return root + should_ext
+	return fqFName
+
 
 def insertCountIfFileExistsAndIsDifferent(fqFName, file_bytes):
 
@@ -196,7 +207,10 @@ class ScraperBase(module_base.ModuleBase, metaclass=abc.ABCMeta):
 
 		assert isinstance(file_content, (bytes, bytearray)), "save_file() requires the file_content be bytes!"
 
+		fqfilename = insertExtIfNeeded(fqfilename, file_content)
 		fqfilename = insertCountIfFileExistsAndIsDifferent(fqfilename, file_content)
+
+
 
 		while 1:
 			try:
