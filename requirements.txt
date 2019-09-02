@@ -1,7 +1,7 @@
 APScheduler==3.6.1
 Babel==2.6.0
 beautifulsoup4==4.8.0
-CherryPy==18.1.1
+CherryPy==18.1.2
 colorama==0.4.1
 future==0.17.1
 httpretty==0.9.6
