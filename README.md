@@ -79,7 +79,7 @@ add or modify them.
  your own risk.
 
  - The Yiff-Party scraper requires significant external infrastructure, as it currently depends on
-threading it's fetch requests through my [autotriever](https://github.com/fake-name/AutoTriever)
+threading it's fetch requests through the [autotriever](https://github.com/fake-name/AutoTriever)
 project. This depends on having both a publically available RabbitMQ instance, and 
 an executing instance of the FetchAgent components of the [ReadableWebProxy](https://github.com/fake-name/ReadableWebProxy) 
 fetch-agent RPC service on your local LAN.
