@@ -18,7 +18,7 @@ python-tumblpy==1.1.4
 pytz==2019.1
 ## PyYAML
 ## repoze.lru
-requests==2.21.0
+requests==2.22.0
 requests-oauthlib==1.2.0
 six==1.12.0
 ## translationstring
