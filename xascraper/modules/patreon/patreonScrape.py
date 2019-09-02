@@ -57,7 +57,7 @@ class GetPatreon(xascraper.modules.scraper_base.ScraperBase):
 	def checkCookie(self):
 		print("Checking login!")
 		try:
-			current = self.get_json("/current_user", retries=1)
+			current = self.get_new_json("/current_user", retries=1)
 		except Exception:
 			print("Not logged in!")
 			current = False
@@ -85,7 +85,7 @@ class GetPatreon(xascraper.modules.scraper_base.ScraperBase):
 				}
 		}
 		try:
-			current = self.get_json("/login", postData=login_data, retries=1)
+			current = self.get_new_json("/login?json-api-version=1.0", postData=login_data, retries=1)
 
 			self.log.info("Login results: %s", current)
 		finally:
@@ -140,8 +140,8 @@ class GetPatreon(xascraper.modules.scraper_base.ScraperBase):
 			postData = {"data" : postData}
 			postData = json.dumps(postData, sort_keys=True)
 
-		print("")
-		content = self.wg.getpage("https://www.patreon.com/api/{endpoint}".format(endpoint=endpoint),
+		assert endpoint.startswith("/")
+		content = self.wg.getpage("https://www.patreon.com/api{endpoint}".format(endpoint=endpoint),
 			addlHeaders={
 				"Accept"          : "application/json, text/plain, */*",
 				"Referer"         : "https://www.patreon.com/login",
@@ -165,7 +165,7 @@ class GetPatreon(xascraper.modules.scraper_base.ScraperBase):
 
 
 	def current_user_info(self):
-		current = self.get_json("/current_user?include=pledges&include=follows")
+		current = self.get_new_json("/current_user?include=pledges&include=follows")
 		return current
 
 
@@ -270,7 +270,7 @@ class GetPatreon(xascraper.modules.scraper_base.ScraperBase):
 		raise ValueError("Wat?")
 
 	def _get_art_post(self, postId, artistName):
-		post = self.get_json("/posts/{pid}".format(pid=postId), apikey=True)
+		post = self.get_new_json("/posts/{pid}".format(pid=postId), apikey=True)
 
 
 		attachments = {item['id'] : item for item in post['included'] if item['type'] == 'attachment'}

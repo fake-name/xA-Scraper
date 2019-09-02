@@ -404,10 +404,10 @@ class GetPX(xascraper.modules.scraper_base.ScraperBase):
 		basePage = "http://www.pixiv.net/member_illust.php?id=%s" % artist
 		page = self.wg.getSoup(basePage)
 
-		mainDiv = page.find("div", class_="layout-a")
-		if not mainDiv:
+		countSpan = page.find("div", class_="sc-LzLwu")
+		if not countSpan:
 			raise exceptions.AccountDisabledException("Could not retreive artist item quantity!")
-		countSpan = mainDiv.find("span", class_="count-badge")
+		countSpan = page.find("div", class_="hWVZtW")
 		if not countSpan:
 			raise exceptions.AccountDisabledException("Could not retreive artist item quantity!")
 
