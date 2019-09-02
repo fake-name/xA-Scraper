@@ -46,7 +46,7 @@ mprpc==0.1.17
 sqlalchemy_jsonfield==0.8.0
 dill==0.2.9
 tqdm==4.31.1
-python-magic
+python-magic==0.4.15
 webrequest==0.0.55
 
 git+https://github.com/berkerpeksag/astor.git
