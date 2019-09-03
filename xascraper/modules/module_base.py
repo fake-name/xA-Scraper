@@ -32,6 +32,7 @@ class ModuleBase(xascraper.status_monitor.StatusMixin, metaclass=abc.ABCMeta):
 
 		self.log = logging.getLogger("Main.%s" % self.pluginName)
 		self.wg = WebGetRobust(custom_ua=self.custom_ua)
+		self.wg.retryDelay = 1
 
 		print("Starting up?")
 
