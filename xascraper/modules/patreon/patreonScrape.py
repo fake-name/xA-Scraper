@@ -54,10 +54,11 @@ class GetPatreon(xascraper.modules.scraper_base.ScraperBase):
 		self.wg.errorOutCount = 1
 
 
+
 	def checkCookie(self):
 		print("Checking login!")
 		try:
-			current = self.get_new_json("/current_user", retries=1)
+			current = self.get_api_json("/current_user", retries=1)
 		except Exception:
 			print("Not logged in!")
 			current = False
@@ -66,6 +67,37 @@ class GetPatreon(xascraper.modules.scraper_base.ScraperBase):
 			return False, "Not logged in"
 		else:
 			return True, "Autheticated OK"
+
+	def handle_recaptcha(self, soup, containing_page, referrer_url):
+		self.log.warning("Hit recaptcha. Attempting to solve.")
+
+		key = settings['captcha']['anti-captcha']['api_key']
+		solver = WebRequest.AntiCaptchaSolver(api_key=key, wg=self.wg)
+		form = soup.find("form", id="challenge-form")
+
+		args = {}
+		for input_tag in form.find_all('input'):
+			if input_tag.get('name'):
+				args[input_tag['name']] = input_tag['value']
+
+
+		captcha_key = form.script['data-sitekey']
+
+		self.log.info("Captcha key: %s with input values: %s", captcha_key, args)
+
+		recaptcha_response = solver.solve_recaptcha(google_key=captcha_key, page_url=containing_page)
+
+		self.log.info("Captcha solved with response: %s", recaptcha_response)
+		args['g-recaptcha-response'] = recaptcha_response
+
+		solved_soup = self.wg.getpage(
+				urllib.parse.urljoin(containing_page, form['action']),
+				postData    = args,
+				addlHeaders = {'Referer': referrer_url},
+			)
+
+		return solved_soup
+
 
 
 	def getCookie(self):
@@ -76,6 +108,19 @@ class GetPatreon(xascraper.modules.scraper_base.ScraperBase):
 		time.sleep(5)
 
 		self.log.info("Not logged in. Doing login.")
+
+		home  = "https://www.patreon.com/home"
+		login = "https://www.patreon.com/login"
+		soup = self.wg.getSoup(home)
+
+		# These won't work for the particular recaptcha flavor patreon uses. Sigh.
+		if soup.find_all("div", class_="g-recaptcha"):
+			soup = WebRequest.as_soup(self.handle_recaptcha(soup, home, login))
+
+		if soup.find_all("div", class_="g-recaptcha"):
+			self.log.error("Failed after attempting to solve recaptcha!")
+			raise exceptions.NotLoggedInException("Login failed due to recaptcha!")
+
 		login_data = {
 			'type' : 'user',
 			'relationships' : {},
@@ -85,8 +130,7 @@ class GetPatreon(xascraper.modules.scraper_base.ScraperBase):
 				}
 		}
 		try:
-			current = self.get_new_json("/login?json-api-version=1.0", postData=login_data, retries=1)
-
+			current = self.get_api_json("/login?json-api-version=1.0", postData=login_data, retries=1)
 			self.log.info("Login results: %s", current)
 		finally:
 			self.log.info("Flushing cookies unconditionally.")
@@ -97,63 +141,48 @@ class GetPatreon(xascraper.modules.scraper_base.ScraperBase):
 	# # ---------------------------------------------------------------------------------------------------------------------------------------------------------
 	# # Internal utilities stuff
 	# # ---------------------------------------------------------------------------------------------------------------------------------------------------------
+	def __cf_check(self, url, *args, **kwargs):
+		try:
+			content = self.wg.getpage(url, *args, **kwargs)
+		except WebRequest.FetchFailureError as e:
+			if e.err_code == 403 and b"Attention Required! | Cloudflare" in e.err_content:
+				e_soup = WebRequest.as_soup(e.err_content)
+				self.handle_recaptcha(e_soup, url, "https://www.patreon.com/home")
+				print()
+				print(e.err_content)
+				print()
+				print(e.err_reason)
+				print()
+			raise
+		return content
 
-	def get_json(self, endpoint, postData = None, apikey = False, retries=3):
+	def get_api_json(self, endpoint, postData = None, retries=1):
 		if postData:
 			postData = {"data" : postData}
 			postData = json.dumps(postData, sort_keys=True)
 
-		if apikey:
-			apikey = "?api_key=1745177328c8a1d48100a9b14a1d38c1"
-		else:
-			apikey = ""
+		assert endpoint.startswith("/"), "Endpoint isn't a relative path! Passed: '%s'" % endpoint
 
 		try:
-			content = self.wg.getpage("https://api.patreon.com{endpoint}{api}".format(endpoint=endpoint, api=apikey),
-				addlHeaders={
-					"Accept"          : "application/json, text/plain, */*",
-					"Referer"         : "https://www.patreon.com/login",
-					"Origin"          : "https://www.patreon.com",
-					"Host"            : "api.patreon.com",
-					"Content-Type"    : "application/json; charset=UTF-8",
-					"Accept-Encoding" : "gzip, deflate",
-					"Pragma"          : "no-cache",
-					"Cache-Control"   : "no-cache",
-					},
-				postData = postData,
-				retryQuantity = retries)
+			content = self.__cf_check(
+					"https://www.patreon.com/api{endpoint}".format(endpoint=endpoint),
+					addlHeaders={
+						"Accept"          : "application/json, text/plain, */*",
+						# "Referer"         : "https://www.patreon.com/login",
+						"Origin"          : "https://www.patreon.com",
+						"Host"            : "www.patreon.com",
+						"Content-Type"    : "application/json",
+						"Accept-Encoding" : "gzip, deflate",
+						"Pragma"          : "no-cache",
+						"Cache-Control"   : "no-cache",
+						},
+					postData      = postData,
+					retryQuantity = retries
+				)
 		except Exception as e:
-			# import pdb
-			# pdb.set_trace()
-			raise
+			traceback.print_exc()
+			raise exceptions.UnrecoverableFailureException("Wat?")
 
-		if content is None:
-			self.log.error("Couldn't login! Please check username and password!")
-			raise LoginFailure("Failed to login. Please check your username and password are correct!")
-
-		content = content.decode("utf-8")
-		vals = json.loads(content)
-		return vals
-
-	def get_new_json(self, endpoint, postData = None, retries=3):
-		if postData:
-			postData = {"data" : postData}
-			postData = json.dumps(postData, sort_keys=True)
-
-		assert endpoint.startswith("/")
-		content = self.wg.getpage("https://www.patreon.com/api{endpoint}".format(endpoint=endpoint),
-			addlHeaders={
-				"Accept"          : "application/json, text/plain, */*",
-				"Referer"         : "https://www.patreon.com/login",
-				"Origin"          : "https://www.patreon.com",
-				"Host"            : "www.patreon.com",
-				"Content-Type"    : "application/json",
-				"Accept-Encoding" : "gzip, deflate",
-				"Pragma"          : "no-cache",
-				"Cache-Control"   : "no-cache",
-				},
-			postData = postData,
-			retryQuantity = retries)
 
 		if content is None:
 			self.log.error("Couldn't login! Please check username and password!")
@@ -165,7 +194,7 @@ class GetPatreon(xascraper.modules.scraper_base.ScraperBase):
 
 
 	def current_user_info(self):
-		current = self.get_new_json("/current_user?include=pledges&include=follows")
+		current = self.get_api_json("/current_user?include=pledges&include=follows")
 		return current
 
 
@@ -270,7 +299,7 @@ class GetPatreon(xascraper.modules.scraper_base.ScraperBase):
 		raise ValueError("Wat?")
 
 	def _get_art_post(self, postId, artistName):
-		post = self.get_new_json("/posts/{pid}".format(pid=postId), apikey=True)
+		post = self.get_api_json("/posts/{pid}".format(pid=postId), apikey=True)
 
 
 		attachments = {item['id'] : item for item in post['included'] if item['type'] == 'attachment'}
@@ -407,7 +436,7 @@ class GetPatreon(xascraper.modules.scraper_base.ScraperBase):
 		artist_name, artist_meta = artist_meta
 
 		if ctrlNamespace.run is False:
-			self.log.warning("Exiting early from %s due to run flag being unset", artist_undecoded)
+			# self.log.warning("Exiting early from %s due to run flag being unset", artist_undecoded)
 			return True
 
 		try:
@@ -420,11 +449,6 @@ class GetPatreon(xascraper.modules.scraper_base.ScraperBase):
 				newArt = self._load_art(patreon_aid, artist_undecoded)
 			else:
 				newArt = []
-
-			# with open("artist_items.json", "wb") as fp:
-			# 	json.dump(newArt, fp)
-
-			# return
 
 
 			embeds = []
@@ -492,6 +516,16 @@ class GetPatreon(xascraper.modules.scraper_base.ScraperBase):
 				self.save_embeds(artist_name, embeds)
 
 			return False
+
+		except exceptions.AccountDisabledException:
+			self.log.error("Artist seems to have disabled their account!")
+			return False
+		except (WebRequest.FetchFailureError, exceptions.UnrecoverableFailureException):
+			self.log.error("Unrecoverable exception!")
+			self.log.error(traceback.format_exc())
+			ctrlNamespace.run = False
+			return False
+
 		except:
 			self.log.error("Exception when retreiving artist %s", artist_name)
 			self.log.error("%s", traceback.format_exc())
@@ -558,7 +592,7 @@ class GetPatreon(xascraper.modules.scraper_base.ScraperBase):
 		postids = set()
 		types = ['posts', 'poll']
 		while True:
-			current = self.get_new_json("stream?" +
+			current = self.get_api_json("/stream?" +
 				"include=recent_comments.commenter%2Crecent_comments.parent%2Crecent_comments.post%2Crecent_comments.first_reply.commenter%2Crecent_comments.first_reply.parent%2Crecent_comments.first_reply.post" +
 				"&fields[post]=change_visibility_at%2Ccomment_count%2Ccontent%2Ccurrent_user_can_delete%2Ccurrent_user_can_view%2Ccurrent_user_has_liked%2Cearly_access_min_cents%2Cembed%2Cimage%2Cis_paid%2Clike_count%2Cmin_cents_pledged_to_view%2Cpost_file%2Cpublished_at%2Cpatron_count%2Cpatreon_url%2Cpost_type%2Cpledge_url%2Cthumbnail_url%2Ctitle%2Cupgrade_url%2Curl" +
 				"&fields[user]=image_url%2Cfull_name%2Curl" +

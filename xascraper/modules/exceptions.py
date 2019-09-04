@@ -3,6 +3,8 @@
 class ScraperException(RuntimeError):
 	pass
 
+class UnrecoverableFailureException(ScraperException):
+	pass
 class RetryException(ScraperException):
 	pass
 class NotLoggedInException(ScraperException):
