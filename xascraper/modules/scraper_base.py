@@ -55,7 +55,7 @@ def makeFilenameSafe(inStr):
 	return inStr
 
 def insertExtIfNeeded(fqFName, file_bytes):
-	root, ext = os.path.splitext(fqfilename)
+	root, ext = os.path.splitext(fqFName)
 	mime = magic.from_buffer(imageContent, mime=True)
 	should_ext = mimetypes.guess_extension(mime)
 	if ext != should_ext:
@@ -592,10 +592,6 @@ class ScraperBase(module_base.ModuleBase, metaclass=abc.ABCMeta):
 					self.log.error("Page Retrieval failed!")
 					self.log.error("Source URL = '%s'", pageURL)
 					self.log.error(traceback.format_exc())
-				except:
-					self.log.error("Unknown error in page retrieval!")
-					self.log.error("Source URL = '%s'", pageURL)
-					self.log.error(traceback.format_exc())
 
 
 				self.log.info("Pages for %s remaining = %s", artist, len(newArt))
@@ -610,6 +606,12 @@ class ScraperBase(module_base.ModuleBase, metaclass=abc.ABCMeta):
 		except exceptions.AccountDisabledException:
 			self.log.error("Artist seems to have disabled their account!")
 			return False
+		except Exceptions.UnrecoverableFailureException:
+
+			self.log.error("Unrecoverable exception!")
+			self.log.error(traceback.format_exc())
+			ctrlNamespace.run = False
+
 
 		except:
 			self.log.error("Exception when retreiving artist %s", artist)
