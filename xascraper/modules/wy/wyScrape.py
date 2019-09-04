@@ -25,6 +25,14 @@ class GetWy(xascraper.modules.scraper_base.ScraperBase):
 
 	numThreads = 2
 
+	def __init__(self):
+		super().__init__()
+
+		# Weasyl is really flaky about serving content sometimes, not sure why.
+		# This turn up the retries (and delay on failure) because of that.
+		self.wg.retryDelay = 5
+		self.wg.errorOutCount  = 2
+	
 	# # ---------------------------------------------------------------------------------------------------------------------------------------------------------
 	# # Cookie Management
 	# # ---------------------------------------------------------------------------------------------------------------------------------------------------------
