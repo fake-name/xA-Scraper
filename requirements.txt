@@ -34,7 +34,7 @@ flask-markdown==0.3
 dateparser==0.7.1
 markdown==3.1.1
 flask_login==0.4.1
-psycopg2==2.8.3
+psycopg2-binary==2.8.3
 flask_csrf==0.9.2
 flask-paginate==0.5.3
 Flask-HTTPAuth==3.3.0
@@ -46,8 +46,8 @@ mprpc==0.1.17
 sqlalchemy_jsonfield==0.8.0
 dill==0.3.0
 tqdm==4.35.0
-python-magic==0.4.15
+python-magic==0.4.14
 webrequest==0.0.58
 
-git+https://github.com/berkerpeksag/astor.git
-git+https://github.com/fake-name/ChromeController.git
+## git+https://github.com/berkerpeksag/astor.git
+## git+https://github.com/fake-name/ChromeController.git
