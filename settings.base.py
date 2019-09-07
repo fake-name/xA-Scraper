@@ -28,6 +28,17 @@ settings = {
 		'thread-pool-size'    : 20,
 	},
 
+
+
+	"captcha" : {
+
+		"anti-captcha" : {
+			'api_key' : "your-key-goes-here"
+		},
+
+	},
+
+
 	# You only need to set these if USE_POSTGRESQL is set to true.
 	"postgres" :
 	{
