@@ -26,7 +26,7 @@ class GetIb(xascraper.modules.scraper_base.ScraperBase):
 
 	ovwMode = "Check Files"
 
-	numThreads = 4
+	numThreads = 2
 
 
 
@@ -212,7 +212,14 @@ class GetIb(xascraper.modules.scraper_base.ScraperBase):
 			return title.get_text().strip()
 
 
-	def _extractDescription(self, desc_soup, tag_soup):
+	def _extractDescription(self, story_div, desc_soup, tag_soup):
+		desc = bs4.BeautifulSoup('', "lxml").new_tag('div')
+
+		if story_div:
+			story = story_div.find("div", id='storysectionbar')
+			story = util.unclassify.unclassify(story.extract())
+			desc.append(story)
+
 
 		# Tag extraction has to go before description extraction, because
 		# the desc extraction modifies the tree
@@ -239,7 +246,8 @@ class GetIb(xascraper.modules.scraper_base.ScraperBase):
 		div = desc_soup.find('div', class_='content')
 		div = util.unclassify.unclassify(div)
 
-		desc = bs4.BeautifulSoup('', "lxml").new_tag('div')
+
+
 		if div.div.span:
 			desc.append(div.div.span)
 		else:
@@ -276,15 +284,22 @@ class GetIb(xascraper.modules.scraper_base.ScraperBase):
 	def _getArtPage(self, dlPathBase, artPageUrl, artistName):
 
 		soup = self.wg.getSoup(artPageUrl)
-
-		if 'ERROR: That submission has been deleted.' in str(soup):
+		soups = str(soup)
+		if 'ERROR: That submission has been deleted.' in soups:
 			self.log.warning("Item %s has been deleted by the poster!", artPageUrl)
 			return self.build_page_ret(status="Deleted", fqDlPath=None)
+
+		if 'The owner has restricted this submission to members' in soups:
+			raise exceptions.NotLoggedInException("Not logged in?")
+		if "You may need to go to that member's userpage (use name link above) and request that they give you access" in soups:
+			raise exceptions.CannotAccessException("Friends only thingie (why is this even a thing)!")
 
 		postTime    = self._extractPostTimestamp(soup)
 		postTags    = self._extractPostTags(soup)
 
 		titleBar, dummy_stats, dummy_footer = soup.body.find_all('div', class_='elephant_555753', recursive=False)
+
+		story_div = None
 
 		mainDivs = soup.body.find_all('div', class_='elephant_white', recursive=False)
 		if len(mainDivs) == 2:
@@ -310,13 +325,32 @@ class GetIb(xascraper.modules.scraper_base.ScraperBase):
 				# print("Adding: ", img)
 				imageURL.add(img)
 			self.log.info("Found %s item series on page!", len(imageURL))
+
+		elif len(mainDivs) == 5:
+			header_div, img_div, story_div, desc_div, footer = mainDivs
+
+
+			imageURL = set()
+			base_img = self._getContentUrlFromPage(img_div)
+			if base_img:
+				imageURL.add(base_img)
+
+			for img in self._getSeqImageDivs(desc_div):
+				# print("Adding: ", img)
+				imageURL.add(img)
+			self.log.info("Found %s item series on page!", len(imageURL))
 		else:
+			soupp = str(mainDivs)
+			with open("log.html", "w") as fp:
+				fp.write(soupp)
+			print(soupp)
+
 			raise ValueError("Unknown number of mainDivs! %s" % len(mainDivs))
 
 		# print(imageURL)
 
 		itemTitle   = self._extractTitle(titleBar)
-		itemCaption = self._extractDescription(desc_div, footer)
+		itemCaption = self._extractDescription(story_div, desc_div, footer)
 
 		if not imageURL:
 			self.log.error("OH NOES!!! No image on page = " + artPageUrl)
@@ -421,14 +455,24 @@ class GetIb(xascraper.modules.scraper_base.ScraperBase):
 
 
 if __name__ == '__main__':
-
+	import multiprocessing.managers
 	import logSetup
+
 	logSetup.initLogging()
+
+
+	manager = multiprocessing.managers.SyncManager()
+	manager.start()
+	namespace = manager.Namespace()
+	namespace.run=True
+
 
 	ins = GetIb()
 	# ins.getCookie()
 	print(ins)
 	print("Instance: ", ins)
 	# dlPathBase, artPageUrl, artistName
-	ins._getArtPage("xxxx", 'https://inkbunny.net/submissionview.php?id=xxx', 'testtt')
+	print("Getting artist")
+	# ins.getCookie()
+	# ins._getArtPage("xxxx", 'https://inkbunny.net/submissionview.php?id=xxx', 'testtt')
 

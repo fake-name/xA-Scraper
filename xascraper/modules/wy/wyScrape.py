@@ -6,6 +6,7 @@ import re
 import dateparser
 import urllib.request
 import urllib.parse
+import WebRequest
 from settings import settings
 import flags
 
@@ -23,7 +24,15 @@ class GetWy(xascraper.modules.scraper_base.ScraperBase):
 
 	ovwMode = "Check Files"
 
-	numThreads = 2
+	numThreads = 1
+
+	def __init__(self):
+		super().__init__()
+
+		# Weasyl is really flaky about serving content sometimes, not sure why.
+		# This turn up the retries (and delay on failure) because of that.
+		self.wg.retryDelay = 5
+		self.wg.errorOutCount  = 2
 
 	# # ---------------------------------------------------------------------------------------------------------------------------------------------------------
 	# # Cookie Management
@@ -137,7 +146,12 @@ class GetWy(xascraper.modules.scraper_base.ScraperBase):
 
 	def _getArtPage(self, dlPathBase, artPageUrl, artistName):
 
-		soup = self.wg.getSoup(artPageUrl)
+		try:
+			soup = self.wg.getSoup(artPageUrl)
+		except WebRequest.FetchFailureError as e:
+			if e.err_code == 404:
+				raise exceptions.CannotFindContentException("Content missing (404)")
+			raise e
 
 
 		imageURL = self._getContentUrlFromPage(soup)
@@ -167,7 +181,14 @@ class GetWy(xascraper.modules.scraper_base.ScraperBase):
 			self.log.info("Exists, skipping...")
 			return self.build_page_ret(status="Exists", fqDlPath=[filePath], pageDesc=itemCaption, pageTitle=itemTitle, postTime=itemDate)
 		else:
-			imgdat = self.wg.getpage(imageURL, addlHeaders={'Referer':artPageUrl})
+
+			try:
+				imgdat = self.wg.getpage(imageURL, addlHeaders={'Referer':artPageUrl})
+			except WebRequest.FetchFailureError as e:
+				if e.err_code == 404:
+					raise exceptions.CannotFindContentException("Content missing (404)")
+				raise e
+
 
 
 			# For text, the URL fetcher returns decoded strings, rather then bytes.
@@ -294,6 +315,6 @@ if __name__ == '__main__':
 	ins = GetWy()
 	print(ins)
 	print("Getting cookie:")
-	ins.getCookie()
+	# ins.getCookie()
 
 

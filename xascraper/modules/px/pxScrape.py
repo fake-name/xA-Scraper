@@ -59,7 +59,7 @@ class GetPX(xascraper.modules.scraper_base.ScraperBase):
 
 		pagetext = self.wg.getpage('https://accounts.pixiv.net/login', postData = logondict, addlHeaders={'Referer': 'https://accounts.pixiv.net/login'})
 
-		self.wg.syncCookiesFromFile()
+		self.wg._syncCookiesFromFile()
 		if '<a href="/logout.php?return_to=%2F" data-text-confirm="ログアウトします。よろしいですか？" onclick="return confirm(this.getAttribute(\'data-text-confirm\'))" class="item header-logout">ログアウト</a>' in pagetext:
 			return True, "Logged In"
 		else:
