@@ -59,7 +59,7 @@ class GetPX(xascraper.modules.scraper_base.ScraperBase):
 
 		pagetext = self.wg.getpage('https://accounts.pixiv.net/login', postData = logondict, addlHeaders={'Referer': 'https://accounts.pixiv.net/login'})
 
-		self.wg.syncCookiesFromFile()
+		self.wg._syncCookiesFromFile()
 		if '<a href="/logout.php?return_to=%2F" data-text-confirm="ログアウトします。よろしいですか？" onclick="return confirm(this.getAttribute(\'data-text-confirm\'))" class="item header-logout">ログアウト</a>' in pagetext:
 			return True, "Logged In"
 		else:
@@ -404,10 +404,10 @@ class GetPX(xascraper.modules.scraper_base.ScraperBase):
 		basePage = "http://www.pixiv.net/member_illust.php?id=%s" % artist
 		page = self.wg.getSoup(basePage)
 
-		mainDiv = page.find("div", class_="layout-a")
-		if not mainDiv:
+		countSpan = page.find("div", class_="sc-LzLwu")
+		if not countSpan:
 			raise exceptions.AccountDisabledException("Could not retreive artist item quantity!")
-		countSpan = mainDiv.find("span", class_="count-badge")
+		countSpan = page.find("div", class_="hWVZtW")
 		if not countSpan:
 			raise exceptions.AccountDisabledException("Could not retreive artist item quantity!")
 

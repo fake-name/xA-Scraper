@@ -56,9 +56,9 @@ def makeFilenameSafe(inStr):
 
 def insertExtIfNeeded(fqFName, file_bytes):
 	root, ext = os.path.splitext(fqFName)
-	mime = magic.from_buffer(imageContent, mime=True)
+	mime = magic.from_buffer(file_bytes, mime=True)
 	should_ext = mimetypes.guess_extension(mime)
-	if ext != should_ext:
+	if ext != should_ext and should_ext:
 		return root + should_ext
 	return fqFName
 
