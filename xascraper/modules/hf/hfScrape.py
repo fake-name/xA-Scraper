@@ -5,10 +5,12 @@ import traceback
 import re
 import bs4
 import dateparser
+import WebRequest
 import urllib.request
 import urllib.parse
 from settings import settings
 import flags
+
 
 import xascraper.modules.scraper_base
 from xascraper.modules import exceptions
@@ -35,7 +37,7 @@ class GetHF(xascraper.modules.scraper_base.ScraperBase):
 	def checkCookie(self):
 		self.log.info("HF Checking cookies")
 		YII_CSRF_TOKEN = re.search(r"<Cookie YII_CSRF_TOKEN=[\w%]*? for www\.hentai-foundry\.com\/>", "%s" % self.wg.cj)
-		PHPSESSID = re.search(r"<Cookie PHPSESSID=[\w%]*? for www\.hentai-foundry\.com\/>", "%s" % self.wg.cj)
+		PHPSESSID = re.search(r"<Cookie PHPSESSID=[\w\-%]*? for www\.hentai-foundry\.com\/>",           "%s" % self.wg.cj)
 
 		if YII_CSRF_TOKEN and PHPSESSID:
 			return True, "Have HF Cookies:\n	%s\n	%s" % (YII_CSRF_TOKEN.group(0), PHPSESSID.group(0))
@@ -284,7 +286,13 @@ class GetHF(xascraper.modules.scraper_base.ScraperBase):
 
 	def _getTotalArtCount(self, artist):
 		basePage = "http://www.hentai-foundry.com/user/%s/profile" % artist
-		page = self.wg.getSoup(basePage)
+
+		try:
+			page = self.wg.getSoup(basePage)
+		except WebRequest.FetchFailureError as e:
+			if e.err_code == 404:
+				raise exceptions.AccountDisabledException("Account seems to have been removed!")
+			raise e
 
 		tds = page.find("b", text="# Pictures")
 

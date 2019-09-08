@@ -3,16 +3,18 @@ import os
 import os.path
 import traceback
 import re
-import bs4
-import dateparser
+import json
 import datetime
 import urllib.request
 import urllib.parse
+import dateparser
+import bs4
+import WebRequest
 from settings import settings
 import flags
-import json
 
 import xascraper.modules.scraper_base
+from xascraper.modules import exceptions
 
 def makeFilenameSafe(inStr):
 
@@ -64,8 +66,7 @@ class GetSf(xascraper.modules.scraper_base.ScraperBase):
 
 	ovwMode = "Check Files"
 
-	numThreads = 2
-
+	numThreads = 1
 
 	# # ---------------------------------------------------------------------------------------------------------------------------------------------------------
 	# # Cookie Management
@@ -135,12 +136,19 @@ class GetSf(xascraper.modules.scraper_base.ScraperBase):
 		if dl_link:
 			itemUrl = urllib.parse.urljoin(self.urlBase, dl_link['href'])
 			return itemUrl
+
+		inline_img_div = soup.find('div', id='sfContentImage')
+		if inline_img_div and inline_img_div.img:
+			itemUrl = urllib.parse.urljoin(self.urlBase, inline_img_div.img['src'])
+			return itemUrl
+
 		return None
 
 	def _extractTitleDescription(self, soup):
 		title = soup.find('span', id='sfContentTitle')
 		title = title.get_text().strip()
 
+		desc_foreward = soup.find('div', id='sfContentDescription')
 		desc_div = soup.find('div', id='sfContentBody')
 
 		for bad_input in desc_div.find_all("input", type='hidden'):
@@ -177,7 +185,7 @@ class GetSf(xascraper.modules.scraper_base.ScraperBase):
 				tagDiv.append(new)
 
 		desc_div.append(tagDiv)
-		desc = str(desc_div.prettify())
+		desc = str(desc_foreward.prettify()) + "\n<br />\n" + str(desc_div.prettify())
 
 		timestamp = datetime.datetime.min
 		stats_sections = soup.find_all("div", class_='section-content')
@@ -194,20 +202,23 @@ class GetSf(xascraper.modules.scraper_base.ScraperBase):
 		return title, desc, plain_tags, timestamp
 
 	def _getArtPage(self, dlPathBase, artPageUrl, artistName):
-		print("GetArtPage!")
+		artPageUrl = artPageUrl.lower()
 		params = json.loads(artPageUrl)
 		soup = self.wg.getSoup(params['url'])
-
+		soups = str(soup)
+		if 'This submission has been deleted.' in soups:
+			self.log.warning("Item %s has been deleted by the poster!", artPageUrl)
+			return self.build_page_ret(status="Deleted", fqDlPath=None)
 
 		imageURL = self._getContentUrlFromPage(soup)
 		itemTitle, itemCaption, itemTags, postTime = self._extractTitleDescription(soup)
 
 
 		if not imageURL:
-			self.log.error("Warning! No image on page = " + artPageUrl)
-			filePath = None
+			if not ("/stories" in artPageUrl or "/journals" in artPageUrl):
+				self.log.error("Warning! No image on page = %s", artPageUrl)
+			return self.build_page_ret(status="Exists", fqDlPath=[], pageDesc=itemCaption, pageTitle=itemTitle, postTags=itemTags, postTime=postTime)
 		else:
-			urlPath = urllib.parse.urlparse(imageURL).path
 			fName = makeFilenameSafe(itemTitle)
 
 			if not fName:
@@ -218,6 +229,7 @@ class GetSf(xascraper.modules.scraper_base.ScraperBase):
 			filePath = os.path.join(dlPathBase, fName)
 
 			self.log.info("	Filename         = %s", fName)
+
 			self.log.info("	Page Image Title = %s", itemTitle)
 			self.log.info("	FileURL          = %s", imageURL)
 			self.log.info("	dlPath           = %s", filePath)
@@ -244,6 +256,7 @@ class GetSf(xascraper.modules.scraper_base.ScraperBase):
 				if not filePath:
 					return self.build_page_ret(status="Failed", fqDlPath=None)
 
+				return self.build_page_ret(status="Succeeded", fqDlPath=[filePath], pageDesc=itemCaption, pageTitle=itemTitle, postTags=itemTags, postTime=postTime)
 
 		return self.build_page_ret(status="Failed", fqDlPath=None)
 
@@ -253,7 +266,12 @@ class GetSf(xascraper.modules.scraper_base.ScraperBase):
 	# ---------------------------------------------------------------------------------------------------------------------------------------------------------
 
 	def _getTotalArtCount(self, artist):
-		soup = self.wg.getSoup("https://%s.sofurry.com/" % artist)
+		try:
+			soup = self.wg.getSoup("https://%s.sofurry.com/" % artist.strip().lower())
+		except WebRequest.FetchFailureError as e:
+			if e.err_code == 404:
+				raise exceptions.AccountDisabledException("Account seems to have been removed!")
+			raise e
 
 		# This is probably stupidly brittle
 		subdiv = soup.find("span", class_='sfTextMedLight', text=re.compile('submissions', flags=re.IGNORECASE))
@@ -335,7 +353,7 @@ class GetSf(xascraper.modules.scraper_base.ScraperBase):
 
 	def _getGalleries(self, artist):
 
-		artist = artist.strip()
+		artist = artist.strip().lower()
 
 		baseUrl = 'https://{user}.sofurry.com/'.format(user=artist)
 
@@ -360,11 +378,11 @@ if __name__ == '__main__':
 	logSetup.initLogging()
 
 	ins = GetSf()
-	ins.getCookie()
+	# ins.getCookie()
 	print(ins)
 	print("Instance: ", ins)
 	# dlPathBase, artPageUrl, artistName
-	ins._getArtPage("xxxx", '{"url":"https://www.sofurry.com/view/xxxx"}', 'testtt')
+	ins._getArtPage("xxxx", '{"url":"https://www.sofurry.com/view/857034"}', 'testtt')
 
 
 

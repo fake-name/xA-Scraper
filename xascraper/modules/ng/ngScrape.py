@@ -6,6 +6,7 @@ import bs4
 import dateparser
 import urllib.request
 import urllib.parse
+import WebRequest
 from settings import settings
 import flags
 
@@ -222,7 +223,14 @@ class GetNg(xascraper.modules.scraper_base.ScraperBase):
 	def _getTotalArtCount(self, artist):
 		basePage = "https://{user}.newgrounds.com/".format(user=artist)
 
-		page = self.wg.getSoup(basePage)
+		try:
+			page = self.wg.getSoup(basePage)
+		except WebRequest.FetchFailureError as e:
+			if e.err_code == 404:
+				raise exceptions.AccountDisabledException("Account seems to have been removed!")
+			raise e
+
+
 		stats = page.find('div', class_='scroll-area')
 		if not stats:
 			return None
