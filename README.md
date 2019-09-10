@@ -24,10 +24,10 @@ Decrepit:
 
 
 Checked so far:
- - hf, df, wy, ng, ib
+ - hf, df, wy, ng, ib, fa
 
 Todo:
- - da, fa, pat, px
+ - da, pat, px
 
 It also has grown a lot of other functions over time. It has a fairly complex,
 interactive web-interface for browsing the local gallery mirrors, and a tool

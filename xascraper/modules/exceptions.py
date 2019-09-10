@@ -22,4 +22,6 @@ class CannotAccessException(ScraperException):
 	pass
 class AccountDisabledException(ScraperException):
 	pass
+class NoArtException(ScraperException):
+	pass
 
