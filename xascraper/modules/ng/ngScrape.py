@@ -230,6 +230,13 @@ class GetNg(xascraper.modules.scraper_base.ScraperBase):
 				raise exceptions.AccountDisabledException("Account seems to have been removed!")
 			raise e
 
+		soups = str(page)
+		print("We have yet to see how MarineNaut will contribute to the site.")
+
+		no_items = page.find('p', class_='padded-message')
+		if no_items:
+			if "We have yet to see how {} will contribute to the site.".format(artist).lower() in no_items.get_text(strip=True).lower():
+				raise exceptions.NoArtException("No art for artist yet!")
 
 		stats = page.find('div', class_='scroll-area')
 		if not stats:
@@ -313,4 +320,28 @@ class GetNg(xascraper.modules.scraper_base.ScraperBase):
 		artlinks = self._getArtItems(artist)
 
 		return artlinks
+
+
+if __name__ == '__main__':
+	import multiprocessing.managers
+	import logSetup
+
+	logSetup.initLogging()
+
+
+	manager = multiprocessing.managers.SyncManager()
+	manager.start()
+	namespace = manager.Namespace()
+	namespace.run=True
+
+
+	ins = GetNg()
+	# ins.getCookie()
+	print(ins)
+	print("Instance: ", ins)
+	# dlPathBase, artPageUrl, artistName
+	print("Getting artist")
+	# ins.getCookie()
+	ac = ins._getTotalArtCount("xxx")
+	print("Art count: ", ac)
 
