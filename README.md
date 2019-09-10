@@ -9,7 +9,6 @@ This is a automated tool for scraping content from a number of art sites:
 - HentaFoundry
 - Pixiv
 - InkBunny
-- Tumblr art blogs
 - SoFurry
 - Weaslyl
 - Newgrounds art galleries
@@ -18,6 +17,17 @@ To Add:
 
  - Artstation
  - https://beta.furrynetwork.com/?
+
+Decrepit: 
+
+- Tumblr art blogs
+
+
+Checked so far:
+ - hf, df, wy, ng, ib
+
+Todo:
+ - da, fa, pat, px
 
 It also has grown a lot of other functions over time. It has a fairly complex,
 interactive web-interface for browsing the local gallery mirrors, and a tool

@@ -3,19 +3,17 @@ import os
 import os.path
 import traceback
 import re
-import bs4
 import time
+import urllib.parse
 import dateparser
-import urllib.request
+import WebRequest
 import flags
 from settings import settings
-import urllib.parse
 
-import util.captcha2upload
 import xascraper.modules.scraper_base
 from xascraper.modules import exceptions
 
-class GetFA(xascraper.modules.scraper_base.ScraperBase, util.captcha2upload.CaptchaSolverMixin):
+class GetFA(xascraper.modules.scraper_base.ScraperBase):
 
 	settingsDictKey = "fa"
 	pluginName = "FaGet"
@@ -34,7 +32,6 @@ class GetFA(xascraper.modules.scraper_base.ScraperBase, util.captcha2upload.Capt
 	# ---------------------------------------------------------------------------------------------------------------------------------------------------------
 
 	def checkCookie(self):
-
 		userID = re.search(r"<Cookie a=[0-9a-f\-]*? for \.furaffinity\.net/>", "%s" % self.wg.cj)
 		sessionID = re.search(r"<Cookie b=[0-9a-f\-]*? for \.furaffinity\.net/>", "%s" % self.wg.cj)
 		if not (userID and sessionID):
@@ -53,9 +50,25 @@ class GetFA(xascraper.modules.scraper_base.ScraperBase, util.captcha2upload.Capt
 			self.log.warn("Do not need to log in!")
 			return "Logged In"
 
+		solver = None
+		if '2captcha' in settings['captcha']:
+			solver_temp = WebRequest.TwoCaptchaSolver(api_key = settings['captcha']['2captcha']['api_key'], wg=self.wg)
+			balance = float(solver_temp.getbalance())
 
-		balance = self.captcha_solver.getbalance()
-		self.log.info("Captcha balance: %s", balance)
+			self.log.info("2Captcha balance: %s", balance)
+			if balance > 0:
+				solver = solver_temp
+		if not solver and 'anti-captcha' in settings['captcha']:
+			solver_temp = WebRequest.AntiCaptchaSolver(api_key = settings['captcha']['anti-captcha']['api_key'], wg=self.wg)
+			balance = float(solver_temp.getbalance())
+			self.log.info("Anti-Captcha balance: %s", balance)
+			if balance > 0:
+				solver = solver_temp
+
+		if not solver:
+			self.log.error("No captcha solver configured (or no solver with a non-zero balance)! Cannot continue!")
+			return "Login Failed"
+
 
 		login_pg    = self.wg.getpage('https://www.furaffinity.net/login/')
 		captcha_img = self.wg.getpage('https://www.furaffinity.net/captcha.jpg')
@@ -64,7 +77,7 @@ class GetFA(xascraper.modules.scraper_base.ScraperBase, util.captcha2upload.Capt
 			fp.write(captcha_img)
 
 		self.log.info("Solving captcha. Please wait")
-		captcha_result = self.captcha_solver.solve(filedata=captcha_img, filename='captcha.jpg')
+		captcha_result = solver.solve_simple_captcha(filedata=captcha_img, filename='captcha.jpg')
 		self.log.info("Captcha solving service result: %s", captcha_result)
 		values = {
 			'action'               : 'login',
@@ -200,7 +213,7 @@ class GetFA(xascraper.modules.scraper_base.ScraperBase, util.captcha2upload.Capt
 
 		try:
 			filePath = os.path.join(dlPathBase, fname)
-			pageDesc, pageTitle, postTags, postTime = self._getContentDescriptionTitleFromSoup(bs4.BeautifulSoup(pageCtnt, "lxml"))
+			pageDesc, pageTitle, postTags, postTime = self._getContentDescriptionTitleFromSoup(WebRequest.as_soup(pageCtnt))
 			self.log.info("			postTags  = %s", postTags)
 			self.log.info("			postTime  = %s", postTime)
 
