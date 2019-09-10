@@ -36,11 +36,15 @@ class GetHF(xascraper.modules.scraper_base.ScraperBase):
 
 	def checkCookie(self):
 		self.log.info("HF Checking cookies")
-		YII_CSRF_TOKEN = re.search(r"<Cookie YII_CSRF_TOKEN=[\w%]*? for www\.hentai-foundry\.com\/>", "%s" % self.wg.cj)
-		PHPSESSID = re.search(r"<Cookie PHPSESSID=[\w\-%]*? for www\.hentai-foundry\.com\/>",           "%s" % self.wg.cj)
+		YII_CSRF_TOKEN = re.search(r"<Cookie YII_CSRF_TOKEN=[\w\-%]*? for www\.hentai-foundry\.com\/>", "%s"   % str(self.wg.cj))
+		PHPSESSID = re.search(r"<Cookie PHPSESSID=[\w\-%]*? for www\.hentai-foundry\.com\/>",           "%s" % str(self.wg.cj))
 
 		if YII_CSRF_TOKEN and PHPSESSID:
 			return True, "Have HF Cookies:\n	%s\n	%s" % (YII_CSRF_TOKEN.group(0), PHPSESSID.group(0))
+
+		print("YII_CSRF_TOKEN", YII_CSRF_TOKEN)
+		print("PHPSESSID", PHPSESSID)
+		print("No cookies?", self.wg.cj)
 
 		return False, "Do not have HF login Cookies"
 
