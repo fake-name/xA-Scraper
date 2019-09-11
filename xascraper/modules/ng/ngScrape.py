@@ -230,19 +230,12 @@ class GetNg(xascraper.modules.scraper_base.ScraperBase):
 				raise exceptions.AccountDisabledException("Account seems to have been removed!")
 			raise e
 
-		soups = str(page)
-		print("We have yet to see how MarineNaut will contribute to the site.")
-
-		no_items = page.find('p', class_='padded-message')
-		if no_items:
-			if "We have yet to see how {} will contribute to the site.".format(artist).lower() in no_items.get_text(strip=True).lower():
-				raise exceptions.NoArtException("No art for artist yet!")
-
+		# Try for stats first, then see if we need to bounce
 		stats = page.find('div', class_='scroll-area')
 		if not stats:
 			return None
 
-		for header_btn in stats.find_all('a', class_='user-header-button '):
+		for header_btn in stats.find_all('a', class_='user-header-button'):
 			dtype = header_btn.find("span").get_text(strip=True)
 			dval  = header_btn.find("strong").get_text(strip=True)
 
@@ -250,6 +243,14 @@ class GetNg(xascraper.modules.scraper_base.ScraperBase):
 				ret = int(dval)
 				self.log.info("Artist %s should have %s gallery items.", artist, ret)
 				return ret
+
+		soups = str(page)
+
+		no_items = page.find('p', class_='padded-message')
+		if no_items:
+			if "We have yet to see how {} will contribute to the site.".format(artist).lower() in no_items.get_text(strip=True).lower():
+				raise exceptions.NoArtException("No art for artist yet!")
+
 
 		return None
 
