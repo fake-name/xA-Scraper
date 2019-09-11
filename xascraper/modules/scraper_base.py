@@ -607,7 +607,7 @@ class ScraperBase(module_base.ModuleBase, metaclass=abc.ABCMeta):
 			self.log.error("Artist seems to have disabled their account!")
 			return False
 		except exceptions.NoArtException:
-			self.log.Warning("Artist has no art (yet)!")
+			self.log.warning("Artist has no art (yet)!")
 			return False
 		except exceptions.UnrecoverableFailureException:
 
