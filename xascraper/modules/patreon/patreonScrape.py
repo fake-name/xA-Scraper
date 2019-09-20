@@ -153,6 +153,7 @@ class GetPatreon(xascraper.modules.scraper_base.ScraperBase):
 				print()
 				print(e.err_reason)
 				print()
+				return self.wg.getpage(url, *args, **kwargs)
 			raise
 		return content
 
@@ -167,14 +168,16 @@ class GetPatreon(xascraper.modules.scraper_base.ScraperBase):
 			content = self.__cf_check(
 					"https://www.patreon.com/api{endpoint}".format(endpoint=endpoint),
 					addlHeaders={
-						"Accept"          : "application/json, text/plain, */*",
-						# "Referer"         : "https://www.patreon.com/login",
+						"Accept"          : "application/json",
 						"Origin"          : "https://www.patreon.com",
 						"Host"            : "www.patreon.com",
 						"Content-Type"    : "application/json",
 						"Accept-Encoding" : "gzip, deflate",
-						"Pragma"          : "no-cache",
-						"Cache-Control"   : "no-cache",
+						"Authority"       : "www.patreon.com",
+						"Scheme"          : "https",
+						# "Referer"         : "https://www.patreon.com/login",
+						# "Pragma"          : "no-cache",
+						# "Cache-Control"   : "no-cache",
 						},
 					postData      = postData,
 					retryQuantity = retries
@@ -299,7 +302,8 @@ class GetPatreon(xascraper.modules.scraper_base.ScraperBase):
 		raise ValueError("Wat?")
 
 	def _get_art_post(self, postId, artistName):
-		post = self.get_api_json("/posts/{pid}".format(pid=postId), apikey=True)
+		post = self.get_api_json("/posts/{pid}".format(pid=postId))
+
 
 
 		attachments = {item['id'] : item for item in post['included'] if item['type'] == 'attachment'}
@@ -660,12 +664,12 @@ if __name__ == '__main__':
 	namespace.run=True
 
 
-	# ins = GetPatreon()
+	ins = GetPatreon()
 	# nl = ins.checkCookie()
 	# nl = ins.getCookie()
 	# nl = ins.getNameList()
 
-	# ins.go(ctrlNamespace=namespace)
+	ins.go(ctrlNamespace=namespace)
 
 	# print(nl)
 	# print(ins)
