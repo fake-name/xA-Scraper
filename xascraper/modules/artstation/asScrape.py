@@ -14,7 +14,7 @@ import util.unclassify
 import xascraper.modules.scraper_base
 from xascraper.modules import exceptions
 
-class GetAs(xascraper.modules.scraper_base.ScraperBase):
+class GetAS(xascraper.modules.scraper_base.ScraperBase):
 
 	settingsDictKey = "as"
 

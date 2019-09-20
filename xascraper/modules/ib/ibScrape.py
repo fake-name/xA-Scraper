@@ -15,7 +15,7 @@ import util.unclassify
 import xascraper.modules.scraper_base
 from xascraper.modules import exceptions
 
-class GetIb(xascraper.modules.scraper_base.ScraperBase):
+class GetIB(xascraper.modules.scraper_base.ScraperBase):
 
 	settingsDictKey = "ib"
 
@@ -467,7 +467,7 @@ if __name__ == '__main__':
 	namespace.run=True
 
 
-	ins = GetIb()
+	ins = GetIB()
 	# ins.getCookie()
 	print(ins)
 	print("Instance: ", ins)

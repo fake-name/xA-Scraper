@@ -13,7 +13,7 @@ import flags
 import xascraper.modules.scraper_base
 from xascraper.modules import exceptions
 
-class GetNg(xascraper.modules.scraper_base.ScraperBase):
+class GetNG(xascraper.modules.scraper_base.ScraperBase):
 
 	settingsDictKey = "ng"
 
@@ -336,7 +336,7 @@ if __name__ == '__main__':
 	namespace.run=True
 
 
-	ins = GetNg()
+	ins = GetNG()
 	# ins.getCookie()
 	print(ins)
 	print("Instance: ", ins)

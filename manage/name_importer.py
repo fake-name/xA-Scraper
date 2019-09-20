@@ -18,7 +18,7 @@ from . import cli_utils
 from settings import settings
 
 
-class NameImporter(xascraper.modules.tumblr.tumblrScrape.GetTumblr):
+class NameImporter(xascraper.modules.tumblr.tumblrScrape.GetTR):
 
 	log = logging.getLogger("Main.NameImporter")
 

@@ -22,7 +22,7 @@ class LoginFailure(Exception):
 class FetchError(Exception):
 	pass
 
-class GetPatreon(xascraper.modules.scraper_base.ScraperBase):
+class GetPN(xascraper.modules.scraper_base.ScraperBase):
 
 	settingsDictKey = "pat"
 
@@ -664,7 +664,7 @@ if __name__ == '__main__':
 	namespace.run=True
 
 
-	ins = GetPatreon()
+	ins = GetPN()
 	# nl = ins.checkCookie()
 	# nl = ins.getCookie()
 	# nl = ins.getNameList()

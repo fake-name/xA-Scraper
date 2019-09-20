@@ -12,7 +12,7 @@ import flags
 import xascraper.modules.scraper_base
 from xascraper.modules import exceptions
 
-class GetAy(xascraper.modules.scraper_base.ScraperBase):
+class GetAY(xascraper.modules.scraper_base.ScraperBase):
 
 	settingsDictKey = "ay"
 

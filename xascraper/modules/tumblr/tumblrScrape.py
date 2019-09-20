@@ -19,7 +19,7 @@ class FetchError(Exception):
 class MissingContentError(Exception):
 	pass
 
-class GetTumblr(xascraper.modules.scraper_base.ScraperBase):
+class GetTR(xascraper.modules.scraper_base.ScraperBase):
 
 	settingsDictKey = "tum"
 
@@ -269,7 +269,7 @@ class GetTumblr(xascraper.modules.scraper_base.ScraperBase):
 
 				future_to_url = {}
 				for aId, aName in nameList:
-					future_to_url[executor.submit(GetTumblr.get_artist_proc, aName, ctrlNamespace)] = aName
+					future_to_url[executor.submit(GetTR.get_artist_proc, aName, ctrlNamespace)] = aName
 
 				for future in concurrent.futures.as_completed(future_to_url):
 					# aName = future_to_url[future]
@@ -310,7 +310,7 @@ def run_local():
 	signal.signal(signal.SIGINT, signal_handler)
 
 	print(sys.argv)
-	ins = GetTumblr()
+	ins = GetTR()
 	# ins.getCookie()
 	print(ins)
 	print("Instance: ", ins)

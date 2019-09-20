@@ -56,7 +56,7 @@ def makeFilenameSafe(inStr):
 	return inStr
 
 
-class GetSf(xascraper.modules.scraper_base.ScraperBase):
+class GetSF(xascraper.modules.scraper_base.ScraperBase):
 
 	settingsDictKey = "sf"
 
@@ -377,7 +377,7 @@ if __name__ == '__main__':
 	import logSetup
 	logSetup.initLogging()
 
-	ins = GetSf()
+	ins = GetSF()
 	# ins.getCookie()
 	print(ins)
 	print("Instance: ", ins)

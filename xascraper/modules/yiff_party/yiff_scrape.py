@@ -41,7 +41,7 @@ def batch(iterable, n=1):
 
 PARALLEL_JOBS = 20
 
-class GetYp(xascraper.modules.scraper_base.ScraperBase, xascraper.modules.rpc_base.RpcMixin):
+class GetYP(xascraper.modules.scraper_base.ScraperBase, xascraper.modules.rpc_base.RpcMixin):
 
 
 	settingsDictKey = "yp"
@@ -716,7 +716,7 @@ def run_remote():
 	signal.signal(signal.SIGINT, signal_handler)
 
 	print(sys.argv)
-	ins = GetYp()
+	ins = GetYP()
 	# ins.getCookie()
 	print(ins)
 	print("Instance: ", ins)
@@ -744,7 +744,7 @@ def run_local():
 	signal.signal(signal.SIGINT, signal_handler)
 
 	print(sys.argv)
-	ins = GetYp()
+	ins = GetYP()
 	# ins.getCookie()
 	print(ins)
 	print("Instance: ", ins)
@@ -771,7 +771,7 @@ if __name__ == '__main__':
 	elif len(sys.argv) == 1 or 'drain' in sys.argv or 'no_namelist' in sys.argv:
 		run_remote()
 	elif 'test_get_filename' in sys.argv:
-		ins = GetYp()
+		ins = GetYP()
 		ins.go_test()
 	else:
 		local_test()

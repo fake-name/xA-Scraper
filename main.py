@@ -52,37 +52,33 @@ class Nopper():
 	def go(self, *args, **kwargs):
 		self.log.info("Empty job looping!")
 
+JOBS = []
+
 def check_keys(kl):
 	for keyn in kl:
-		if not keyn in settings:
-			raise RuntimeError("You're missing the setting parameters for the site "
-				+ "'%s'. Check if you need to update your settings due to added scrapers."
-				 % (keyn, ))
+		if keyn in settings:
+			JOBS.append((eval(keyn+'s.Get'+keyn.upper()), settings[keyn]["runInterval"], keyn))
 
+check_keys(["da", "fa", "hf", "ib", "ng", "pn", "sf", "wy"])
 
-check_keys(["fa", "hf", "wy", "ib", "px", "sf","pat", "da", "ng", "ay", "as", "yp","tum"])
-
-
-
-JOBS = [
-	(fas.GetFA,      settings[ "fa"]["runInterval"],  "fa"),
-	(hfs.GetHF,      settings[ "hf"]["runInterval"],  "hf"),
-	(wys.GetWy,      settings[ "wy"]["runInterval"],  "wy"),
-	(ibs.GetIb,      settings[ "ib"]["runInterval"],  "ib"),
-	(pxs.GetPX,      settings[ "px"]["runInterval"],  "px"),
-	(sfs.GetSf,      settings[ "sf"]["runInterval"],  "sf"),
-	(pts.GetPatreon, settings["pat"]["runInterval"], "pat"),
-	# (Nopper,                                     30, "nop"),
-	(das.GetDA,      settings[ "da"]["runInterval"],  "da"),
-	(ngs.GetNg,      settings[ "ng"]["runInterval"],  "ng"),
-]
-
+#This is what JOBS should evaluate to, assuming all keys are filled out:
+#JOBS = [
+#	(das.GetDA,  settings["da"]["runInterval"],  "da"),
+#	(fas.GetFA,  settings["fa"]["runInterval"],  "fa"),
+#	(hfs.GetHF,  settings["hf"]["runInterval"],  "hf"),
+#	(ibs.GetIB,  settings["ib"]["runInterval"],  "ib"),
+#	(ngs.GetNG,  settings["ng"]["runInterval"],  "ng"),
+#	(sfs.GetSF,  settings["sf"]["runInterval"],  "sf"),
+#	(wys.GetWY,  settings["wy"]["runInterval"],  "wy")
+#]
 
 JOBS_DISABLED = [
-	(ays.GetAy,      settings[ "ay"]["runInterval"],  "ay"),
-	(ass.GetAs,      settings[ "as"]["runInterval"],  "as"),
-	(yps.GetYp,      settings[ "yp"]["runInterval"],  "yp"),
-	(tus.GetTumblr,  settings["tum"]["runInterval"], "tum"),
+#	(Nopper,     30, "nop"),
+	(ays.GetAY,  -1,  "ay"),
+	(ass.GetAS,  -1,  "as"),
+	(pxs.GetPX,  -1,  "px"),
+	(tus.GetTR,  -1,  "tr"),
+	(yps.GetYP,  -1,  "yp")
 ]
 
 # Yeah, this has to be after the job init. Sigh.

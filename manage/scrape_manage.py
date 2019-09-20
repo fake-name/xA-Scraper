@@ -15,11 +15,6 @@ import sys
 
 from . import cli_utils
 
-manager = multiprocessing.managers.SyncManager()
-manager.start()
-namespace = manager.Namespace()
-namespace.run = True
-
 from main import JOBS
 
 PLUGINS = {
@@ -29,18 +24,21 @@ PLUGINS = {
 
 # PLUGINS = {
 
-# 	'da'     : (GetDA,     "Deviant-Art"),
-# 	'fa'     : (GetFA,     "Fur-Affinity"),
-# 	'hf'     : (GetHF,     "Hentai Foundry"),
-# 	'ib'     : (GetIb,     "Ink Bunny"),
-# 	'px'     : (GetPX,     "Pixiv"),
-# 	'sf'     : (GetSf,     "So Furry"),
-# 	'tum'    : (GetTumblr, "Tumblr"),
-# 	'wy'     : (GetWy,     "Weasyl"),
+#	'da'  :  (GetDA,  "Deviant-Art"),
+#	'fa'  :  (GetFA,  "Fur-Affinity"),
+#	'hf'  :  (GetHF,  "Hentai Foundry"),
+#	'ib'  :  (GetIB,  "Ink Bunny"),
+#	'px'  :  (GetPX,  "Pixiv"),
+#	'sf'  :  (GetSF,  "So Furry"),
+#	'tr'  :  (GetTR,  "Tumblr"),
+#	'wy'  :  (GetWY,  "Weasyl"),
 
 # }
 
-def do_plugin(requested_name):
+def do_plugin(requested_name, namespace=None):
+	if namespace is None:
+		namespace = flags.namespace
+	
 	if requested_name not in PLUGINS:
 		print("Cannot find plugin for name %s!" % requested_name)
 		return
@@ -79,7 +77,7 @@ def do_fetch(args):
 def do_fetch_all():
 
 	processes = [
-			multiprocessing.Process(target=do_plugin, name='run-'+key, args=(key, ))
+			multiprocessing.Process(target=do_plugin, name='run-'+key, args=(key,flags.namespace, ))
 		for
 			key in PLUGINS.keys()
 	]
