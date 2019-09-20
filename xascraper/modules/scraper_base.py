@@ -59,6 +59,10 @@ def insertExtIfNeeded(fqFName, file_bytes):
 	mime = magic.from_buffer(file_bytes, mime=True)
 	should_ext = mimetypes.guess_extension(mime)
 	if ext != should_ext and should_ext:
+		if ext == '.jfif':
+			ext = '.jpeg'
+		if ext == '.jpe':
+			ext = '.jpeg'
 		return root + should_ext
 	return fqFName
 

@@ -242,11 +242,13 @@ class GetDA(xascraper.modules.scraper_base.ScraperBase):
 
 			fname = imgurl.split("/")[-1]
 			fname = fname.split("?")[0]
-			self.log.info("			Filename = " + fname)
-			self.log.info("			FileURL = " + imgurl)
+			fname = "{} - {}".format(pageTitle, fname)
+			self.log.info("			Filename = %s", fname)
+			self.log.info("			FileURL = %s", imgurl)
 
 			# Sanitize filename
-			fname = "".join([x for x in fname if x.isalpha() or x.isdigit() or x == "_" or x == "-" or x == "." or x == "(" or x == ")"	])
+			fname = xascraper.modules.scraper_base.makeFilenameSafe(fname)
+
 			# print self.DLFolder, daName, fname
 			filePath = os.path.join(dlPathBase, fname)
 			if self._checkFileExists(filePath):
