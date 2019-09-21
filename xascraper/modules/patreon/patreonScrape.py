@@ -214,11 +214,10 @@ class GetPatreon(xascraper.modules.scraper_base.ScraperBase):
 			os.makedirs(dirp)
 		return dirp
 
-	def save_file(self, aname, filename, filecontent):
+	def local_save_file(self, aname, filename, filecontent):
 		fdir = self.get_save_dir(aname)
 		fqpath = os.path.join(fdir, filename)
-		with open(fqpath, "wb") as fp:
-			fp.write(filecontent)
+		self.save_file(fqfilename=fqpath, file_content=filecontent)
 
 	def save_json(self, aname, itemid, filecontent):
 		fdir = self.get_save_dir(aname)
@@ -240,7 +239,7 @@ class GetPatreon(xascraper.modules.scraper_base.ScraperBase):
 		else:
 			content = self.wg.getpage(furl, addlHeaders={"Referer" : "https://www.patreon.com/home"})
 			if content:
-				self.save_file(aname, fname, content)
+				self.local_save_file(aname, fname, content)
 			else:
 				self.log.error("Could not retreive content: ")
 				self.log.error("%s", furl)
@@ -312,7 +311,7 @@ class GetPatreon(xascraper.modules.scraper_base.ScraperBase):
 		post_info = post_content['attributes']
 
 		if 'current_user_can_view' in post_info and post_info['current_user_can_view'] is False:
-			self.log.warning("You apparently cannot view post %s. Ignoring.", postId)
+			self.log.warning("You apparently cannot view post %s for artist %s. Ignoring.", postId, artistName)
 			fail = {
 				'status' : ''
 				}
