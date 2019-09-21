@@ -52,38 +52,37 @@ class Nopper():
 	def go(self, *args, **kwargs):
 		self.log.info("Empty job looping!")
 
-def check_keys(kl):
-	for keyn in kl:
-		if not keyn in settings:
-			raise RuntimeError("You're missing the setting parameters for the site "
-				+ "'%s'. Check if you need to update your settings due to added scrapers."
-				 % (keyn, ))
 
+def check_jobs(kJOBS):
+	i = 0
+	while i < len(kJOBS):
+		if kJOBS[i][2] in settings:
+			kJOBS[i] = (kJOBS[i][0], settings[kJOBS[i][2]]["runInterval"], kJOBS[i][2])
+			i+=True
+		else:
+			kJOBS.pop(i)
+	return kJOBS
 
-check_keys(["fa", "hf", "wy", "ib", "px", "sf","pat", "da", "ng", "ay", "as", "yp","tum"])
-
-
-
-JOBS = [
-	(fas.GetFA,      settings[ "fa"]["runInterval"],  "fa"),
-	(hfs.GetHF,      settings[ "hf"]["runInterval"],  "hf"),
-	(wys.GetWy,      settings[ "wy"]["runInterval"],  "wy"),
-	(ibs.GetIb,      settings[ "ib"]["runInterval"],  "ib"),
-	(pxs.GetPX,      settings[ "px"]["runInterval"],  "px"),
-	(sfs.GetSf,      settings[ "sf"]["runInterval"],  "sf"),
-	(pts.GetPatreon, settings["pat"]["runInterval"], "pat"),
-	# (Nopper,                                     30, "nop"),
-	(das.GetDA,      settings[ "da"]["runInterval"],  "da"),
-	(ngs.GetNg,      settings[ "ng"]["runInterval"],  "ng"),
-]
-
+JOBS = check_jobs([
+	(das.GetDA,       -1,   "da"),
+	(fas.GetFA,       -1,   "fa"),
+	(ibs.GetIb,       -1,   "ib"),
+	(ngs.GetNg,       -1,   "ng"),
+	(pts.GetPatreon,  -1,  "pat"),
+	(pxs.GetPX,       -1,   "px"),
+	(sfs.GetSf,       -1,   "sf"),
+	(wys.GetWy,       -1,   "wy")
+])
 
 JOBS_DISABLED = [
-	(ays.GetAy,      settings[ "ay"]["runInterval"],  "ay"),
-	(ass.GetAs,      settings[ "as"]["runInterval"],  "as"),
-	(yps.GetYp,      settings[ "yp"]["runInterval"],  "yp"),
-	(tus.GetTumblr,  settings["tum"]["runInterval"], "tum"),
+#	(Nopper,          30,  "nop"),
+	(ays.GetAy,       -1,   "ay"),
+	(ass.GetAs,       -1,   "as"),
+	(hfs.GetHF,       -1,   "hf"),
+	(tus.GetTumblr,   -1,  "tum"),
+	(yps.GetYp,       -1,   "yp")
 ]
+
 
 # Yeah, this has to be after the job init. Sigh.
 import xascraper
@@ -134,16 +133,17 @@ def scheduleJobs(sched, managedNamespace):
 	# start = datetime.datetime.now() + datetime.timedelta(minutes=1)
 	for scraperClass, interval, name in JOBS:
 		# log.info(scraperClass, interval)
-		sched.add_job(runScraper,
-				trigger            = 'interval',
-				seconds            = interval,
-				start_date         = '2014-1-4 0:00:00',
-				name               = name,
-				args               = (scraperClass, managedNamespace,),
-				coalesce           = True,
-				max_instances      = 1,
-				misfire_grace_time = 60 * 60 * 2,
-			)
+		if interval > 0:
+			sched.add_job(runScraper,
+					trigger            = 'interval',
+					seconds            = interval,
+					start_date         = '2014-1-4 0:00:00',
+					name               = name,
+					args               = (scraperClass, managedNamespace,),
+					coalesce           = True,
+					max_instances      = 1,
+					misfire_grace_time = 60 * 60 * 2,
+				)
 		# sched.add_job(runScraper, trigger='interval', seconds=interval, start_date=start, name=name, args=(scraperClass, managedNamespace,))
 		# start = start  + datetime.timedelta(minutes=60)
 	# sched.add_interval_job(printWat, seconds=10, start_date='2014-1-1 01:00')
