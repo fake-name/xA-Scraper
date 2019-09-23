@@ -7,6 +7,8 @@ import datetime
 import urllib.error
 import abc
 import mimetypes
+import pickle
+import os.path
 import magic
 import sqlalchemy.exc
 from settings import settings
@@ -59,8 +61,8 @@ def insertExtIfNeeded(fqFName, file_bytes):
 	mime = magic.from_buffer(file_bytes, mime=True)
 	should_ext = mimetypes.guess_extension(mime)
 	if ext != should_ext and should_ext:
-		if (ext == '.jpe') or (ext == '.jpeg') or (ext == '.jfif'):
-			ext = '.jpg'
+		if should_ext in ('.jpe', '.jpeg', '.jfif'):
+			should_ext = '.jpg'
 		return root + should_ext
 	return fqFName
 
@@ -114,6 +116,8 @@ class ScraperBase(module_base.ModuleBase, metaclass=abc.ABCMeta):
 		self.dlBasePath = settings[self.settingsDictKey]["dlDirName"]
 		self.targetShortName = settings[self.settingsDictKey]["shortName"]
 
+		self.config_file_name = "transient_config.pik"
+
 		super().__init__()
 
 
@@ -165,6 +169,28 @@ class ScraperBase(module_base.ModuleBase, metaclass=abc.ABCMeta):
 	# Utility
 	# ---------------------------------------------------------------------------------------------------------------------------------------------------------
 
+	def get_param_cache(self):
+		if not os.path.exists(self.config_file_name):
+			return {}
+
+		with open(self.config_file_name, "rb") as fp:
+			conf = pickle.load(fp)
+
+		return conf.get(self.settingsDictKey, {})
+
+
+	def set_param_cache(self, value):
+		conf = {}
+		if os.path.exists(self.config_file_name):
+			with open(self.config_file_name, "rb") as fp:
+				conf = pickle.load(fp)
+
+		conf[self.settingsDictKey] = value
+
+		with open(self.config_file_name, "wb") as fp:
+			pickle.dump(conf, fp)
+
+
 
 	def build_page_ret(self, status, fqDlPath, pageDesc=None, pageTitle=None, postTime=None, postTags=None):
 
@@ -207,7 +233,7 @@ class ScraperBase(module_base.ModuleBase, metaclass=abc.ABCMeta):
 
 		chop = len(fileN)-4
 
-		assert isinstance(file_content, (bytes, bytearray)), "save_file() requires the file_content be bytes!"
+		assert isinstance(file_content, (bytes, bytearray)), "save_file() requires the file_content be bytes! Passed %s" % file_content
 
 		fqfilename = insertExtIfNeeded(fqfilename, file_content)
 		fqfilename = insertCountIfFileExistsAndIsDifferent(fqfilename, file_content)

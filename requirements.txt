@@ -50,5 +50,7 @@ python-magic==0.4.15; platform_system != "Windows"
 python-magic-bin==0.4.14; platform_system == "Windows"
 webrequest==0.0.60
 
+pixivpy
+
 ## git+https://github.com/berkerpeksag/astor.git
 ## git+https://github.com/fake-name/ChromeController.git

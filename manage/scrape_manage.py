@@ -24,7 +24,7 @@ from main import JOBS
 
 PLUGINS = {
 		key : (cls_def, cls_def.pluginName)
-	for cls_def, dummy_interval, key in JOBS
+	for cls_def, dummy_interval, key, enabled in JOBS if enabled
 }
 
 # PLUGINS = {

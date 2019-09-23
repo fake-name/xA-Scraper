@@ -115,7 +115,7 @@ def exceptHook(exc_type, exc_value, exc_traceback):
 
 LOGGING_INITIALIZED = False
 
-def initLogging(logLevel=logging.INFO):
+def initLogging(logLevel=logging.DEBUG):
 
 	global LOGGING_INITIALIZED
 	if LOGGING_INITIALIZED:
@@ -132,10 +132,14 @@ def initLogging(logLevel=logging.INFO):
 		os.mkdir(os.path.join("./logs"))
 
 	mainLogger = logging.getLogger("Main")			# Main logger
+	reqLogger = logging.getLogger()			# requests
 	apschd_log = logging.getLogger("apscheduler")			# Main logger
 	mainLogger.setLevel(logLevel)
+	reqLogger .setLevel(logLevel)
+	apschd_log.setLevel(logLevel)
 	ch = ColourHandler()
 	mainLogger.addHandler(ch)
+	reqLogger .addHandler(ch)
 	apschd_log.addHandler(ch)
 
 	# logName	= "Error - %s.txt" % (time.strftime("%Y-%m-%d %H;%M;%S", time.gmtime()))
