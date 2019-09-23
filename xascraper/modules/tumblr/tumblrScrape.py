@@ -32,6 +32,30 @@ class GetTumblr(xascraper.modules.scraper_base.ScraperBase):
 	numThreads = 2
 
 
+	@classmethod
+	def validate_config(cls, params):
+		if cls.settingsDictKey not in params:
+			print("No settings for plugin key %s. Skipping" % cls.settingsDictKey)
+			return None
+
+		this_settings = params[cls.settingsDictKey]
+
+		assert 'runInterval' in this_settings, "Settings for plugin '%s' must have key 'runInterval', which is missing!" % (cls.settingsDictKey)
+		assert 'dlDirName' in this_settings,   "Settings for plugin '%s' must have key 'dlDirName', which is missing!" % (cls.settingsDictKey)
+		assert 'shortName' in this_settings,   "Settings for plugin '%s' must have key 'shortName', which is missing!" % (cls.settingsDictKey)
+
+		assert 'consumer_key' in this_settings,      "Settings for plugin '%s' must have key 'consumer_key', which is missing!" % (cls.settingsDictKey)
+		assert 'consumer_secret' in this_settings,   "Settings for plugin '%s' must have key 'consumer_secret', which is missing!" % (cls.settingsDictKey)
+		assert 'token' in this_settings,             "Settings for plugin '%s' must have key 'token', which is missing!" % (cls.settingsDictKey)
+		assert 'token_secret' in this_settings,      "Settings for plugin '%s' must have key 'token_secret', which is missing!" % (cls.settingsDictKey)
+
+		if not this_settings['runInterval']:
+			print("Plugin %s disabled (runInterval is false)" % (cls.settingsDictKey))
+			return False
+
+		return True
+
+
 
 	# # ---------------------------------------------------------------------------------------------------------------------------------------------------------
 	# # Cookie Management

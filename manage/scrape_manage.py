@@ -21,10 +21,11 @@ namespace = manager.Namespace()
 namespace.run = True
 
 from main import JOBS
+from main import JOBS_DISABLED
 
 PLUGINS = {
 		key : (cls_def, cls_def.pluginName)
-	for cls_def, dummy_interval, key in JOBS
+	for cls_def, dummy_interval, key in JOBS + JOBS_DISABLED
 }
 
 # PLUGINS = {

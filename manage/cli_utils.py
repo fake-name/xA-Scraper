@@ -13,10 +13,21 @@ from xascraper import database
 from settings import settings
 
 from main import JOBS
+from main import JOBS_DISABLED
+from main import JOBS_NO_CONF
 
 PLUGINS = {
 		key : (cls_def, cls_def.pluginName)
 	for cls_def, dummy_interval, key in JOBS
+}
+
+DISABLED_PLUGINS = {
+		key : (cls_def, cls_def.pluginName)
+	for cls_def, dummy_interval, key in JOBS_DISABLED
+}
+UNRUNNABLE_PLUGINS = {
+		cls_def.settingsDictKey : (cls_def, cls_def.pluginName)
+	for cls_def in JOBS_NO_CONF
 }
 
 def print_help():
@@ -55,8 +66,15 @@ def print_help():
 	print("		tracking.")
 	print("		Note: this will call `name-clean` after execution automatically.")
 
-	print("")
-	print("	Available plugins (sitename -> Human-Readable name):")
+	print("Plugins (sitename -> Human-Readable name)")
+	print("	Available plugins (will be run by the scheduler):")
 	for key, tup in PLUGINS.items():
+		print("		{} -> {}".format(key.ljust(8), tup[1]))
+
+	print("	Disabled plugins (can be run manually, will not auto run):")
+	for key, tup in DISABLED_PLUGINS.items():
+		print("		{} -> {}".format(key.ljust(8), tup[1]))
+	print("	Unconfigured plugins (cannot be used):")
+	for key, tup in UNRUNNABLE_PLUGINS.items():
 		print("		{} -> {}".format(key.ljust(8), tup[1]))
 

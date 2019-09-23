@@ -121,6 +121,35 @@ class ScraperBase(module_base.ModuleBase, metaclass=abc.ABCMeta):
 		super().__init__()
 
 
+	@classmethod
+	def validate_config(cls, params):
+		if cls.settingsDictKey not in params:
+			print("No settings for plugin key %s. Skipping" % cls.settingsDictKey)
+			return None
+
+		this_settings = params[cls.settingsDictKey]
+
+		assert 'username' in this_settings,    "Settings for plugin '%s' must have key 'username', which is missing!" % (cls.settingsDictKey)
+		assert 'password' in this_settings,    "Settings for plugin '%s' must have key 'password', which is missing!" % (cls.settingsDictKey)
+		assert 'runInterval' in this_settings, "Settings for plugin '%s' must have key 'runInterval', which is missing!" % (cls.settingsDictKey)
+		assert 'dlDirName' in this_settings,   "Settings for plugin '%s' must have key 'dlDirName', which is missing!" % (cls.settingsDictKey)
+		assert 'shortName' in this_settings,   "Settings for plugin '%s' must have key 'shortName', which is missing!" % (cls.settingsDictKey)
+
+		if not this_settings['runInterval']:
+			print("Plugin %s disabled (runInterval is false)" % (cls.settingsDictKey))
+			return False
+
+		return True
+
+	@classmethod
+	def get_config(cls, params):
+		if cls.settingsDictKey not in params:
+			print("No settings for plugin key %s. Skipping" % cls.settingsDictKey)
+			return False
+
+		this_settings = params[cls.settingsDictKey]
+		return cls, this_settings['runInterval'], cls.settingsDictKey
+
 	@abc.abstractmethod
 	def settingsDictKey(self):
 		return None

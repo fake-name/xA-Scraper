@@ -58,6 +58,28 @@ class GetYp(xascraper.modules.scraper_base.ScraperBase, xascraper.modules.rpc_ba
 
 		self.job_counter = 0
 
+
+
+	@classmethod
+	def validate_config(cls, params):
+		if cls.settingsDictKey not in params:
+			print("No settings for plugin key %s. Skipping" % cls.settingsDictKey)
+			return None
+
+		this_settings = params[cls.settingsDictKey]
+
+		assert 'runInterval' in this_settings, "Settings for plugin '%s' must have key 'runInterval', which is missing!" % (cls.settingsDictKey)
+		assert 'dlDirName' in this_settings,   "Settings for plugin '%s' must have key 'dlDirName', which is missing!" % (cls.settingsDictKey)
+		assert 'shortName' in this_settings,   "Settings for plugin '%s' must have key 'shortName', which is missing!" % (cls.settingsDictKey)
+
+		if not this_settings['runInterval']:
+			print("Plugin %s disabled (runInterval is false)" % (cls.settingsDictKey))
+			return False
+
+		return True
+
+
+
 	# # ---------------------------------------------------------------------------------------------------------------------------------------------------------
 	# # Giant bunch of stubs to shut up the abstract base class
 	# # ---------------------------------------------------------------------------------------------------------------------------------------------------------
