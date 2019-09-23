@@ -261,13 +261,11 @@ class GetPX(xascraper.modules.scraper_base.ScraperBase):
 
 		time.sleep(random.triangular(1,3,10))
 
-		if item_type == 'illustration':
+		# I don't understand why the delineate here, since illustration type content can also be manga.
+		if item_type in ('illustration', 'manga'):
 			return self._getIllustration(artistName, dlPathBase, item_id)
-		else:
-			raise RuntimeError("Unknown item type: '%s'" % item_type)
 
-
-		raise RuntimeError("Unknown content type!")
+		raise RuntimeError("Unknown item type: '%s' for artist:item_id -> %s -> %s" % (item_type, artistName, item_id))
 
 	# ---------------------------------------------------------------------------------------------------------------------------------------------------------
 	# Gallery Scraping
@@ -385,8 +383,8 @@ if __name__ == '__main__':
 	# dlPathBase, artPageUrl, artistName
 	print("Getting Galleries")
 
-	count = ins._getTotalArtCount("512775")
-	print(count)
+	# count = ins._getTotalArtCount("512775")
+	# print(count)
 	# ret = ins._getArtPage("xxx", '{"type" : "illustration", "id" : 76882251}', "xxx")
 	# print(ret)
 
