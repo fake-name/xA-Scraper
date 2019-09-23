@@ -9,6 +9,7 @@ import json
 import datetime
 import urllib.request
 import urllib.parse
+import random
 
 import dateparser
 import bs4
@@ -214,7 +215,7 @@ class GetPX(xascraper.modules.scraper_base.ScraperBase):
 
 	def _getIllustration(self, artistName, dlPathBase, item_id):
 		meta = self.papi.works(item_id)
-		pprint.pprint(meta)
+		# pprint.pprint(meta)
 
 		if not meta['status'] == 'success':
 			return self.build_page_ret(status="Failed", fqDlPath=None)
@@ -246,6 +247,8 @@ class GetPX(xascraper.modules.scraper_base.ScraperBase):
 		params = json.loads(item_params)
 		item_type = params['type']
 		item_id   = params['id']
+
+		time.sleep(random.triangular(1,3,10))
 
 		if item_type == 'illustration':
 			return self._getIllustration(artistName, dlPathBase, item_id)
@@ -296,6 +299,8 @@ class GetPX(xascraper.modules.scraper_base.ScraperBase):
 					"id":   tmp["id"],
 					"type": tmp["type"],
 				}, sort_keys=True) for tmp in items['response'])
+
+			time.sleep(random.triangular(1,2,5))
 
 		self.log.info("Found %s links", (len(artlinks)))
 
