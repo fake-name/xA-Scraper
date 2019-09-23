@@ -66,24 +66,24 @@ check_keys(["fa", "hf", "wy", "ib", "px", "sf","pat", "da", "ng", "ay", "as", "y
 
 
 JOBS = [
-	(fas.GetFA,      settings[ "fa"]["runInterval"],  "fa", False),
-	(hfs.GetHF,      settings[ "hf"]["runInterval"],  "hf", False),
-	(wys.GetWy,      settings[ "wy"]["runInterval"],  "wy", False),
-	(ibs.GetIb,      settings[ "ib"]["runInterval"],  "ib", False),
-	(pxs.GetPX,      settings[ "px"]["runInterval"],  "px", False),
-	(sfs.GetSf,      settings[ "sf"]["runInterval"],  "sf", False),
-	(pts.GetPatreon, settings["pat"]["runInterval"], "pat", False),
-	# (Nopper,                                     30, "nop", False),
-	(das.GetDA,      settings[ "da"]["runInterval"],  "da", False),
-	(ngs.GetNg,      settings[ "ng"]["runInterval"],  "ng", False),
+	(fas.GetFA,      settings[ "fa"]["runInterval"],  "fa"),
+	(hfs.GetHF,      settings[ "hf"]["runInterval"],  "hf"),
+	(wys.GetWy,      settings[ "wy"]["runInterval"],  "wy"),
+	(ibs.GetIb,      settings[ "ib"]["runInterval"],  "ib"),
+	(pxs.GetPX,      settings[ "px"]["runInterval"],  "px"),
+	(sfs.GetSf,      settings[ "sf"]["runInterval"],  "sf"),
+	(pts.GetPatreon, settings["pat"]["runInterval"], "pat"),
+	# (Nopper,                                     30, "nop"),
+	(das.GetDA,      settings[ "da"]["runInterval"],  "da"),
+	(ngs.GetNg,      settings[ "ng"]["runInterval"],  "ng"),
 ]
 
 
 JOBS_DISABLED = [
-	(ays.GetAy,      settings[ "ay"]["runInterval"],  "ay", False),
-	(ass.GetAs,      settings[ "as"]["runInterval"],  "as", False),
-	(yps.GetYp,      settings[ "yp"]["runInterval"],  "yp", False),
-	(tus.GetTumblr,  settings["tum"]["runInterval"], "tum", False),
+	(ays.GetAy,      settings[ "ay"]["runInterval"],  "ay"),
+	(ass.GetAs,      settings[ "as"]["runInterval"],  "as"),
+	(yps.GetYp,      settings[ "yp"]["runInterval"],  "yp"),
+	(tus.GetTumblr,  settings["tum"]["runInterval"], "tum"),
 ]
 
 # Yeah, this has to be after the job init. Sigh.
