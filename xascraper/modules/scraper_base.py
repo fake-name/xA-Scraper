@@ -221,7 +221,7 @@ class ScraperBase(module_base.ModuleBase, metaclass=abc.ABCMeta):
 
 
 
-	def build_page_ret(self, status, fqDlPath, pageDesc=None, pageTitle=None, postTime=None, postTags=None):
+	def build_page_ret(self, status, fqDlPath, pageDesc=None, pageTitle=None, postTime=None, postTags=None, **kwargs):
 
 		assert isinstance(fqDlPath, (list, type(None))), "Wat? Item: %s, type: %s" % (fqDlPath, type(fqDlPath))
 		assert status in ['Succeeded', 'Exists', 'Ignore', 'Failed', 'Deleted', 'Prose']
@@ -249,6 +249,7 @@ class ScraperBase(module_base.ModuleBase, metaclass=abc.ABCMeta):
 			'page_title' : pageTitle,
 			'post_time'  : postTime,
 			'post_tags'  : set(postTags) if postTags else [],
+			**kwargs,
 		}
 		return ret
 

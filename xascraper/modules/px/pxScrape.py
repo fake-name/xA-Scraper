@@ -193,6 +193,8 @@ class GetPX(xascraper.modules.scraper_base.ScraperBase):
 		itemTitle, itemCaption, postTime, postTags = self._extractTitleDescription(item_meta)
 		imgurl   = self._get_best_ugoira_from_set(item_meta['metadata']['zip_urls'])
 
+		pprint.pprint(item_meta)
+
 		fcont = self.__papi_download(imgurl)
 
 		regx4 = re.compile(r"http://.+/")				# FileName RE
@@ -225,13 +227,22 @@ class GetPX(xascraper.modules.scraper_base.ScraperBase):
 		resp = meta['response'][0]
 
 		if resp['type'] == 'ugoira':
-			return self._getAnimation(dlPathBase, resp)
+			ret = self._getAnimation(dlPathBase, resp)
+			if 'metadata' in resp:
+				ret['metadata'] = resp['metadata']
+			return ret
 
 		if resp['type'] == 'manga':
-			return self._getManga(dlPathBase, resp)
+			ret = self._getManga(dlPathBase, resp)
+			if 'metadata' in resp:
+				ret['metadata'] = resp['metadata']
+			return ret
 
 		if resp['type'] == 'illustration':
-			return self._getSinglePageContent(dlPathBase, resp)
+			ret = self._getSinglePageContent(dlPathBase, resp)
+			if 'metadata' in resp:
+				ret['metadata'] = resp['metadata']
+			return ret
 
 		raise RuntimeError("Content type not known: '%s'" % resp['type'])
 
@@ -265,6 +276,8 @@ class GetPX(xascraper.modules.scraper_base.ScraperBase):
 	def _getTotalArtCount(self, artist):
 		aid = int(artist)
 		items = self.papi.users_works(aid, include_stats=False)
+		if items['status'] != 'success':
+			raise exceptions.NotLoggedInException("Failed to get artist page?")
 
 		return items['pagination']['total']
 
@@ -372,6 +385,10 @@ if __name__ == '__main__':
 	# dlPathBase, artPageUrl, artistName
 	print("Getting Galleries")
 
+	count = ins._getTotalArtCount("512775")
+	print(count)
+	# ret = ins._getArtPage("xxx", '{"type" : "illustration", "id" : 76882251}', "xxx")
+	# print(ret)
 
 
 
