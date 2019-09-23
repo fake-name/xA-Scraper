@@ -261,8 +261,9 @@ class GetPX(xascraper.modules.scraper_base.ScraperBase):
 
 		time.sleep(random.triangular(1,3,10))
 
-		# I don't understand why the delineate here, since illustration type content can also be manga.
-		if item_type in ('illustration', 'manga'):
+		# So my previous migration just categorized EVERYTHING as a illustration. Properly, the dispatch should be
+		# done here for type, instead of in _getIllustration. However, doing it there doesn't cause additional work, it seems harmless.
+		if item_type in ('illustration', 'manga', 'ugoira'):
 			return self._getIllustration(artistName, dlPathBase, item_id)
 
 		raise RuntimeError("Unknown item type: '%s' for artist:item_id -> %s -> %s" % (item_type, artistName, item_id))
