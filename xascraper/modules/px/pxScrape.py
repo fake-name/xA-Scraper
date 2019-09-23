@@ -260,19 +260,10 @@ class GetPX(xascraper.modules.scraper_base.ScraperBase):
 	# ---------------------------------------------------------------------------------------------------------------------------------------------------------
 
 	def _getTotalArtCount(self, artist):
-		basePage = "http://www.pixiv.net/member_illust.php?id=%s" % artist
-		page = self.wg.getSoup(basePage)
+		aid = int(artist)
+		items = self.papi.users_works(aid, include_stats=False)
 
-		countSpan = page.find("div", class_="sc-LzLwu")
-		if not countSpan:
-			raise exceptions.AccountDisabledException("Could not retreive artist item quantity!")
-		countSpan = page.find("div", class_="hWVZtW")
-		if not countSpan:
-			raise exceptions.AccountDisabledException("Could not retreive artist item quantity!")
-
-		text = countSpan.text.split()[0]
-		text = ''.join([char for char in text if char in '0123456789'])
-		return int(text)
+		return items['pagination']['total']
 
 
 	def _getItemsOnPage(self, inSoup):
@@ -375,6 +366,7 @@ if __name__ == '__main__':
 	# print("Instance: ", ins)
 	# dlPathBase, artPageUrl, artistName
 	print("Getting Galleries")
+
 
 
 
