@@ -221,7 +221,7 @@ class ScraperBase(module_base.ModuleBase, metaclass=abc.ABCMeta):
 
 
 
-	def build_page_ret(self, status, fqDlPath, pageDesc=None, pageTitle=None, postTime=None, postTags=None, **kwargs):
+	def build_page_ret(self, status, fqDlPath, pageDesc=None, pageTitle=None, postTime=None, postTags=None, content_structured=None):
 
 		assert isinstance(fqDlPath, (list, type(None))), "Wat? Item: %s, type: %s" % (fqDlPath, type(fqDlPath))
 		assert status in ['Succeeded', 'Exists', 'Ignore', 'Failed', 'Deleted', 'Prose']
@@ -243,14 +243,15 @@ class ScraperBase(module_base.ModuleBase, metaclass=abc.ABCMeta):
 
 
 		ret = {
-			'status'     : status,
-			'dl_path'    : fqDlPath,
-			'page_desc'  : pageDesc,
-			'page_title' : pageTitle,
-			'post_time'  : postTime,
-			'post_tags'  : set(postTags) if postTags else [],
-			**kwargs,
+			'status'             : status,
+			'dl_path'            : fqDlPath,
+			'page_desc'          : pageDesc,
+			'page_title'         : pageTitle,
+			'post_time'          : postTime,
+			'post_tags'          : set(postTags) if postTags else [],
+			'content_structured' : content_structured,
 		}
+
 		return ret
 
 
@@ -329,7 +330,20 @@ class ScraperBase(module_base.ModuleBase, metaclass=abc.ABCMeta):
 			return set([item for sublist in res for item in sublist])
 
 	# Insert recently retreived items into the database
-	def _updatePreviouslyRetreived(self, artist, release_meta, state='new', fqDlPath=None, pageDesc=None, pageTitle=None, seqNum=None, filename=None, addTime=None, postTags=[]):
+	def _updatePreviouslyRetreived(self,
+				artist,
+				release_meta,
+				state              = 'new',
+				fqDlPath           = None,
+				pageDesc           = None,
+				pageTitle          = None,
+				seqNum             = None,
+				filename           = None,
+				addTime            = None,
+				postTags           = [],
+				content_structured = None
+			):
+
 		if addTime and addTime > datetime.datetime.now():
 			addtime = datetime.datetime.now()
 
@@ -357,6 +371,8 @@ class ScraperBase(module_base.ModuleBase, metaclass=abc.ABCMeta):
 
 					if pageDesc and pageDesc != row.content:
 						row.content = pageDesc
+					if content_structured and content_structured != row.content_structured:
+						row.content_structured = content_structured
 					if pageTitle and pageTitle != row.title:
 						row.title = pageTitle
 					if addTime and addTime != row.addtime:
@@ -408,7 +424,7 @@ class ScraperBase(module_base.ModuleBase, metaclass=abc.ABCMeta):
 					print("Args:")
 
 					print("	artist: ", artist)
-					print("	pageUrl: ", pageUrl)
+					print("	release_meta: ", release_meta)
 					print("	fqDlPath: ", fqDlPath)
 					print("	pageDesc: ", pageDesc)
 					print("	pageTitle: ", pageTitle)
@@ -416,6 +432,7 @@ class ScraperBase(module_base.ModuleBase, metaclass=abc.ABCMeta):
 					print("	filename: ", filename)
 					print("	addTime: ", addTime)
 					print("	postTags: ", postTags)
+					print("	content_structured: ", content_structured)
 
 					traceback.print_exc()
 					sess.rollback()
@@ -575,6 +592,17 @@ class ScraperBase(module_base.ModuleBase, metaclass=abc.ABCMeta):
 
 
 	def getArtist(self, artist, ctrlNamespace):
+
+		valid_ret_keys = [
+			'status',
+			'dl_path',
+			'page_desc',
+			'page_title',
+			'post_time',
+			'post_tags',
+			'content_structured',
+		]
+
 		if artist != artist.strip():
 			artist = artist.strip()
 			self.log.warning("Artist name seems to have trailing or leading whitespace!")
@@ -601,6 +629,9 @@ class ScraperBase(module_base.ModuleBase, metaclass=abc.ABCMeta):
 					assert isinstance(ret, dict)
 					assert 'status'     in ret
 
+					assert all([tmp in valid_ret_keys for tmp in ret.keys()]), "Invalid key in return. Allowed %s. Received %s (Bad: %s)" % (
+						valid_ret_keys, list(ret.keys()), [tmp for tmp in ret.keys() if tmp not in valid_ret_keys])
+
 
 					if ret['status'] == "Prose":
 						assert 'dl_path'    in ret
@@ -624,19 +655,21 @@ class ScraperBase(module_base.ModuleBase, metaclass=abc.ABCMeta):
 						assert 'page_desc'  in ret
 						assert 'page_title' in ret
 						assert 'post_time'  in ret
+						assert 'content_structured'  in ret
 						assert isinstance(ret['dl_path'], list)
 						seq = 0
 						for item in ret['dl_path']:
 							self._updatePreviouslyRetreived(
-									artist       = artist,
-									state        = 'complete',
-									release_meta = pageURL,
-									fqDlPath     = item,
-									pageDesc     = ret['page_desc'],
-									pageTitle    = ret['page_title'],
-									seqNum       = seq,
-									addTime      = ret['post_time'],
-									postTags     = ret['post_tags'],
+									artist             = artist,
+									state              = 'complete',
+									release_meta       = pageURL,
+									fqDlPath           = item,
+									pageDesc           = ret['page_desc'],
+									pageTitle          = ret['page_title'],
+									seqNum             = seq,
+									addTime            = ret['post_time'],
+									postTags           = ret['post_tags'],
+									content_structured = ret['content_structured'],
 								)
 							seq += 1
 					elif ret['status'] == "Ignore":  # Used for compound pages (like Pixiv's manga pages), where the page has multiple sub-pages that are managed by the plugin

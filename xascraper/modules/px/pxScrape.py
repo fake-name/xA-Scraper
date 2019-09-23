@@ -186,7 +186,7 @@ class GetPX(xascraper.modules.scraper_base.ScraperBase):
 		file_path = os.path.join(dlPathBase, fname)
 		saved_to = self.save_file(file_path, fcont)
 
-		return self.build_page_ret(status="Succeeded", fqDlPath=[saved_to], pageDesc=itemCaption, pageTitle=itemTitle, postTags=postTags, postTime=postTime)
+		return self.build_page_ret(status="Succeeded", fqDlPath=[saved_to], pageDesc=itemCaption, pageTitle=itemTitle, postTags=postTags, postTime=postTime, content_structured={'metadata':item_meta['metadata']})
 
 
 	def _getAnimation(self, dlPathBase, item_meta):
@@ -210,9 +210,8 @@ class GetPX(xascraper.modules.scraper_base.ScraperBase):
 		file_path = os.path.join(dlPathBase, fname)
 		saved_to = self.save_file(file_path, fcont)
 
-		# TODO: Unpack ugoira unto a gif (or at least a set of files)
-
-		return self.build_page_ret(status="Succeeded", fqDlPath=[saved_to], pageDesc=itemCaption, pageTitle=itemTitle, postTags=postTags, postTime=postTime)
+		# TODO: Unpack ugoira unto a apng/gif (or at least a set of files)
+		return self.build_page_ret(status="Succeeded", fqDlPath=[saved_to], pageDesc=itemCaption, pageTitle=itemTitle, postTags=postTags, postTime=postTime, content_structured={'metadata':item_meta['metadata']})
 
 
 	def _getIllustration(self, artistName, dlPathBase, item_id):
@@ -228,20 +227,14 @@ class GetPX(xascraper.modules.scraper_base.ScraperBase):
 
 		if resp['type'] == 'ugoira':
 			ret = self._getAnimation(dlPathBase, resp)
-			if 'metadata' in resp:
-				ret['metadata'] = resp['metadata']
 			return ret
 
 		if resp['type'] == 'manga':
 			ret = self._getManga(dlPathBase, resp)
-			if 'metadata' in resp:
-				ret['metadata'] = resp['metadata']
 			return ret
 
 		if resp['type'] == 'illustration':
 			ret = self._getSinglePageContent(dlPathBase, resp)
-			if 'metadata' in resp:
-				ret['metadata'] = resp['metadata']
 			return ret
 
 		raise RuntimeError("Content type not known: '%s'" % resp['type'])
@@ -311,6 +304,7 @@ class GetPX(xascraper.modules.scraper_base.ScraperBase):
 					"id":   tmp["id"],
 					"type": tmp["type"],
 				}, sort_keys=True) for tmp in items['response'])
+			self.log.info("Found %s links so far", len(artLinks))
 
 			time.sleep(random.triangular(1,2,5))
 
@@ -324,44 +318,53 @@ class GetPX(xascraper.modules.scraper_base.ScraperBase):
 	# ---------------------------------------------------------------------------------------------------------------------------------------------------------
 
 	def getNameList(self):
-		self.checkLogin()
-		self.log.info("Getting list of favourite artists.")
+		# self.checkLogin()
+		# self.log.info("Getting list of favourite artists.")
 
 
-		self.log.info("Fetching public follows")
-		following = self.papi.me_following()
-		resultList = set(str(tmp['id']) for tmp in following['response'])
-		while following['pagination']['next']:
-			following = self.papi.me_following(page=following['pagination']['next'])
-			resultList |= set(str(tmp['id']) for tmp in following['response'])
-			self.log.info("Names found so far - %s", len(resultList))
-			time.sleep(1)
+		# self.log.info("Fetching public follows")
+		# following = self.papi.me_following()
+		# resultList = set(str(tmp['id']) for tmp in following['response'])
+		# while following['pagination']['next']:
+		# 	following = self.papi.me_following(page=following['pagination']['next'])
+		# 	if not following['status'] == 'success':
+		# 		self.log.error("Failed on fetch!")
+		# 		pprint.pprint(following)
+		# 		raise RuntimeError("Wat?")
+
+		# 	resultList |= set(str(tmp['id']) for tmp in following['response'])
+		# 	self.log.info("Names found so far - %s", len(resultList))
+		# 	time.sleep(1)
 
 
 
-		self.log.info("Fetching private follows")
-		following = self.papi.me_following(publicity='private')
-		resultList |= set(str(tmp['id']) for tmp in following['response'])
-		while following['pagination']['next']:
-			following = self.papi.me_following(page=following['pagination']['next'], publicity='private')
-			resultList |= set(str(tmp['id']) for tmp in following['response'])
-			self.log.info("Names found so far - %s", len(resultList))
-			time.sleep(1)
+		# self.log.info("Fetching private follows")
+		# following = self.papi.me_following(publicity='private')
+		# resultList |= set(str(tmp['id']) for tmp in following['response'])
+		# while following['pagination']['next']:
+		# 	following = self.papi.me_following(page=following['pagination']['next'], publicity='private')
+		# 	if not following['status'] == 'success':
+		# 		self.log.error("Failed on fetch!")
+		# 		pprint.pprint(following)
+		# 		raise RuntimeError("Wat?")
+		# 	resultList |= set(str(tmp['id']) for tmp in following['response'])
+		# 	self.log.info("Names found so far - %s", len(resultList))
+		# 	time.sleep(1)
 
-		self.log.info("Found %d Names", len(resultList))
+		# self.log.info("Found %d Names", len(resultList))
 
-		self.log.info("Inserting IDs into DB")
-		# Push the pixiv name list into the DB
-		with self.db.context_sess() as sess:
-			for name in resultList:
-				res = sess.query(self.db.ScrapeTargets.id)             \
-					.filter(self.db.ScrapeTargets.site_name == self.targetShortName) \
-					.filter(self.db.ScrapeTargets.artist_name == name)              \
-					.scalar()
-				if not res:
-					self.log.info("Need to insert name: %s", name)
-					sess.add(self.db.ScrapeTargets(site_name=self.targetShortName, artist_name=name))
-					sess.commit()
+		# self.log.info("Inserting IDs into DB")
+		# # Push the pixiv name list into the DB
+		# with self.db.context_sess() as sess:
+		# 	for name in resultList:
+		# 		res = sess.query(self.db.ScrapeTargets.id)             \
+		# 			.filter(self.db.ScrapeTargets.site_name == self.targetShortName) \
+		# 			.filter(self.db.ScrapeTargets.artist_name == name)              \
+		# 			.scalar()
+		# 		if not res:
+		# 			self.log.info("Need to insert name: %s", name)
+		# 			sess.add(self.db.ScrapeTargets(site_name=self.targetShortName, artist_name=name))
+		# 			sess.commit()
 
 
 		return super().getNameList()
