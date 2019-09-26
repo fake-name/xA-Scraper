@@ -706,10 +706,18 @@ class ScraperBase(module_base.ModuleBase, metaclass=abc.ABCMeta):
 			self.log.error(traceback.format_exc())
 			ctrlNamespace.run = False
 
+		except exceptions.NotLoggedInException:
+
+			self.log.error("Aborting due to logout?")
+			self.log.error(traceback.format_exc())
+			ctrlNamespace.run = False
+
 
 		except:
-			self.log.error("Exception when retreiving artist %s", artist)
+			self.log.error("Unhandled exception when retreiving artist %s", artist)
+			self.log.error("Aborting fetch.")
 			self.log.error("%s", traceback.format_exc())
+			ctrlNamespace.run = False
 			return True
 
 

@@ -304,7 +304,7 @@ class GetPX(xascraper.modules.scraper_base.ScraperBase):
 					"id":   tmp["id"],
 					"type": tmp["type"],
 				}, sort_keys=True) for tmp in items['response'])
-			self.log.info("Found %s links so far", len(artLinks))
+			self.log.info("Found %s links so far", len(artlinks))
 
 			time.sleep(random.triangular(1,2,5))
 
