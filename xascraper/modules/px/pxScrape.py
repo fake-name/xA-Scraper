@@ -146,6 +146,21 @@ class GetPX(xascraper.modules.scraper_base.ScraperBase):
 		self.log.info("			postTags = %s", postTags)
 		self.log.info("Saving image set")
 
+		if 'metadata' not in item_meta:
+			self.log.error("Missing 'metadata' member!")
+			pprint.pprint(item_meta)
+			raise CannotFindContentException("Missing 'metadata' member!")
+
+		if item_meta['metadata'] is None:
+			self.log.error("Item metadata is None!")
+			pprint.pprint(item_meta)
+			raise CannotFindContentException("'metadata' member is None!")
+
+		if 'pages' not in item_meta['metadata']:
+			self.log.error("Missing 'pages' member!")
+			pprint.pprint(item_meta)
+			raise CannotFindContentException("Missing 'pages' member!")
+
 		images = []
 		index = 1
 		for imagedat in item_meta['metadata']['pages']:
@@ -225,6 +240,9 @@ class GetPX(xascraper.modules.scraper_base.ScraperBase):
 
 		resp = meta['response'][0]
 
+		if resp is None:
+			self.log.error("No metadata in response!")
+
 		if resp['type'] == 'ugoira':
 			ret = self._getAnimation(dlPathBase, resp)
 			return ret
@@ -252,12 +270,17 @@ class GetPX(xascraper.modules.scraper_base.ScraperBase):
 		item_type = params['type']
 		item_id   = params['id']
 
-		time.sleep(random.triangular(1,3,10))
+		try:
 
-		# So my previous migration just categorized EVERYTHING as a illustration. Properly, the dispatch should be
-		# done here for type, instead of in _getIllustration. However, doing it there doesn't cause additional work, it seems harmless.
-		if item_type in ('illustration', 'manga', 'ugoira'):
-			return self._getIllustration(artistName, dlPathBase, item_id)
+			# So my previous migration just categorized EVERYTHING as a illustration. Properly, the dispatch should be
+			# done here for type, instead of in _getIllustration. However, doing it there doesn't cause additional work, it seems harmless.
+			if item_type in ('illustration', 'manga', 'ugoira'):
+				ret = self._getIllustration(artistName, dlPathBase, item_id)
+				time.sleep(random.triangular(1,3,5))
+				return ret
+
+		except pixivpy3.PixivError as e:
+			raise exceptions.RetryException("Error: '%s'" % e)
 
 		raise RuntimeError("Unknown item type: '%s' for artist:item_id -> %s -> %s" % (item_type, artistName, item_id))
 
@@ -306,7 +329,7 @@ class GetPX(xascraper.modules.scraper_base.ScraperBase):
 				}, sort_keys=True) for tmp in items['response'])
 			self.log.info("Found %s links so far", len(artlinks))
 
-			time.sleep(random.triangular(1,2,5))
+			time.sleep(random.triangular(3,5,15))
 
 		self.log.info("Found %s links", (len(artlinks)))
 
@@ -318,53 +341,53 @@ class GetPX(xascraper.modules.scraper_base.ScraperBase):
 	# ---------------------------------------------------------------------------------------------------------------------------------------------------------
 
 	def getNameList(self):
-		# self.checkLogin()
-		# self.log.info("Getting list of favourite artists.")
+		self.checkLogin()
+		self.log.info("Getting list of favourite artists.")
 
 
-		# self.log.info("Fetching public follows")
-		# following = self.papi.me_following()
-		# resultList = set(str(tmp['id']) for tmp in following['response'])
-		# while following['pagination']['next']:
-		# 	following = self.papi.me_following(page=following['pagination']['next'])
-		# 	if not following['status'] == 'success':
-		# 		self.log.error("Failed on fetch!")
-		# 		pprint.pprint(following)
-		# 		raise RuntimeError("Wat?")
+		self.log.info("Fetching public follows")
+		following = self.papi.me_following()
+		resultList = set(str(tmp['id']) for tmp in following['response'])
+		while following['pagination']['next']:
+			following = self.papi.me_following(page=following['pagination']['next'])
+			if not following['status'] == 'success':
+				self.log.error("Failed on fetch!")
+				pprint.pprint(following)
+				raise RuntimeError("Wat?")
 
-		# 	resultList |= set(str(tmp['id']) for tmp in following['response'])
-		# 	self.log.info("Names found so far - %s", len(resultList))
-		# 	time.sleep(1)
+			resultList |= set(str(tmp['id']) for tmp in following['response'])
+			self.log.info("Names found so far - %s", len(resultList))
+			time.sleep(1)
 
 
 
-		# self.log.info("Fetching private follows")
-		# following = self.papi.me_following(publicity='private')
-		# resultList |= set(str(tmp['id']) for tmp in following['response'])
-		# while following['pagination']['next']:
-		# 	following = self.papi.me_following(page=following['pagination']['next'], publicity='private')
-		# 	if not following['status'] == 'success':
-		# 		self.log.error("Failed on fetch!")
-		# 		pprint.pprint(following)
-		# 		raise RuntimeError("Wat?")
-		# 	resultList |= set(str(tmp['id']) for tmp in following['response'])
-		# 	self.log.info("Names found so far - %s", len(resultList))
-		# 	time.sleep(1)
+		self.log.info("Fetching private follows")
+		following = self.papi.me_following(publicity='private')
+		resultList |= set(str(tmp['id']) for tmp in following['response'])
+		while following['pagination']['next']:
+			following = self.papi.me_following(page=following['pagination']['next'], publicity='private')
+			if not following['status'] == 'success':
+				self.log.error("Failed on fetch!")
+				pprint.pprint(following)
+				raise RuntimeError("Wat?")
+			resultList |= set(str(tmp['id']) for tmp in following['response'])
+			self.log.info("Names found so far - %s", len(resultList))
+			time.sleep(1)
 
-		# self.log.info("Found %d Names", len(resultList))
+		self.log.info("Found %d Names", len(resultList))
 
-		# self.log.info("Inserting IDs into DB")
-		# # Push the pixiv name list into the DB
-		# with self.db.context_sess() as sess:
-		# 	for name in resultList:
-		# 		res = sess.query(self.db.ScrapeTargets.id)             \
-		# 			.filter(self.db.ScrapeTargets.site_name == self.targetShortName) \
-		# 			.filter(self.db.ScrapeTargets.artist_name == name)              \
-		# 			.scalar()
-		# 		if not res:
-		# 			self.log.info("Need to insert name: %s", name)
-		# 			sess.add(self.db.ScrapeTargets(site_name=self.targetShortName, artist_name=name))
-		# 			sess.commit()
+		self.log.info("Inserting IDs into DB")
+		# Push the pixiv name list into the DB
+		with self.db.context_sess() as sess:
+			for name in resultList:
+				res = sess.query(self.db.ScrapeTargets.id)             \
+					.filter(self.db.ScrapeTargets.site_name == self.targetShortName) \
+					.filter(self.db.ScrapeTargets.artist_name == name)              \
+					.scalar()
+				if not res:
+					self.log.info("Need to insert name: %s", name)
+					sess.add(self.db.ScrapeTargets(site_name=self.targetShortName, artist_name=name))
+					sess.commit()
 
 
 		return super().getNameList()

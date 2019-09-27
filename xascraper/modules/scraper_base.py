@@ -3,12 +3,13 @@ import os
 import os.path
 import traceback
 import concurrent.futures
+import time
 import datetime
 import urllib.error
 import abc
 import mimetypes
 import pickle
-import os.path
+import random
 import magic
 import sqlalchemy.exc
 from settings import settings
@@ -582,10 +583,12 @@ class ScraperBase(module_base.ModuleBase, metaclass=abc.ABCMeta):
 			except exceptions.CannotFindContentException as e:
 				return self.build_page_ret(status="Failed", fqDlPath=None, pageTitle="Error: %s" % e)
 
+			except exceptions.RetryException:
+				time.sleep(random.triangular(1,3,10))
+
 			except exceptions.NotLoggedInException:
 				self.log.error("You are not logged in? Checking and re-logging in.")
 				self.getCookie()
-				pass
 
 		self.log.error("Failed to fetch content with args: '%s', kwargs: '%s'", args, kwargs)
 		return self.build_page_ret(status="Failed", fqDlPath=None)
