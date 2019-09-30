@@ -26,7 +26,7 @@ class GetIb(xascraper.modules.scraper_base.ScraperBase):
 
 	ovwMode = "Check Files"
 
-	numThreads = 2
+	numThreads = 1
 
 
 
@@ -111,10 +111,10 @@ class GetIb(xascraper.modules.scraper_base.ScraperBase):
 
 		filePath = os.path.join(dlPathBase, fName)
 
-		self.log.info("			Filename			= %s", fName)
-		self.log.info("			Page Image Title	= %s", itemTitle)
-		self.log.info("			FileURL				= %s", imageURL)
-		self.log.info("			dlPath				= %s", filePath)
+		self.log.info("    Filename         = %s", fName)
+		self.log.info("    Page Image Title = %s", itemTitle)
+		self.log.info("    FileURL          = %s", imageURL)
+		self.log.info("    dlPath           = %s", filePath)
 
 		if self._checkFileExists(filePath):
 			self.log.info("Exists, skipping...")
@@ -217,8 +217,9 @@ class GetIb(xascraper.modules.scraper_base.ScraperBase):
 
 		if story_div:
 			story = story_div.find("div", id='storysectionbar')
-			story = util.unclassify.unclassify(story.extract())
-			desc.append(story)
+			if story:
+				story = util.unclassify.unclassify(story.extract())
+				desc.append(story)
 
 
 		# Tag extraction has to go before description extraction, because
@@ -273,7 +274,7 @@ class GetIb(xascraper.modules.scraper_base.ScraperBase):
 		ret = set()
 
 		pages = seqDiv.find_all('div', class_='widget_imageFromSubmission')
-
+		print("Sequence divs: ", pages)
 		for page in pages:
 			pgUrl = urllib.parse.urljoin(self.urlBase, page.a['href'])
 			ctnt = self._getContentUrlFromPage(url=pgUrl)
@@ -285,7 +286,7 @@ class GetIb(xascraper.modules.scraper_base.ScraperBase):
 
 		soup = self.wg.getSoup(artPageUrl)
 		soups = str(soup)
-		if 'ERROR: That submission has been deleted.' in soups:
+		if 'That submission has been deleted.' in soups:
 			self.log.warning("Item %s has been deleted by the poster!", artPageUrl)
 			return self.build_page_ret(status="Deleted", fqDlPath=None)
 
@@ -293,6 +294,11 @@ class GetIb(xascraper.modules.scraper_base.ScraperBase):
 			raise exceptions.NotLoggedInException("Not logged in?")
 		if "You may need to go to that member's userpage (use name link above) and request that they give you access" in soups:
 			raise exceptions.CannotAccessException("Friends only thingie (why is this even a thing)!")
+
+		datespan = soup.find('span', id='submittime_exact')
+		if not datespan:
+			self.log.warning("No date-span in content on page '%s'!!", artPageUrl)
+			return self.build_page_ret(status='Failed', pageTitle="Missing content!", fqDlPath=None)
 
 		postTime    = self._extractPostTimestamp(soup)
 		postTags    = self._extractPostTags(soup)
@@ -302,7 +308,9 @@ class GetIb(xascraper.modules.scraper_base.ScraperBase):
 		story_div = None
 
 		mainDivs = soup.body.find_all('div', class_='elephant_white', recursive=False)
+		print("Maindivs: ", len(mainDivs))
 		if len(mainDivs) == 2:
+			print("Sequence item!")
 			imgDiv, desc_div = mainDivs
 			footer = desc_div
 			imageURL    = [self._getContentUrlFromPage(imgDiv)]
@@ -319,15 +327,14 @@ class GetIb(xascraper.modules.scraper_base.ScraperBase):
 				imageURL.add(base_img)
 
 			for img in self._getSeqImageDivs(seqDiv):
-				# print("Adding: ", img)
 				imageURL.add(img)
 			for img in self._getSeqImageDivs(desc_div):
-				# print("Adding: ", img)
 				imageURL.add(img)
+
 			self.log.info("Found %s item series on page!", len(imageURL))
 
 		elif len(mainDivs) == 5:
-			header_div, img_div, story_div, desc_div, footer = mainDivs
+			_header_div, img_div, story_div, desc_div, footer = mainDivs
 
 
 			imageURL = set()
@@ -335,9 +342,13 @@ class GetIb(xascraper.modules.scraper_base.ScraperBase):
 			if base_img:
 				imageURL.add(base_img)
 
-			for img in self._getSeqImageDivs(desc_div):
-				# print("Adding: ", img)
+			for img in self._getSeqImageDivs(img_div):
 				imageURL.add(img)
+			for img in self._getSeqImageDivs(story_div):
+				imageURL.add(img)
+			for img in self._getSeqImageDivs(desc_div):
+				imageURL.add(img)
+
 			self.log.info("Found %s item series on page!", len(imageURL))
 		else:
 			soupp = str(mainDivs)
@@ -382,12 +393,12 @@ class GetIb(xascraper.modules.scraper_base.ScraperBase):
 
 
 	def _getItemsOnPage(self, inSoup):
-
 		links = set()
 
 		pages = inSoup.find_all("div", class_='widget_thumbnailLargeCompleteFromSubmission')
 		for page in pages:
 			itemUrl = urllib.parse.urljoin(self.urlBase, page.a['href'])
+			# print("Item URL:", itemUrl)
 			links.add(itemUrl)
 
 		nextPage = False
@@ -474,5 +485,6 @@ if __name__ == '__main__':
 	# dlPathBase, artPageUrl, artistName
 	print("Getting artist")
 	# ins.getCookie()
-	# ins._getArtPage("xxxx", 'https://inkbunny.net/submissionview.php?id=xxx', 'testtt')
+	# ins._getGalleries("xskullstomperx")
+	ins._getArtPage("xxxx", 'https://inkbunny.net/s/1653120', 'testtt')
 

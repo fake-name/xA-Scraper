@@ -40,6 +40,7 @@ def batch(iterable, n=1):
 		yield iterable[ndx:min(ndx + n, l)]
 
 PARALLEL_JOBS = 20
+DO_LOCAL = True
 
 class GetYp(xascraper.modules.scraper_base.ScraperBase, xascraper.modules.rpc_base.RpcMixin):
 
@@ -283,6 +284,9 @@ class GetYp(xascraper.modules.scraper_base.ScraperBase, xascraper.modules.rpc_ba
 
 	def __blocking_dispatch_call_remote(self, remote_cls, call_kwargs, meta=None, expect_partials=False):
 
+		raise RuntimeError
+
+
 		jobid = self.put_job(remote_cls, call_kwargs, meta)
 		ret = self.process_response_items([jobid], expect_partials)
 		if not expect_partials:
@@ -290,15 +294,15 @@ class GetYp(xascraper.modules.scraper_base.ScraperBase, xascraper.modules.rpc_ba
 		return ret
 
 
-	def blocking_dispatch_call(self, remote_cls, call_kwargs, meta=None, expect_partials=False, local=False):
+	def blocking_dispatch_call(self, remote_cls, call_kwargs, meta=None, expect_partials=False, local=DO_LOCAL):
 		if local:
 			return self.__blocking_dispatch_call_local(remote_cls=remote_cls, call_kwargs=call_kwargs, meta=meta, expect_partials=expect_partials)
 		else:
-			# raise RuntimeError
+			raise RuntimeError
 			return self.__blocking_dispatch_call_remote(remote_cls=remote_cls, call_kwargs=call_kwargs, meta=meta, expect_partials=expect_partials)
 
 
-	def fetch_update_names(self, local=False):
+	def fetch_update_names(self, local=DO_LOCAL):
 		namelist = self.blocking_dispatch_call(yiff_remote.RemoteExecClass, call_kwargs={'mode' : 'yp_get_names'}, local=local)
 
 		new     = 0
@@ -336,7 +340,7 @@ class GetYp(xascraper.modules.scraper_base.ScraperBase, xascraper.modules.rpc_ba
 
 		self.log.info("Had %s new names, %s with changes since last update.", new, updated)
 
-	def getNameList(self, update_namelist, local=False):
+	def getNameList(self, update_namelist, local=DO_LOCAL):
 		if update_namelist:
 			self.fetch_update_names(local=local)
 
@@ -658,7 +662,7 @@ class GetYp(xascraper.modules.scraper_base.ScraperBase, xascraper.modules.rpc_ba
 		self.log.info("do_fetch_by_aids has completed")
 
 
-	def go(self, ctrlNamespace=None, update_namelist=True, local=False):
+	def go(self, ctrlNamespace=None, update_namelist=True, local=DO_LOCAL):
 		if ctrlNamespace is None:
 			raise ValueError("You need to specify a namespace!")
 

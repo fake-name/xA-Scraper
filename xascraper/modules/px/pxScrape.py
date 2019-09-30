@@ -147,19 +147,22 @@ class GetPX(xascraper.modules.scraper_base.ScraperBase):
 		self.log.info("Saving image set")
 
 		if 'metadata' not in item_meta:
-			self.log.error("Missing 'metadata' member!")
+			self.log.warning("Missing 'metadata' member!")
+			if item['page_count'] == 1:
+				self.log.warning("Treating as single-image item!")
+				return self._getSinglePageContent(dlPathBase, item_mete)
 			pprint.pprint(item_meta)
-			raise CannotFindContentException("Missing 'metadata' member!")
+			raise exceptions.CannotFindContentException("Missing 'metadata' member!")
 
 		if item_meta['metadata'] is None:
 			self.log.error("Item metadata is None!")
 			pprint.pprint(item_meta)
-			raise CannotFindContentException("'metadata' member is None!")
+			raise exceptions.CannotFindContentException("'metadata' member is None!")
 
 		if 'pages' not in item_meta['metadata']:
 			self.log.error("Missing 'pages' member!")
 			pprint.pprint(item_meta)
-			raise CannotFindContentException("Missing 'pages' member!")
+			raise exceptions.CannotFindContentException("Missing 'pages' member!")
 
 		images = []
 		index = 1
@@ -292,7 +295,15 @@ class GetPX(xascraper.modules.scraper_base.ScraperBase):
 		aid = int(artist)
 		items = self.papi.users_works(aid, include_stats=False)
 		if items['status'] != 'success':
+			self.log.error("Error while attempting to get artist gallery content for ID %s!!", artist)
+			for line in traceback.format_exc().split("\n"):
+				self.log.error(line)
+			for line in pprint.pformat(items).split("\n"):
+				self.log.error(line)
+
+
 			raise exceptions.NotLoggedInException("Failed to get artist page?")
+
 
 		return items['pagination']['total']
 
@@ -314,24 +325,32 @@ class GetPX(xascraper.modules.scraper_base.ScraperBase):
 
 		artlinks = set()
 
-
-		items = self.papi.users_works(aid, include_stats=False)
-		artlinks.update(json.dumps({
-				"id":   tmp["id"],
-				"type": tmp["type"],
-			}, sort_keys=True) for tmp in items['response'])
-
-		while items['pagination']['next']:
-			items = self.papi.users_works(aid, page=items['pagination']['next'], include_stats=False)
+		try:
+			items = self.papi.users_works(aid, include_stats=False)
 			artlinks.update(json.dumps({
 					"id":   tmp["id"],
 					"type": tmp["type"],
 				}, sort_keys=True) for tmp in items['response'])
-			self.log.info("Found %s links so far", len(artlinks))
 
-			time.sleep(random.triangular(3,5,15))
+			while items['pagination']['next']:
+				items = self.papi.users_works(aid, page=items['pagination']['next'], include_stats=False)
+				artlinks.update(json.dumps({
+						"id":   tmp["id"],
+						"type": tmp["type"],
+					}, sort_keys=True) for tmp in items['response'])
+				self.log.info("Found %s links so far", len(artlinks))
 
-		self.log.info("Found %s links", (len(artlinks)))
+				time.sleep(random.triangular(3,5,15))
+
+			self.log.info("Found %s links", (len(artlinks)))
+		except KeyError:
+			self.log.error("Error while attempting to get gallery listing!")
+			for line in traceback.format_exc().split("\n"):
+				self.log.error(line)
+
+			self.log.error("Aborting run!")
+
+			raise exceptions.RetryException("What?")
 
 		return artlinks
 

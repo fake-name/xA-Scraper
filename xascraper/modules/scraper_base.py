@@ -11,6 +11,7 @@ import mimetypes
 import pickle
 import random
 import magic
+import WebRequest
 import sqlalchemy.exc
 from settings import settings
 
@@ -697,8 +698,14 @@ class ScraperBase(module_base.ModuleBase, metaclass=abc.ABCMeta):
 			self.log.info("Successfully retreived content for artist %s", artist)
 
 			return False
+		except exceptions.RetryException:
+			self.log.error("Cannot consume. Will retry next execution")
+			return False
 		except exceptions.AccountDisabledException:
 			self.log.error("Artist seems to have disabled their account!")
+			return False
+		except WebRequest.FetchFailureError:
+			self.log.error("Failure fetching artist '%s' for site '%s'", artist, self.settingsDictKey)
 			return False
 		except exceptions.NoArtException:
 			self.log.warning("Artist has no art (yet)!")
