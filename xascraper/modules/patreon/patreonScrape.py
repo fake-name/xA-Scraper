@@ -333,11 +333,6 @@ class GetPatreon(xascraper.modules.scraper_base.ScraperBase):
 			"?include=media"
 			)
 
-
-
-		attachments = {item['id'] : item for item in post['included'] if item['type'] == 'attachment'}
-		media       = {item['id'] : item for item in post['included'] if item['type'] == 'media'}
-
 		post_content = post['data']
 		post_info = post_content['attributes']
 
@@ -347,6 +342,9 @@ class GetPatreon(xascraper.modules.scraper_base.ScraperBase):
 				'status' : ''
 				}
 			return fail
+
+		attachments = {item['id'] : item for item in post['included'] if item['type'] == 'attachment'}
+		media       = {item['id'] : item for item in post['included'] if item['type'] == 'media'}
 
 		tags = []
 		if 'user_defined_tags' in post_content['relationships']:
