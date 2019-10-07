@@ -35,7 +35,7 @@ class GetTumblr(xascraper.modules.scraper_base.ScraperBase):
 	@classmethod
 	def validate_config(cls, params):
 		if cls.settingsDictKey not in params:
-			print("No settings for plugin key %s. Skipping" % cls.settingsDictKey)
+			# print("No settings for plugin key %s. Skipping" % cls.settingsDictKey)
 			return None
 
 		this_settings = params[cls.settingsDictKey]
@@ -50,7 +50,7 @@ class GetTumblr(xascraper.modules.scraper_base.ScraperBase):
 		assert 'token_secret' in this_settings,      "Settings for plugin '%s' must have key 'token_secret', which is missing!" % (cls.settingsDictKey)
 
 		if not this_settings['runInterval']:
-			print("Plugin %s disabled (runInterval is false)" % (cls.settingsDictKey))
+			# print("Plugin %s disabled (runInterval is false)" % (cls.settingsDictKey))
 			return False
 
 		return True

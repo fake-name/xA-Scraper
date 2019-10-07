@@ -124,7 +124,7 @@ def scheduleJobs(sched, managedNamespace):
 
 	# start = datetime.datetime.now() + datetime.timedelta(minutes=1)
 	for scraperClass, interval, name in JOBS:
-		# log.info(scraperClass, interval)
+		log.info("Scheduling %s to run every %s hours.", scraperClass, interval / (60 * 60))
 		sched.add_job(runScraper,
 				trigger            = 'interval',
 				seconds            = interval,

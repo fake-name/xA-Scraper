@@ -126,7 +126,7 @@ class ScraperBase(module_base.ModuleBase, metaclass=abc.ABCMeta):
 	@classmethod
 	def validate_config(cls, params):
 		if cls.settingsDictKey not in params:
-			print("No settings for plugin key %s. Skipping" % cls.settingsDictKey)
+			# print("No settings for plugin key %s. Skipping" % cls.settingsDictKey)
 			return None
 
 		this_settings = params[cls.settingsDictKey]
@@ -138,7 +138,7 @@ class ScraperBase(module_base.ModuleBase, metaclass=abc.ABCMeta):
 		assert 'shortName' in this_settings,   "Settings for plugin '%s' must have key 'shortName', which is missing!" % (cls.settingsDictKey)
 
 		if not this_settings['runInterval']:
-			print("Plugin %s disabled (runInterval is false)" % (cls.settingsDictKey))
+			# print("Plugin %s disabled (runInterval is false)" % (cls.settingsDictKey))
 			return False
 
 		return True
@@ -146,7 +146,7 @@ class ScraperBase(module_base.ModuleBase, metaclass=abc.ABCMeta):
 	@classmethod
 	def get_config(cls, params):
 		if cls.settingsDictKey not in params:
-			print("No settings for plugin key %s. Skipping" % cls.settingsDictKey)
+			# print("No settings for plugin key %s. Skipping" % cls.settingsDictKey)
 			return False
 
 		this_settings = params[cls.settingsDictKey]
