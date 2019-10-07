@@ -274,6 +274,35 @@ class GetPatreon(xascraper.modules.scraper_base.ScraperBase):
 		return fqpath
 
 
+	def save_media(self, aname, pid, dat_struct):
+		print("Saving media item: '%s'" % dat_struct['attributes']['download_url'])
+		if dat_struct['attributes']['download_url'].startswith("https"):
+			url = dat_struct['attributes']['download_url']
+		else:
+			url = "https:{url}".format(url=dat_struct['attributes']['download_url'])
+
+		fname = "{pid}-{aid}-{fname}".format(pid=pid, aid=dat_struct['id'], fname=dat_struct['attributes']['file_name'])
+
+		fdir = self.get_save_dir(aname)
+		fqpath = os.path.join(fdir, fname)
+
+		if os.path.exists(fqpath):
+			self.log.info("Do not need to download: '%s'", fname)
+		else:
+			content = self.wg.getpage(url, addlHeaders={"Referer" : "https://www.patreon.com/home"})
+			if content:
+				if isinstance(content, str):
+					with open(fqpath, "wb") as fp:
+						fp.write(content.encode("utf-8"))
+				else:
+					with open(fqpath, "wb") as fp:
+						fp.write(content)
+			else:
+				return None
+
+		return fqpath
+
+
 
 	# TODO: Implement this
 	def fetch_video_embed(self, post_content):
@@ -300,11 +329,14 @@ class GetPatreon(xascraper.modules.scraper_base.ScraperBase):
 		raise ValueError("Wat?")
 
 	def _get_art_post(self, postId, artistName):
-		post = self.get_api_json("/posts/{pid}".format(pid=postId))
+		post = self.get_api_json("/posts/{pid}".format(pid=postId) +
+			"?include=media"
+			)
 
 
 
 		attachments = {item['id'] : item for item in post['included'] if item['type'] == 'attachment'}
+		media       = {item['id'] : item for item in post['included'] if item['type'] == 'media'}
 
 		post_content = post['data']
 		post_info = post_content['attributes']
@@ -358,6 +390,11 @@ class GetPatreon(xascraper.modules.scraper_base.ScraperBase):
 			for aid, dat_struct in attachments.items():
 				# print("Post attachments")
 				fpath = self.save_attachment(artistName, postId, dat_struct)
+				files.append(fpath)
+
+			for aid, dat_struct in media.items():
+				# print("Post attachments")
+				fpath = self.save_media(artistName, postId, dat_struct)
 				files.append(fpath)
 
 			if 'embed' in post_info and post_info['embed']:
@@ -667,7 +704,7 @@ if __name__ == '__main__':
 	# nl = ins.getCookie()
 	# nl = ins.getNameList()
 
-	ins.go(ctrlNamespace=namespace)
+	# ins.go(ctrlNamespace=namespace)
 
 	# print(nl)
 	# print(ins)
@@ -677,6 +714,7 @@ if __name__ == '__main__':
 
 	# ins._fetch_retrier(13131994, "Dan Shive")
 	# ins.getArtist('["191466", ["Dan Shive", {"campaign": {"links": {"related": "https://www.patreon.com/api/campaigns/96494"}, "data": {"type": "campaign", "id": "96494"}}}]]', namespace)
+	ins._get_art_post('30321123', 'test')
 
 	# nl = ins.getNameList()
 
