@@ -15,6 +15,25 @@ import flags
 import xascraper.modules.scraper_base
 from xascraper.modules import exceptions
 
+def patch_scheme(url, scheme_url):
+	'''
+	Given a URL, insert a scheme if it's not present.
+	The scheme is taken from another passed URL.
+
+	If scheme_url has no scheme, as assertion will be raised.
+
+	'''
+	parsed = urllib.parse.urlparse(url)
+
+	if parsed.scheme:
+		return url
+
+	scheme = urllib.parse.urlparse(scheme_url).scheme
+	assert scheme, "Scheme url has no valid value. Scheme: %s. Full url: %s" % (scheme, scheme_url)
+
+	return urllib.parse.urlunsplit((scheme, ) + parsed[1:5])
+
+
 class GetHF(xascraper.modules.scraper_base.ScraperBase):
 
 	settingsDictKey = "hf"
@@ -231,13 +250,10 @@ class GetHF(xascraper.modules.scraper_base.ScraperBase):
 			self.log.error("OH NOES!!! No image on page = " + artPageUrl)
 			return self.build_page_ret(status="Failed", fqDlPath=None)										# Return Fail
 
+		imageURL = patch_scheme(imageURL, artPageUrl)
 
-
-		if "http" not in imageURL.lower():
-			imageURL =  urllib.parse.urljoin("http://hentai-foundry.com", imageURL)
-
-		fTypeRegx	= re.compile(r"http://.+?\.com.*/.*?\.")
-		fNameRegex	= re.compile(r"http://.+/")
+		fTypeRegx	= re.compile(r"https?://.+?\.com.*/.*?\.")
+		fNameRegex	= re.compile(r"https?://.+/")
 		ftype		= fTypeRegx.sub("" , imageURL)
 		fname		= fNameRegex.sub("" , imageURL)
 
