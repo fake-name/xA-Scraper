@@ -281,7 +281,9 @@ class GetPatreon(xascraper.modules.scraper_base.ScraperBase):
 		else:
 			url = "https:{url}".format(url=dat_struct['attributes']['download_url'])
 
-		fname = "{pid}-{aid}-{fname}".format(pid=pid, aid=dat_struct['id'], fname=dat_struct['attributes']['file_name'])
+
+		fname = str(dat_struct['attributes']['file_name']).split("/")[-1]
+		fname = "{pid}-{aid}-{fname}".format(pid=pid, aid=dat_struct['id'], fname=fname)
 
 		fdir = self.get_save_dir(aname)
 		fqpath = os.path.join(fdir, fname)
@@ -292,11 +294,9 @@ class GetPatreon(xascraper.modules.scraper_base.ScraperBase):
 			content = self.wg.getpage(url, addlHeaders={"Referer" : "https://www.patreon.com/home"})
 			if content:
 				if isinstance(content, str):
-					with open(fqpath, "wb") as fp:
-						fp.write(content.encode("utf-8"))
+					self.local_save_file(aname, fname, content.encode("utf-8"))
 				else:
-					with open(fqpath, "wb") as fp:
-						fp.write(content)
+					self.local_save_file(aname, fname, content)
 			else:
 				return None
 
@@ -342,6 +342,14 @@ class GetPatreon(xascraper.modules.scraper_base.ScraperBase):
 				'status' : ''
 				}
 			return fail
+
+		if not 'included' in post:
+			self.log.warning("No contents on post %s for artist %s (%s). Please report if this is in error.", postId, artistName, post_info['url'])
+			fail = {
+				'status' : ''
+				}
+			return fail
+
 
 		attachments = {item['id'] : item for item in post['included'] if item['type'] == 'attachment'}
 		media       = {item['id'] : item for item in post['included'] if item['type'] == 'media'}
