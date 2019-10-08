@@ -23,30 +23,23 @@ namespace.run = True
 from main import JOBS
 from main import JOBS_DISABLED
 
-PLUGINS = {
+PLUGINS_ALL = {
 		key : (cls_def, cls_def.pluginName)
 	for cls_def, dummy_interval, key in JOBS + JOBS_DISABLED
 }
 
-# PLUGINS = {
+ENABLED_PLUGINS = {
+		key : (cls_def, cls_def.pluginName)
+	for cls_def, dummy_interval, key in JOBS
+}
 
-# 	'da'     : (GetDA,     "Deviant-Art"),
-# 	'fa'     : (GetFA,     "Fur-Affinity"),
-# 	'hf'     : (GetHF,     "Hentai Foundry"),
-# 	'ib'     : (GetIb,     "Ink Bunny"),
-# 	'px'     : (GetPX,     "Pixiv"),
-# 	'sf'     : (GetSf,     "So Furry"),
-# 	'tum'    : (GetTumblr, "Tumblr"),
-# 	'wy'     : (GetWy,     "Weasyl"),
-
-# }
 
 def do_plugin(requested_name):
-	if requested_name not in PLUGINS:
+	if requested_name not in PLUGINS_ALL:
 		print("Cannot find plugin for name %s!" % requested_name)
 		return
 
-	plg, dummy_name = PLUGINS[requested_name]
+	plg, dummy_name = PLUGINS_ALL[requested_name]
 
 	if hasattr(plg, "runScraper"):
 		plg.runScraper(namespace)
@@ -60,16 +53,18 @@ def do_fetch(args):
 	print("fetch args", args, type(args))
 	if len(args) == 0:
 		print("Fetching for all sites!")
-		keys = list(PLUGINS.keys())
+		keys = list(ENABLED_PLUGINS.keys())
 		keys.sort()
 		for key in keys:
+			if not namespace.run:
+				return
 			try:
 				do_plugin(key)
 			except Exception as e:
 				traceback.print_exc()
 	else:
 		for plgname in args:
-			if not plgname in PLUGINS:
+			if not plgname in PLUGINS_ALL:
 				print("Error! Plugin short-name '%s' is not known!" % plgname)
 
 		for plgname in args:

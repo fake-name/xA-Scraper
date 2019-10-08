@@ -12,7 +12,7 @@ from xascraper import db
 from xascraper import database
 import xascraper.modules.tumblr.tumblrScrape
 
-from .scrape_manage import PLUGINS
+from .scrape_manage import PLUGINS_ALL
 from . import cli_utils
 
 from settings import settings
@@ -111,9 +111,8 @@ class NameImporter(xascraper.modules.tumblr.tumblrScrape.GetTumblr):
 		self.log.info("done")
 
 
-
 	def import_names_from_file(self, sitename, filename):
-		if not sitename in PLUGINS:
+		if not sitename in PLUGINS_ALL:
 			print("Error! Plugin short-name '%s' is not known!" % sitename)
 			print("Showing help instead.")
 			print("")

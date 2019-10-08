@@ -51,6 +51,7 @@ class GetDA(xascraper.modules.scraper_base.ScraperBase):
 	def getCookie(self):
 
 		login_page = 'https://www.deviantart.com/users/login'
+		login_action = '/_sisu/do/signin'
 		try:
 			soup = self.wg.getSoup(login_page, retryQuantity = 0)
 		except WebRequest.FetchFailureError as err:
@@ -64,7 +65,7 @@ class GetDA(xascraper.modules.scraper_base.ScraperBase):
 
 
 		# print prepage
-		form = soup.find("form", action=login_page)
+		form = soup.find("form", action=login_action)
 		if not form:
 			with open("Bad page.html", "w") as fp:
 				fp.write(soup.prettify())
@@ -73,7 +74,7 @@ class GetDA(xascraper.modules.scraper_base.ScraperBase):
 		logDict = {}
 		for item in items:
 			if "name" in item.attrs and "value" in item.attrs:
-				# print(item["name"], item["value"])
+				print(item["name"], item["value"])
 				logDict[item["name"]] = item["value"]
 
 		# print(logDict)
@@ -83,12 +84,14 @@ class GetDA(xascraper.modules.scraper_base.ScraperBase):
 		logDict["username"]     = settings["da"]["username"]
 		logDict["password"]     = settings["da"]["password"]
 		# logDict["ref"]          = 'https://www.deviantart.com/'
-		logDict["remember_me"]  = 1
+		logDict["remember"]  = 1
 
 		time.sleep(5)
 
+		login_post_page = urllib.parse.urljoin(login_page, login_action)
+
 		try:
-			pagetext = self.wg.getpage(login_page, postData = logDict, addlHeaders={'Referer':login_page}, retryQuantity = 0)
+			pagetext = self.wg.getpage(login_post_page, postData = logDict, addlHeaders={'Referer':login_page}, retryQuantity = 0)
 		except WebRequest.FetchFailureError as err:
 			failtime = time.time()
 			with open("%s - Login failure source.html" % (failtime, ), "w") as fp:
