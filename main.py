@@ -32,6 +32,7 @@ import xascraper.modules.sf.sfScrape as sfs
 import xascraper.modules.ng.ngScrape as ngs
 import xascraper.modules.ay.ayScrape as ays
 import xascraper.modules.artstation.asScrape as ass
+import xascraper.modules.twit.twitScrape as twits
 import xascraper.modules.tumblr.tumblrScrape as tus
 import xascraper.modules.patreon.patreonScrape as pts
 import xascraper.modules.yiff_party.yiff_scrape as yps
@@ -66,6 +67,7 @@ PLUGINS =[
 	ass.GetAs,
 	yps.GetYp,
 	tus.GetTumblr,
+	twits.GetTwit,
 ]
 
 # Plugins that have no config have cls.validate_config() return None
