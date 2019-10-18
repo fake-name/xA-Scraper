@@ -20,7 +20,7 @@ class GetTwit(xascraper.modules.scraper_base.ScraperBase):
 
 	pluginName = "TwitGet"
 
-	urlBase = "https://twitter.net/"
+	urlBase = "https://twitter.com/"
 
 
 	ovwMode = "Check Files"
@@ -45,11 +45,11 @@ class GetTwit(xascraper.modules.scraper_base.ScraperBase):
 
 	def getToken(self):
 			self.log.info("Getting Entrance Cookie")
-			soup = self.wg.getSoup('https://inkbunny.net/login.php')
+			soup = self.wg.getSoup('https://twitter.com/login')
 			inputs = soup.find_all("input")
 
 			for intag in inputs:
-				if 'name' in intag.attrs and intag['name'] == 'token':
+				if 'name' in intag.attrs and intag['name'] == 'authenticity_token':
 					return intag['value']
 
 			return False
@@ -65,20 +65,19 @@ class GetTwit(xascraper.modules.scraper_base.ScraperBase):
 				self.log.info("Got Entrance token, logging in")
 				# print("accessToken", accessToken)
 
-				logondict = {"token"        : accessToken,
-							"username"      : settings["as"]["username"],
-							"password"      : settings["as"]["password"]
+				logondict = {"authenticity_token"           : accessToken,
+							"session[username_or_email]"    : settings["twit"]["username"],
+							"session[password]"             : settings["twit"]["password"]
 							}
 
 				extraHeaders = {
-							"Referer"       : "https://inkbunny.net/login.php",
+							"Referer"       : "https://twitter.com/login",
 				}
 
-				pagetext = self.wg.getpage('https://inkbunny.net/login_process.php', postData=logondict, addlHeaders=extraHeaders)
-				with open('temp.html', 'w') as fp:
+				pagetext = self.wg.getpage('https://twitter.com/sessions', postData=logondict, addlHeaders=extraHeaders)
+				with open('temp.html', 'w', encoding="utf-8") as fp:
 					fp.write(pagetext)
-				if settings["as"]["username"] in pagetext:
-
+				if "\"isLoggedIn\":true" in pagetext:
 					self.wg.saveCookies()
 					return True, "Logged In"
 				else:
@@ -339,7 +338,7 @@ class GetTwit(xascraper.modules.scraper_base.ScraperBase):
 
 	def _getTotalArtCount(self, artist):
 
-		basePage = 'https://inkbunny.net/{user}'.format(user=artist)
+		basePage = 'https://twitter.com/{user}'.format(user=artist)
 
 		page = self.wg.getSoup(basePage)
 		stats = page.find('span', class_='stat', title='Submissions Uploaded')
@@ -414,7 +413,7 @@ class GetTwit(xascraper.modules.scraper_base.ScraperBase):
 		artlinks = set()
 		artist = artist.strip()
 
-		baseUrl = 'https://inkbunny.net/{user}'.format(user=artist)
+		baseUrl = 'https://twitter.com/{user}'.format(user=artist)
 		galleries = self._getGalleryUrls(baseUrl)
 
 		artlinks = set()
