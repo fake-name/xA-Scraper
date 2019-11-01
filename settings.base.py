@@ -154,6 +154,8 @@ settings = {
 	"as" :  # Artstation
 	{
 		# No password here.
+		"username"        : None,
+		"password"        : None,
 		"runInterval"     : days(2),
 		"dlDirName"       : "ArtStation",
 		"shortName"       : "as",
