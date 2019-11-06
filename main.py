@@ -126,7 +126,7 @@ def scheduleJobs(sched, managedNamespace):
 
 	# start = datetime.datetime.now() + datetime.timedelta(minutes=1)
 	for scraperClass, interval, name in JOBS:
-		log.info("Scheduling %s to run every %s hours.", scraperClass, interval / (60 * 60))
+		log.info("Scheduling '%s' to run every %s hours.", name, interval / (60 * 60))
 		sched.add_job(runScraper,
 				trigger            = 'interval',
 				seconds            = interval,
@@ -172,7 +172,8 @@ def job_evt_listener(event):
 		log.info('Job event code: %s, job: %s', JOB_MAP[event.code], event.job_id)
 
 def go(managedNamespace):
-	log.info("Go()")
+	if "xAdebug" in sys.argv:
+		log.info("Go()")
 
 
 	resetter = xascraper.status_monitor.StatusResetter()
@@ -183,8 +184,9 @@ def go(managedNamespace):
 	managedNamespace.serverRun = True
 
 	server_process = multiprocessing.Process(target=serverProcess, args=(managedNamespace,))
-	if "debug" in sys.argv:
-		log.info("Not starting scheduler due to debug mode!")
+
+	if "xAdebug" in sys.argv and "xAdebug" in sys.argv == 2:
+		log.info("Not starting scheduler due to debug mode lvl-2!")
 		sched = None
 	else:
 		sched = BackgroundScheduler({
@@ -200,14 +202,17 @@ def go(managedNamespace):
 				'apscheduler.job_defaults.misfire_grace_time ' : 60 * 60 * 2,
 			})
 
+		if "xAdebug" in sys.argv:
+			logging.getLogger('apscheduler').setLevel(logging.DEBUG)
+			sched.add_listener(job_evt_listener,
+					apscheduler.events.EVENT_JOB_EXECUTED |
+					apscheduler.events.EVENT_JOB_ERROR    |
+					apscheduler.events.EVENT_JOB_MISSED   |
+					apscheduler.events.EVENT_JOB_MAX_INSTANCES
+				)
+		else:
+			logging.getLogger('apscheduler').setLevel(logging.WARNING)
 
-		logging.getLogger('apscheduler').setLevel(logging.DEBUG)
-		sched.add_listener(job_evt_listener,
-				apscheduler.events.EVENT_JOB_EXECUTED |
-				apscheduler.events.EVENT_JOB_ERROR    |
-				apscheduler.events.EVENT_JOB_MISSED   |
-				apscheduler.events.EVENT_JOB_MAX_INSTANCES
-			)
 		scheduleJobs(sched, managedNamespace)
 		sched.start()
 		log.info("Scheduler is running!")
