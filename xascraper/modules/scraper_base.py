@@ -711,24 +711,23 @@ class ScraperBase(module_base.ModuleBase, metaclass=abc.ABCMeta):
 			self.log.warning("Artist has no art (yet)!")
 			return False
 		except exceptions.UnrecoverableFailureException:
-
 			self.log.error("Unrecoverable exception!")
 			self.log.error(traceback.format_exc())
 			ctrlNamespace.run = False
-
+			return True
 		except exceptions.NotLoggedInException:
-
 			self.log.error("Aborting due to logout?")
 			self.log.error(traceback.format_exc())
 			ctrlNamespace.run = False
-
-
+			return True
 		except:
 			self.log.error("Unhandled exception when retreiving artist %s", artist)
 			self.log.error("Aborting fetch.")
 			self.log.error("%s", traceback.format_exc())
 			ctrlNamespace.run = False
 			return True
+
+		return False
 
 
 	def go(self, nameList=None, ctrlNamespace=None):
@@ -771,7 +770,9 @@ class ScraperBase(module_base.ModuleBase, metaclass=abc.ABCMeta):
 
 				for future in concurrent.futures.as_completed(future_to_url):
 					# aName = future_to_url[future]
-					# res = future.result()
+					res = future.result()
+					if type(res) is not bool:
+						raise RuntimeError("Future for plugin %s returned non-boolean value (%s). Function %s of class %s" % (self.settingsDictKey, res, self.getArtist, self))
 					errored  |= future.result()
 					# self.log.info("Return = %s, aName = %s, errored = %s" % (res, aName, errored))
 

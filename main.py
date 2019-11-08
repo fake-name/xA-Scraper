@@ -187,6 +187,13 @@ def go(managedNamespace):
 		log.info("Not starting scheduler due to debug mode!")
 		sched = None
 	else:
+
+		aplogger = logging.getLogger('apscheduler')
+		if aplogger.hasHandlers():
+			aplogger.handlers.clear()
+
+		aplogger.setLevel(logging.ERROR)
+
 		sched = BackgroundScheduler({
 				'apscheduler.jobstores.default': {
 					'type': 'memory'
@@ -200,8 +207,8 @@ def go(managedNamespace):
 				'apscheduler.job_defaults.misfire_grace_time ' : 60 * 60 * 2,
 			})
 
+		sched.start()
 
-		logging.getLogger('apscheduler').setLevel(logging.DEBUG)
 		sched.add_listener(job_evt_listener,
 				apscheduler.events.EVENT_JOB_EXECUTED |
 				apscheduler.events.EVENT_JOB_ERROR    |
@@ -209,7 +216,7 @@ def go(managedNamespace):
 				apscheduler.events.EVENT_JOB_MAX_INSTANCES
 			)
 		scheduleJobs(sched, managedNamespace)
-		sched.start()
+		aplogger.setLevel(logging.DEBUG)
 		log.info("Scheduler is running!")
 
 	log.info("Launching server process")
@@ -219,10 +226,10 @@ def go(managedNamespace):
 	log.info("Entering idle loop.")
 	while managedNamespace.run:
 		time.sleep(0.1)
-		# if loopCtr % 100 == 0:
-		# 	for job in sched.get_jobs():
-		# 		print("Job: ", job.name, job.next_run_time.timestamp())
-		# 		# statusMgr.updateNextRunTime(job.name, job.next_run_time.timestamp())
+		if loopCtr % 100 == 0:
+			for job in sched.get_jobs():
+				# print("Job: ", job.name, job.next_run_time.timestamp() -time.time())
+				# statusMgr.updateNextRunTime(job.name, job.next_run_time.timestamp())
 		loopCtr += 1
 
 	if sched:
