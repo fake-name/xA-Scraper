@@ -226,8 +226,8 @@ def go(managedNamespace):
 	log.info("Entering idle loop.")
 	while managedNamespace.run:
 		time.sleep(0.1)
-		if loopCtr % 100 == 0:
-			for job in sched.get_jobs():
+		# if loopCtr % 100 == 0:
+			# for job in sched.get_jobs():
 				# print("Job: ", job.name, job.next_run_time.timestamp() -time.time())
 				# statusMgr.updateNextRunTime(job.name, job.next_run_time.timestamp())
 		loopCtr += 1
