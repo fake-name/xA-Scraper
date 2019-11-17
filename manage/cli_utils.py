@@ -12,9 +12,9 @@ from xascraper import database
 
 from settings import settings
 
-from main import JOBS
-from main import JOBS_DISABLED
-from main import JOBS_NO_CONF
+from plugins import JOBS
+from plugins import JOBS_DISABLED
+from plugins import JOBS_NO_CONF
 
 PLUGINS = {
 		key : (cls_def, cls_def.pluginName)

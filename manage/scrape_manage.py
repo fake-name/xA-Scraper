@@ -20,8 +20,8 @@ manager.start()
 namespace = manager.Namespace()
 namespace.run = True
 
-from main import JOBS
-from main import JOBS_DISABLED
+from plugins import JOBS
+from plugins import JOBS_DISABLED
 
 PLUGINS_ALL = {
 		key : (cls_def, cls_def.pluginName)

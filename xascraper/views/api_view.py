@@ -2,24 +2,14 @@
 import os.path
 import traceback
 
-from flask import redirect
-from flask import url_for
 from flask import request
-from flask import g
 from flask import jsonify
-from datetime import datetime
-from sqlalchemy import desc
-from sqlalchemy.orm import joinedload
 from xascraper import app
 from xascraper import auth
 from xascraper import db
 from xascraper import database
 
-import main
-from settings import settings
-
-
-
+import plugins
 
 def getResponse(message, error=False, shouldReload=True):
 	ret = {
@@ -76,7 +66,7 @@ def add_artist_name(params):
 	assert params['add']    == 'True',            "Wrong add-artist name"
 	assert params['mode']   == 'add-artist-name', "Wrong add-artist name"
 
-	allowed_modes = [tmp[-1] for tmp in main.JOBS] + [tmp[-1] for tmp in main.JOBS_DISABLED]
+	allowed_modes = [tmp[-1] for tmp in plugins.JOBS] + [tmp[-1] for tmp in plugins.JOBS_DISABLED]
 	assert params['site'] in allowed_modes, "Site %s not in available modes: %s" % (params['site'], allowed_modes)
 
 

@@ -1,42 +1,22 @@
 
-import os.path
-import traceback
+import uuid
 import requests
 import WebRequest
-import uuid
-from settings import settings
 
 from flask import make_response
 from flask import render_template
-from flask import flash
 from flask import redirect
 from flask import url_for
 from flask import request
 from flask import session
-from flask import g
-from flask import send_file
-from flask_login import login_user
-from flask_login import logout_user
-from flask_login import current_user
-from flask_login import login_required
-from itsdangerous import URLSafeTimedSerializer
-from itsdangerous import BadSignature
-from flask_sqlalchemy import get_debug_queries
-from datetime import datetime
-from sqlalchemy import desc
-from sqlalchemy.orm import joinedload
+
+from settings import settings
+
 from xascraper import app
 from xascraper import auth
-from xascraper import db
-from xascraper import database
-
-import main
-
-
 
 request_sessions = {}
 request_cookies = {}
-
 
 # @app.route('/watched-api', methods=['GET', 'POST'])
 # @auth.login_required

@@ -1,51 +1,22 @@
 
 import os.path
 import traceback
-from settings import settings
 
 from flask import render_template
-from flask import flash
-from flask import redirect
-from flask import url_for
 from flask import request
-from flask import g
 from flask import send_file
-from flask_login import login_user
-from flask_login import logout_user
-from flask_login import current_user
-from flask_login import login_required
-from itsdangerous import URLSafeTimedSerializer
-from itsdangerous import BadSignature
 from flask_sqlalchemy import get_debug_queries
-from datetime import datetime
 from sqlalchemy import desc
 from sqlalchemy.orm import joinedload
+
+from settings import settings
+
 from xascraper import app
 from xascraper import auth
 from xascraper import db
 from xascraper import database
 
-import main
-
-
-# from app import lm
-
-
-
-# @lm.user_loader
-# def load_user(id):
-# 	return Users.query.get(int(id))
-
-# % for key in keys:
-# 	<%
-
-# 	cur.execute('SELECT COUNT(*) FROM errored_pages WHERE siteName=%s;', (key, ))
-# 	errs = cur.fetchone()[0]
-
-# 	cur.execute('SELECT COUNT(*) FROM retrieved_pages WHERE siteName=%s;', (key, ))
-# 	succeed = cur.fetchone()[0]
-
-# 	%>
+import plugins
 
 
 def get_source_list():
@@ -169,7 +140,7 @@ def view_by_site(site_name, pagenum=1):
 			return error_page("That's not a number!", "The page number '%s' is not actually a number"
 				% (request.args['page'], ))
 	print("view_by_site, page:", pagenum)
-	valid_sitenanes = [tmp[-1] for tmp in main.JOBS]
+	valid_sitenanes = [tmp[-1] for tmp in plugins.JOBS]
 	if site_name not in valid_sitenanes:
 		return error_page("Invalid site-name!", "The site-name '%s' is not in the "
 			"valid site-name list %s" % (site_name, valid_sitenanes))
