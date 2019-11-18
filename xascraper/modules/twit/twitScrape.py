@@ -173,12 +173,11 @@ class GetTwit(xascraper.modules.scraper_base.ScraperBase):
 
 
 
-	def getArtist(self, artist, ctrlNamespace):
+	def getArtist(self, aid, artist, ctrlNamespace):
 		if ctrlNamespace.run == False:
 			self.log.warning("Exiting early from %s due to run flag being unset", artist)
 			return True
 
-		aid = self._artist_name_to_rid(artist)
 
 		self.log.info("GetArtist - %s (ID: %s)", artist, aid)
 
@@ -225,9 +224,9 @@ class GetTwit(xascraper.modules.scraper_base.ScraperBase):
 
 			random.shuffle(nameList)
 
-			for name in nameList:
+			for aid, name in nameList:
 				try:
-					errored |= self.getArtist(artist=name, ctrlNamespace=ctrlNamespace)
+					errored |= self.getArtist(aid=aid, artist=name, ctrlNamespace=ctrlNamespace)
 				except Exception:
 					for line in traceback.format_exc().split("\n"):
 						self.log.error(line)
