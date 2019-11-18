@@ -51,7 +51,7 @@ python-magic-bin==0.4.14; platform_system == "Windows"
 webrequest==0.0.60
 
 twitter-scraper
-pixivpy
+pixivpy==3.5.2
 ugoira
 apng
 
