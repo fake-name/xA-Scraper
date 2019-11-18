@@ -94,7 +94,6 @@ settings = {
 		"password"        : "your_password",
 		"runInterval"     : days(2),
 		"dlDirName"       : "DeviantArt",
-		"shortName"       : "da",
 
 		'user-url'        : "http://%s.deviantart.com/",
 	},
@@ -104,7 +103,6 @@ settings = {
 		"password"        : "your_password",
 		"runInterval"     : days(3),
 		"dlDirName"       : "Fur Affinity",
-		"shortName"       : "fa",
 
 		'user-url'        : "http://www.furaffinity.net/user/%s/",
 	},
@@ -114,7 +112,6 @@ settings = {
 		"password"        : "your_password",
 		"runInterval"     : days(2),   # every 36 hours
 		"dlDirName"       : "Hentai Foundry",
-		"shortName"       : "hf",
 
 		'user-url' : "http://www.hentai-foundry.com/user/%s/profile",
 	},
@@ -124,7 +121,6 @@ settings = {
 		"password"        : "your_password",
 		"runInterval"     : days(2),
 		"dlDirName"       : "Pixiv",
-		"shortName"       : "px",
 
 		'user-url'        : "http://www.pixiv.net/member.php?id=%s"
 	},
@@ -135,7 +131,6 @@ settings = {
 		"password"        : "your_password",
 		"runInterval"     : days(2),
 		"dlDirName"       : "InkBunny",
-		"shortName"       : "ib",
 
 		'user-url'        : "https://inkbunny.net/%s"
 	},
@@ -146,7 +141,6 @@ settings = {
 		"password"        : "your_password",
 		"runInterval"     : days(2),
 		"dlDirName"       : "Weasyl",
-		"shortName"       : "wy",
 
 		'user-url'        : "https://www.weasyl.com/~%s"
 	},
@@ -158,7 +152,6 @@ settings = {
 		"password"        : None,
 		"runInterval"     : days(2),
 		"dlDirName"       : "ArtStation",
-		"shortName"       : "as",
 
 		'user-url'        : "https://www.artstation.com/artist/%s"
 	},
@@ -170,7 +163,6 @@ settings = {
 		"password"        : "your_password",
 		"runInterval"     : days(2),
 		"dlDirName"       : "SoFurry",
-		"shortName"       : "sf",
 
 		'user-url'        : "https://%s.sofurry.com/"
 	},
@@ -187,7 +179,6 @@ settings = {
 
 		"runInterval"     : days(2),
 		"dlDirName"       : "Tumblr",
-		"shortName"       : "tum",
 		'user-url'        : "http://%s.tumblr.com/"
 	},
 
@@ -203,7 +194,6 @@ settings = {
 	"yp" :  # yiff Party
 	{
 		"dlDirName"       : "YiffParty",
-		"shortName"       : "yp",
 		"runInterval"     : days(2),
 
 		'user-url'        : "%s-None"
@@ -215,7 +205,6 @@ settings = {
 		"password"        : "<password>",
 
 		"dlDirName"       : "Patreon",
-		"shortName"       : "pat",
 		"runInterval"     : 60*60*18,   # every 24 hours
 
 		'user-url'        : "%s-None"
@@ -225,7 +214,6 @@ settings = {
 		"runInterval"     : 60*60*48,   # every 24 hours
 		'user-url'        : "https://%s.newgrounds.com/art",
 
-		"shortName"       : "ng",
 		"username"        : "<username>",
 		"password"        : "<password>",
 		"dlDirName"       : "NewGrounds",
@@ -236,7 +224,6 @@ settings = {
 		"runInterval"     : 60*60*48,   # every 24 hours
 		'user-url'        : "https://aryion.com/g4/user/%s",
 
-		"shortName"       : "ay",
 		"username"        : "<username>",
 		"password"        : "<password>",
 		"dlDirName"       : "Aryion",

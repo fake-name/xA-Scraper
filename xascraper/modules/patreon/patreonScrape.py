@@ -23,7 +23,7 @@ class FetchError(Exception):
 
 class GetPatreon(xascraper.modules.scraper_base.ScraperBase):
 
-	settingsDictKey = "pat"
+	pluginShortName = "pat"
 
 	pluginName = "PatreonGet"
 
@@ -124,8 +124,8 @@ class GetPatreon(xascraper.modules.scraper_base.ScraperBase):
 			'type' : 'user',
 			'relationships' : {},
 			'attributes' : {
-					"email"    : settings[self.settingsDictKey]['username'],
-					"password" : settings[self.settingsDictKey]['password'],
+					"email"    : settings[self.pluginShortName]['username'],
+					"password" : settings[self.pluginShortName]['password'],
 				}
 		}
 		try:
@@ -456,7 +456,6 @@ class GetPatreon(xascraper.modules.scraper_base.ScraperBase):
 
 		artPages = self.get_campaign_posts(patreon_aid)
 
-
 		self.log.info("Total gallery items %s", len(artPages))
 
 		new = 0
@@ -615,12 +614,12 @@ class GetPatreon(xascraper.modules.scraper_base.ScraperBase):
 		with self.db.context_sess() as sess:
 			for name in resultList:
 				res = sess.query(self.db.ScrapeTargets.id)             \
-					.filter(self.db.ScrapeTargets.site_name == self.targetShortName) \
+					.filter(self.db.ScrapeTargets.site_name == self.pluginShortName) \
 					.filter(self.db.ScrapeTargets.artist_name == name)              \
 					.scalar()
 				if not res:
 					self.log.info("Need to insert name: %s", name)
-					sess.add(self.db.ScrapeTargets(site_name=self.targetShortName, artist_name=name))
+					sess.add(self.db.ScrapeTargets(site_name=self.pluginShortName, artist_name=name))
 					sess.commit()
 
 		return super().getNameList()

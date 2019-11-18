@@ -58,7 +58,7 @@ def makeFilenameSafe(inStr):
 
 class GetSf(xascraper.modules.scraper_base.ScraperBase):
 
-	settingsDictKey = "sf"
+	pluginShortName = "sf"
 
 	pluginName = "SfGet"
 

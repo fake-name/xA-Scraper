@@ -45,8 +45,7 @@ DO_LOCAL = True
 class GetYp(xascraper.modules.scraper_base.ScraperBase, xascraper.modules.rpc_base.RpcMixin):
 
 
-	settingsDictKey = "yp"
-
+	pluginShortName = "yp"
 	pluginName = "YpGet"
 
 	rpc_timeout_s = 60 * 60 * 24 * 3
@@ -63,18 +62,17 @@ class GetYp(xascraper.modules.scraper_base.ScraperBase, xascraper.modules.rpc_ba
 
 	@classmethod
 	def validate_config(cls, params):
-		if cls.settingsDictKey not in params:
-			# print("No settings for plugin key %s. Skipping" % cls.settingsDictKey)
+		if cls.pluginShortName not in params:
+			# print("No settings for plugin key %s. Skipping" % cls.pluginShortName)
 			return None
 
-		this_settings = params[cls.settingsDictKey]
+		this_settings = params[cls.pluginShortName]
 
-		assert 'runInterval' in this_settings, "Settings for plugin '%s' must have key 'runInterval', which is missing!" % (cls.settingsDictKey)
-		assert 'dlDirName' in this_settings,   "Settings for plugin '%s' must have key 'dlDirName', which is missing!" % (cls.settingsDictKey)
-		assert 'shortName' in this_settings,   "Settings for plugin '%s' must have key 'shortName', which is missing!" % (cls.settingsDictKey)
+		assert 'runInterval' in this_settings, "Settings for plugin '%s' must have key 'runInterval', which is missing!" % (cls.pluginShortName)
+		assert 'dlDirName' in this_settings,   "Settings for plugin '%s' must have key 'dlDirName', which is missing!" % (cls.pluginShortName)
 
 		if not this_settings['runInterval']:
-			# print("Plugin %s disabled (runInterval is false)" % (cls.settingsDictKey))
+			# print("Plugin %s disabled (runInterval is false)" % (cls.pluginShortName))
 			return False
 
 		return True
@@ -314,7 +312,7 @@ class GetYp(xascraper.modules.scraper_base.ScraperBase, xascraper.modules.rpc_ba
 			for adict in namelist['creators']:
 				name = str(adict['id'])
 				res = sess.query(self.db.ScrapeTargets)             \
-					.filter(self.db.ScrapeTargets.site_name == self.targetShortName) \
+					.filter(self.db.ScrapeTargets.site_name == self.pluginShortName) \
 					.filter(self.db.ScrapeTargets.artist_name == name)              \
 					.scalar()
 
@@ -322,7 +320,7 @@ class GetYp(xascraper.modules.scraper_base.ScraperBase, xascraper.modules.rpc_ba
 					new += 1
 					self.log.info("Need to insert name: %s -> %s", name, adict['name'])
 					row = self.db.ScrapeTargets(
-							site_name   = self.targetShortName,
+							site_name   = self.pluginShortName,
 							artist_name = name,
 							extra_meta  = adict,
 							release_cnt = adict['post_count']
@@ -346,7 +344,7 @@ class GetYp(xascraper.modules.scraper_base.ScraperBase, xascraper.modules.rpc_ba
 
 		with self.db.context_sess() as sess:
 			res = sess.query(self.db.ScrapeTargets)                                                                \
-				.filter(self.db.ScrapeTargets.site_name == self.targetShortName)                                   \
+				.filter(self.db.ScrapeTargets.site_name == self.pluginShortName)                                   \
 				.filter(self.db.ScrapeTargets.last_fetched < datetime.datetime.now() - datetime.timedelta(days=7)) \
 				.all()
 
@@ -679,7 +677,7 @@ class GetYp(xascraper.modules.scraper_base.ScraperBase, xascraper.modules.rpc_ba
 				if
 					aname.lower()
 				not in
-					settings[self.settingsDictKey]['masked-users']
+					settings[self.pluginShortName]['masked-users']
 					]
 		# for chunk in [nl, ]:
 
@@ -732,9 +730,9 @@ def local_test():
 	pprint.pprint(("R2:", r3))
 
 def run_remote():
-	import multiprocessing
+	from multiprocessing.managers import SyncManager
 
-	manager = multiprocessing.managers.SyncManager()
+	manager = SyncManager()
 	manager.start()
 	flags.namespace = manager.Namespace()
 	flags.namespace.run = True
@@ -760,9 +758,9 @@ def run_remote():
 
 
 def run_local():
-	import multiprocessing
+	from multiprocessing.managers import SyncManager
 
-	manager = multiprocessing.managers.SyncManager()
+	manager = SyncManager()
 	manager.start()
 	flags.namespace = manager.Namespace()
 	flags.namespace.run = True

@@ -22,7 +22,7 @@ from xascraper.modules import exceptions
 
 class GetPX(xascraper.modules.scraper_base.ScraperBase):
 
-	settingsDictKey = "px"
+	pluginShortName = "px"
 	pluginName     = "PxGet"
 
 	urlBase         = "http://www.pixiv.net/"
@@ -71,8 +71,8 @@ class GetPX(xascraper.modules.scraper_base.ScraperBase):
 	def getCookie(self):
 		self.log.info("Pixiv Getting cookie")
 
-		self.papi.login(username=settings[self.settingsDictKey]["username"], password=settings[self.settingsDictKey]["password"])
-		# self.aapi.login(username=settings[self.settingsDictKey]["username"], password=settings[self.settingsDictKey]["password"])
+		self.papi.login(username=settings[self.pluginShortName]["username"], password=settings[self.pluginShortName]["password"])
+		# self.aapi.login(username=settings[self.pluginShortName]["username"], password=settings[self.pluginShortName]["password"])
 
 		if self.papi.access_token and self.aapi.access_token:
 
@@ -400,12 +400,12 @@ class GetPX(xascraper.modules.scraper_base.ScraperBase):
 		with self.db.context_sess() as sess:
 			for name in resultList:
 				res = sess.query(self.db.ScrapeTargets.id)             \
-					.filter(self.db.ScrapeTargets.site_name == self.targetShortName) \
+					.filter(self.db.ScrapeTargets.site_name == self.pluginShortName) \
 					.filter(self.db.ScrapeTargets.artist_name == name)              \
 					.scalar()
 				if not res:
 					self.log.info("Need to insert name: %s", name)
-					sess.add(self.db.ScrapeTargets(site_name=self.targetShortName, artist_name=name))
+					sess.add(self.db.ScrapeTargets(site_name=self.pluginShortName, artist_name=name))
 					sess.commit()
 
 

@@ -21,7 +21,7 @@ class MissingContentError(Exception):
 
 class GetTumblr(xascraper.modules.scraper_base.ScraperBase):
 
-	settingsDictKey = "tum"
+	pluginShortName = "tum"
 
 	pluginName = "TumblrGet"
 
@@ -34,23 +34,22 @@ class GetTumblr(xascraper.modules.scraper_base.ScraperBase):
 
 	@classmethod
 	def validate_config(cls, params):
-		if cls.settingsDictKey not in params:
-			# print("No settings for plugin key %s. Skipping" % cls.settingsDictKey)
+		if cls.pluginShortName not in params:
+			# print("No settings for plugin key %s. Skipping" % cls.pluginShortName)
 			return None
 
-		this_settings = params[cls.settingsDictKey]
+		this_settings = params[cls.pluginShortName]
 
-		assert 'runInterval' in this_settings, "Settings for plugin '%s' must have key 'runInterval', which is missing!" % (cls.settingsDictKey)
-		assert 'dlDirName' in this_settings,   "Settings for plugin '%s' must have key 'dlDirName', which is missing!" % (cls.settingsDictKey)
-		assert 'shortName' in this_settings,   "Settings for plugin '%s' must have key 'shortName', which is missing!" % (cls.settingsDictKey)
+		assert 'runInterval' in this_settings, "Settings for plugin '%s' must have key 'runInterval', which is missing!" % (cls.pluginShortName)
+		assert 'dlDirName' in this_settings,   "Settings for plugin '%s' must have key 'dlDirName', which is missing!" % (cls.pluginShortName)
 
-		assert 'consumer_key' in this_settings,      "Settings for plugin '%s' must have key 'consumer_key', which is missing!" % (cls.settingsDictKey)
-		assert 'consumer_secret' in this_settings,   "Settings for plugin '%s' must have key 'consumer_secret', which is missing!" % (cls.settingsDictKey)
-		assert 'token' in this_settings,             "Settings for plugin '%s' must have key 'token', which is missing!" % (cls.settingsDictKey)
-		assert 'token_secret' in this_settings,      "Settings for plugin '%s' must have key 'token_secret', which is missing!" % (cls.settingsDictKey)
+		assert 'consumer_key' in this_settings,      "Settings for plugin '%s' must have key 'consumer_key', which is missing!" % (cls.pluginShortName)
+		assert 'consumer_secret' in this_settings,   "Settings for plugin '%s' must have key 'consumer_secret', which is missing!" % (cls.pluginShortName)
+		assert 'token' in this_settings,             "Settings for plugin '%s' must have key 'token', which is missing!" % (cls.pluginShortName)
+		assert 'token_secret' in this_settings,      "Settings for plugin '%s' must have key 'token_secret', which is missing!" % (cls.pluginShortName)
 
 		if not this_settings['runInterval']:
-			# print("Plugin %s disabled (runInterval is false)" % (cls.settingsDictKey))
+			# print("Plugin %s disabled (runInterval is false)" % (cls.pluginShortName))
 			return False
 
 		return True
@@ -264,16 +263,16 @@ class GetTumblr(xascraper.modules.scraper_base.ScraperBase):
 	def go(self, nameList=None, ctrlNamespace=None):
 		if ctrlNamespace is None:
 			raise ValueError("You need to specify a namespace!")
-		is_another_active = self.getRunningStatus(self.settingsDictKey)
+		is_another_active = self.getRunningStatus(self.pluginShortName)
 
 		if is_another_active:
-			self.log.error("Another instance of the %s scraper is running.", self.targetShortName)
+			self.log.error("Another instance of the %s scraper is running.", self.pluginShortName)
 			self.log.error("Not starting")
 			return
 		try:
-			self.updateRunningStatus(self.settingsDictKey, True)
+			self.updateRunningStatus(self.pluginShortName, True)
 			startTime = datetime.datetime.now()
-			self.updateLastRunStartTime(self.settingsDictKey, startTime)
+			self.updateLastRunStartTime(self.pluginShortName, startTime)
 
 			if not nameList:
 				nameList = self.getNameList()
@@ -305,10 +304,10 @@ class GetTumblr(xascraper.modules.scraper_base.ScraperBase):
 				self.log.warn("Had errors!")
 
 			runTime = datetime.datetime.now()-startTime
-			self.updateLastRunDuration(self.settingsDictKey, runTime)
+			self.updateLastRunDuration(self.pluginShortName, runTime)
 
 		finally:
-			self.updateRunningStatus(self.settingsDictKey, False)
+			self.updateRunningStatus(self.pluginShortName, False)
 
 
 def mgr_init():

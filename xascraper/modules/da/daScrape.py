@@ -19,7 +19,7 @@ import xascraper.modules.exceptions
 
 class GetDA(xascraper.modules.scraper_base.ScraperBase):
 
-	settingsDictKey = "da"
+	pluginShortName = "da"
 	pluginName = "DaGet"
 
 	ovwMode = "Check Files"

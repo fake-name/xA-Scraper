@@ -15,7 +15,7 @@ from xascraper.modules import exceptions
 
 class GetWy(xascraper.modules.scraper_base.ScraperBase):
 
-	settingsDictKey = "wy"
+	pluginShortName = "wy"
 
 	pluginName = "WyGet"
 

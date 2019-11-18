@@ -15,7 +15,7 @@ from xascraper.modules import exceptions
 
 class GetNg(xascraper.modules.scraper_base.ScraperBase):
 
-	settingsDictKey = "ng"
+	pluginShortName = "ng"
 
 	pluginName = "NgGet"
 

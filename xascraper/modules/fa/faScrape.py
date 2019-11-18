@@ -15,7 +15,7 @@ from xascraper.modules import exceptions
 
 class GetFA(xascraper.modules.scraper_base.ScraperBase):
 
-	settingsDictKey = "fa"
+	pluginShortName = "fa"
 	pluginName = "FaGet"
 
 	urlBase = "http://www.furaffinity.net/"

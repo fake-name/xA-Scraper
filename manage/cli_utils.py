@@ -26,7 +26,7 @@ DISABLED_PLUGINS = {
 	for cls_def, dummy_interval, key in JOBS_DISABLED
 }
 UNRUNNABLE_PLUGINS = {
-		cls_def.settingsDictKey : (cls_def, cls_def.pluginName)
+		cls_def.pluginShortName : (cls_def, cls_def.pluginName)
 	for cls_def in JOBS_NO_CONF
 }
 

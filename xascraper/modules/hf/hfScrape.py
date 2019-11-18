@@ -36,7 +36,7 @@ def patch_scheme(url, scheme_url):
 
 class GetHF(xascraper.modules.scraper_base.ScraperBase):
 
-	settingsDictKey = "hf"
+	pluginShortName = "hf"
 
 	pluginName = "HfGet"
 

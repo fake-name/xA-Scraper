@@ -16,7 +16,7 @@ from xascraper.modules import exceptions
 
 class GetAs(xascraper.modules.scraper_base.ScraperBase):
 
-	settingsDictKey = "as"
+	pluginShortName = "as"
 
 	pluginName = "AsGet"
 

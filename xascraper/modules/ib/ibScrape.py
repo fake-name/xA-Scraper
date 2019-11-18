@@ -17,7 +17,7 @@ from xascraper.modules import exceptions
 
 class GetIb(xascraper.modules.scraper_base.ScraperBase):
 
-	settingsDictKey = "ib"
+	pluginShortName = "ib"
 
 	pluginName = "IbGet"
 

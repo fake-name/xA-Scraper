@@ -115,9 +115,7 @@ class ScraperBase(module_base.ModuleBase, metaclass=abc.ABCMeta):
 
 	def __init__(self):
 		print("ScraperBase Init")
-		self.dlBasePath = settings[self.settingsDictKey]["dlDirName"]
-		self.targetShortName = settings[self.settingsDictKey]["shortName"]
-
+		self.dlBasePath = settings[self.pluginShortName]["dlDirName"]
 		self.config_file_name = "transient_config.pik"
 
 		super().__init__()
@@ -125,36 +123,36 @@ class ScraperBase(module_base.ModuleBase, metaclass=abc.ABCMeta):
 
 	@classmethod
 	def validate_config(cls, params):
-		if cls.settingsDictKey not in params:
-			# print("No settings for plugin key %s. Skipping" % cls.settingsDictKey)
+		if cls.pluginShortName not in params:
+			# print("No settings for plugin key %s. Skipping" % cls.pluginShortName)
 			return None
 
-		this_settings = params[cls.settingsDictKey]
+		this_settings = params[cls.pluginShortName]
 
-		assert 'username' in this_settings,    "Settings for plugin '%s' must have key 'username', which is missing!" % (cls.settingsDictKey)
-		assert 'password' in this_settings,    "Settings for plugin '%s' must have key 'password', which is missing!" % (cls.settingsDictKey)
-		assert 'runInterval' in this_settings, "Settings for plugin '%s' must have key 'runInterval', which is missing!" % (cls.settingsDictKey)
-		assert 'dlDirName' in this_settings,   "Settings for plugin '%s' must have key 'dlDirName', which is missing!" % (cls.settingsDictKey)
-		assert 'shortName' in this_settings,   "Settings for plugin '%s' must have key 'shortName', which is missing!" % (cls.settingsDictKey)
+		assert 'username' in this_settings,    "Settings for plugin '%s' must have key 'username', which is missing!" % (cls.pluginShortName)
+		assert 'password' in this_settings,    "Settings for plugin '%s' must have key 'password', which is missing!" % (cls.pluginShortName)
+		assert 'runInterval' in this_settings, "Settings for plugin '%s' must have key 'runInterval', which is missing!" % (cls.pluginShortName)
+		assert 'dlDirName' in this_settings,   "Settings for plugin '%s' must have key 'dlDirName', which is missing!" % (cls.pluginShortName)
 
 		if not this_settings['runInterval']:
-			# print("Plugin %s disabled (runInterval is false)" % (cls.settingsDictKey))
+			# print("Plugin %s disabled (runInterval is false)" % (cls.pluginShortName))
 			return False
 
 		return True
 
 	@classmethod
 	def get_config(cls, params):
-		if cls.settingsDictKey not in params:
-			# print("No settings for plugin key %s. Skipping" % cls.settingsDictKey)
+		if cls.pluginShortName not in params:
+			# print("No settings for plugin key %s. Skipping" % cls.pluginShortName)
 			return False
 
-		this_settings = params[cls.settingsDictKey]
-		return cls, this_settings['runInterval'], cls.settingsDictKey
+		this_settings = params[cls.pluginShortName]
+		return cls, this_settings['runInterval'], cls.pluginShortName
 
 	@abc.abstractmethod
-	def settingsDictKey(self):
+	def pluginShortName(self):
 		return None
+
 
 
 	ovwMode = "Check Files"
@@ -207,7 +205,7 @@ class ScraperBase(module_base.ModuleBase, metaclass=abc.ABCMeta):
 		with open(self.config_file_name, "rb") as fp:
 			conf = pickle.load(fp)
 
-		return conf.get(self.settingsDictKey, {})
+		return conf.get(self.pluginShortName, {})
 
 
 	def set_param_cache(self, value):
@@ -216,7 +214,7 @@ class ScraperBase(module_base.ModuleBase, metaclass=abc.ABCMeta):
 			with open(self.config_file_name, "rb") as fp:
 				conf = pickle.load(fp)
 
-		conf[self.settingsDictKey] = value
+		conf[self.pluginShortName] = value
 
 		with open(self.config_file_name, "wb") as fp:
 			pickle.dump(conf, fp)
@@ -301,12 +299,10 @@ class ScraperBase(module_base.ModuleBase, metaclass=abc.ABCMeta):
 	def _artist_name_to_rid(self, aname):
 		with self.db.context_sess() as sess:
 			res = sess.query(self.db.ScrapeTargets.id)             \
-				.filter(self.db.ScrapeTargets.site_name == self.targetShortName) \
+				.filter(self.db.ScrapeTargets.site_name == self.pluginShortName) \
 				.filter(self.db.ScrapeTargets.artist_name == aname)              \
 				.one()
 			return res[0]
-
-
 
 	# Fetch the previously retrieved item URLs from the database.
 	def _getPreviouslyRetreived(self, artist):
@@ -499,7 +495,7 @@ class ScraperBase(module_base.ModuleBase, metaclass=abc.ABCMeta):
 
 		with self.db.context_sess() as sess:
 			res = sess.query(self.db.ScrapeTargets) \
-				.filter(self.db.ScrapeTargets.site_name == self.targetShortName) \
+				.filter(self.db.ScrapeTargets.site_name == self.pluginShortName) \
 				.filter(self.db.ScrapeTargets.artist_name == artist) \
 				.one()
 			res.last_fetched = datetime.datetime.now()
@@ -531,7 +527,7 @@ class ScraperBase(module_base.ModuleBase, metaclass=abc.ABCMeta):
 
 		with self.db.context_sess() as sess:
 			res = sess.query(self.db.ScrapeTargets) \
-				.filter(self.db.ScrapeTargets.site_name == self.targetShortName) \
+				.filter(self.db.ScrapeTargets.site_name == self.pluginShortName) \
 				.order_by(self.db.ScrapeTargets.last_fetched) \
 				.all()
 
@@ -705,7 +701,7 @@ class ScraperBase(module_base.ModuleBase, metaclass=abc.ABCMeta):
 			self.log.error("Artist seems to have disabled their account!")
 			return False
 		except WebRequest.FetchFailureError:
-			self.log.error("Failure fetching artist '%s' for site '%s'", artist, self.settingsDictKey)
+			self.log.error("Failure fetching artist '%s' for site '%s'", artist, self.pluginShortName)
 			return False
 		except exceptions.NoArtException:
 			self.log.warning("Artist has no art (yet)!")
@@ -733,16 +729,16 @@ class ScraperBase(module_base.ModuleBase, metaclass=abc.ABCMeta):
 	def go(self, nameList=None, ctrlNamespace=None):
 		if ctrlNamespace is None:
 			raise ValueError("You need to specify a namespace!")
-		is_another_active = self.getRunningStatus(self.settingsDictKey)
+		is_another_active = self.getRunningStatus(self.pluginShortName)
 
 		if is_another_active:
-			self.log.error("Another instance of the %s scraper is running.", self.targetShortName)
+			self.log.error("Another instance of the %s scraper is running.", self.pluginShortName)
 			self.log.error("Not starting")
 			return
 		try:
-			self.updateRunningStatus(self.settingsDictKey, True)
+			self.updateRunningStatus(self.pluginShortName, True)
 			startTime = datetime.datetime.now()
-			self.updateLastRunStartTime(self.settingsDictKey, startTime)
+			self.updateLastRunStartTime(self.pluginShortName, startTime)
 
 			if not nameList:
 				nameList = self.getNameList()
@@ -772,7 +768,7 @@ class ScraperBase(module_base.ModuleBase, metaclass=abc.ABCMeta):
 					# aName = future_to_url[future]
 					res = future.result()
 					if type(res) is not bool:
-						raise RuntimeError("Future for plugin %s returned non-boolean value (%s). Function %s of class %s" % (self.settingsDictKey, res, self.getArtist, self))
+						raise RuntimeError("Future for plugin %s returned non-boolean value (%s). Function %s of class %s" % (self.pluginShortName, res, self.getArtist, self))
 					errored  |= future.result()
 					# self.log.info("Return = %s, aName = %s, errored = %s" % (res, aName, errored))
 
@@ -780,10 +776,10 @@ class ScraperBase(module_base.ModuleBase, metaclass=abc.ABCMeta):
 				self.log.warn("Had errors!")
 
 			runTime = datetime.datetime.now()-startTime
-			self.updateLastRunDuration(self.settingsDictKey, runTime)
+			self.updateLastRunDuration(self.pluginShortName, runTime)
 
 		finally:
-			self.updateRunningStatus(self.settingsDictKey, False)
+			self.updateRunningStatus(self.pluginShortName, False)
 
 
 	@classmethod
