@@ -2,87 +2,73 @@
 import os
 import os.path
 import traceback
-import re
-import bs4
-import urllib.request
 import urllib.parse
+import concurrent.futures
+import datetime
+import random
+
 from settings import settings
-import flags
-
-import util.unclassify
-
 import xascraper.modules.scraper_base
 from xascraper.modules import exceptions
 
+from . import vendored_twitter_scrape
+
 class GetTwit(xascraper.modules.scraper_base.ScraperBase):
 
-	settingsDictKey = "twit"
-
+	pluginShortName = "twit"
 	pluginName = "TwitGet"
-
 	urlBase = "https://twitter.com/"
-
-
 	ovwMode = "Check Files"
-
-	numThreads = 4
-
-
+	numThreads = 1
 
 	# # ---------------------------------------------------------------------------------------------------------------------------------------------------------
 	# # Cookie Management
 	# # ---------------------------------------------------------------------------------------------------------------------------------------------------------
 
 	def checkCookie(self):
+		return True, "No login required"
 
-
-		pagetext = self.wg.getpage(self.urlBase)
-		if settings["twit"]["username"] in pagetext:
-			return True, "Have as Cookie."
-		else:
-			return False, "Do not have as login Cookies"
+		# pagetext = self.wg.getpage(self.urlBase)
+		# if settings["twit"]["username"] in pagetext:
+		# 	return True, "Have as Cookie."
+		# else:
+		# 	return False, "Do not have as login Cookies"
 
 
 	def getToken(self):
-			self.log.info("Getting Entrance Cookie")
-			soup = self.wg.getSoup('https://twitter.com/login')
-			inputs = soup.find_all("input")
+		self.log.info("Getting Entrance Cookie")
+		soup = self.wg.getSoup('https://twitter.com/login')
+		inputs = soup.find_all("input")
 
-			for intag in inputs:
-				if 'name' in intag.attrs and intag['name'] == 'authenticity_token':
-					return intag['value']
+		for intag in inputs:
+			if 'name' in intag.attrs and intag['name'] == 'authenticity_token':
+				return intag['value']
 
-			return False
+		raise RuntimeError("No access toke found!")
+
 
 	def getCookie(self):
 		try:
-
 			accessToken = self.getToken()
 
-			#print soup.find_all("input")
-			#print soup
-			if accessToken:
-				self.log.info("Got Entrance token, logging in")
-				# print("accessToken", accessToken)
+			logondict = {"authenticity_token"           : accessToken,
+						"session[username_or_email]"    : settings["twit"]["username"],
+						"session[password]"             : settings["twit"]["password"]
+						}
 
-				logondict = {"authenticity_token"           : accessToken,
-							"session[username_or_email]"    : settings["twit"]["username"],
-							"session[password]"             : settings["twit"]["password"]
-							}
+			extraHeaders = {
+						"Referer"       : "https://twitter.com/login",
+			}
 
-				extraHeaders = {
-							"Referer"       : "https://twitter.com/login",
-				}
-
-				pagetext = self.wg.getpage('https://twitter.com/sessions', postData=logondict, addlHeaders=extraHeaders)
-				with open('temp.html', 'w', encoding="utf-8") as fp:
-					fp.write(pagetext)
-				if "\"isLoggedIn\":true" in pagetext:
-					self.wg.saveCookies()
-					return True, "Logged In"
-				else:
-					self.log.error("Login failed!")
-					return False, "Failed to log in"
+			pagetext = self.wg.getpage('https://twitter.com/sessions', postData=logondict, addlHeaders=extraHeaders)
+			with open('temp.html', 'w', encoding="utf-8") as fp:
+				fp.write(pagetext)
+			if "\"isLoggedIn\":true" in pagetext:
+				self.wg.saveCookies()
+				return True, "Logged In"
+			else:
+				self.log.error("Login failed!")
+				return False, "Failed to log in"
 			return "No hidden input - entry step-through failed"
 
 		except:
@@ -92,336 +78,167 @@ class GetTwit(xascraper.modules.scraper_base.ScraperBase):
 			return "Login Failed"
 
 
-
-
 	# ---------------------------------------------------------------------------------------------------------------------------------------------------------
-	# Individual page scraping
+	# Stubs to handle base class
 	# ---------------------------------------------------------------------------------------------------------------------------------------------------------
-
-	def _fetchImage(self, imageURL, dlPathBase, itemCaption, itemTitle, artPageUrl):
-		urlPath = urllib.parse.urlparse(imageURL).path
-		fName = urlPath.split("/")[-1]
-
-		if not fName:
-			self.log.error("OH NOES!!! No filename for image on page = " + artPageUrl)
-			raise ValueError("No filename found!")
-
-
-		filePath = os.path.join(dlPathBase, fName)
-
-		self.log.info("			Filename			= %s", fName)
-		self.log.info("			Page Image Title	= %s", itemTitle)
-		self.log.info("			FileURL				= %s", imageURL)
-		self.log.info("			dlPath				= %s", filePath)
-
-		if self._checkFileExists(filePath):
-			self.log.info("Exists, skipping...")
-			return filePath
-		else:
-			imgdat = self.wg.getpage(imageURL, addlHeaders={'Referer':artPageUrl})
-
-			errs = 0
-			fp = None
-
-			while not fp:
-				try:
-					# For text, the URL fetcher returns decoded strings, rather then bytes.
-					# Therefore, if the file is a string type, we encode it with utf-8
-					# so we can write it to a file.
-					if isinstance(imgdat, str):
-						imgdat = imgdat.encode(encoding='UTF-8')
-
-					fp = open(filePath, "wb")								# Open file for saving image (Binary)
-					fp.write(imgdat)						# Write Image to File
-					fp.close()
-				except IOError:
-					try:
-						fp.close()
-					except:
-						pass
-					errs += 1
-					self.log.critical("Error attempting to save image file - %s", filePath)
-					if errs > 3:
-						self.log.critical("Could not open file for writing!")
-						return self.build_page_ret(status="Failed", fqDlPath=None)
-
-
-
-			self.log.info("Successfully got: %s", imageURL)
-
-		return filePath
-
-	def _getContentUrlFromPage(self, soup=None, url=None):
-		if not soup:
-			soup = self.wg.getSoup(url)
-
-		resize       = soup.find('div', title='Click to show max preview size')
-		origSize     = soup.find_all('a', target='_blank')
-		swfContainer = soup.find('embed', type='application/x-shockwave-flash')
-
-		origSize = list(set([tmp['href'] for tmp in origSize if tmp.get('href') and '/full/' in tmp.get('href')]))
-		if len(origSize) > 1:
-			self.log.error("Too many content images? Wat?")
-			self.log.error("%s", origSize)
-		elif not origSize:
-			ctnt_l = soup.select("div.content.magicboxParent")
-			for ctnt in ctnt_l:
-
-				if ctnt and ctnt.img and ctnt:
-					for img in ctnt.find_all("img"):
-						if "/full/" in img['src']:
-							origSize = [img['src']]
-				if origSize:
-					break
-				if not origSize and ctnt:
-					links = ctnt.find_all("a")
-					for link in links:
-						if "/full/" in link['href']:
-							origSize = [link['href']]
-				if origSize:
-					break
-			if not origSize:
-				self.log.error("No image on page?")
-				self.log.error("%s", origSize)
-
-		if resize:
-			# print("Resize link found:", resize.a['href'])
-			return resize.a['href']
-		elif origSize:
-			# print("OrigSize valid:", origSize)
-			return origSize[0]
-		elif swfContainer:
-			# print("SwfContainer found: ", swfContainer)
-			return swfContainer['src']
-		else:
-			self.log.error("No content found on page!")
-			# print("Nothing found?")
-			return None
-
-
-
-	def _extractTitle(self, soup):
-		div = soup.find('div', class_='content')
-		tds = div.find_all('td')
-		if len(tds) == 4:
-			dummy_avatar, titleTd, dummy_smiley, dummy_donate = tds
-		elif len(tds) == 2:
-			dummy_avatar, titleTd = tds
-		elif len(tds) == 6:
-			dummy_prev_release, dummy_author_1, dummy_author_2, dummy_avatar, titleTd, dummy_next_release = tds
-		else:
-			print("TDS:", len(tds))
-			for td in tds:
-				print()
-				print("----------------------------------------")
-				print(td)
-				print("----------------------------------------")
-				print()
-			raise ValueError("Do not know how to unpack title!")
-
-		if len(tds) == 6:
-			return titleTd.get_text()
-		else:
-			title, dummy_by = titleTd.find_all('div')
-			return title.get_text()
-
-
-	def _extractDescription(self, desc_soup, tag_soup):
-
-		# Tag extraction has to go before description extraction, because
-		# the desc extraction modifies the tree
-		kwdHeader = tag_soup.find('div', id='kw_scroll')
-		tags = kwdHeader.next_sibling.next_sibling
-
-		# Horrible hack using ** to work around the fact that 'class' is a reserved keyword
-		tagDiv = bs4.BeautifulSoup('', "lxml").new_tag('div', **{'class' : 'tags'})
-
-		tagHeader = bs4.BeautifulSoup('', "lxml").new_tag('b')
-		tagHeader.append('Tags:')
-		tagDiv.append(tagHeader)
-
-		for tag in tags.find_all('a'):
-			if 'block by ' in tag.get_text():
-				continue
-			new = bs4.BeautifulSoup('', "lxml").new_tag('div', **{'class' : 'tag'})
-			tagtxt = tag.get_text().strip()
-			if tagtxt != "keywording policy":
-				new.append(tagtxt)
-				tagDiv.append(new)
-
-
-		div = desc_soup.find('div', class_='content')
-		div = util.unclassify.unclassify(div)
-
-		desc = bs4.BeautifulSoup('', "lxml").new_tag('div')
-		if div.div.span:
-			desc.append(div.div.span)
-		else:
-			desc.append(div)
-
-		desc.append(tagDiv)
-		desc = str(desc.prettify())
-		return desc
-
-	def _getSeqImageDivs(self, seqDiv):
-		ret = set()
-
-		pages = seqDiv.find_all('div', class_='widget_imageFromSubmission')
-
-		for page in pages:
-			pgUrl = urllib.parse.urljoin(self.urlBase, page.a['href'])
-			ctnt = self._getContentUrlFromPage(url=pgUrl)
-			if ctnt:
-				ret.add(ctnt)
-		return ret
-
-	def _getArtPage(self, dlPathBase, artPageUrl, artistName):
-
-		soup = self.wg.getSoup(artPageUrl)
-
-		titleBar, dummy_stats, dummy_footer = soup.body.find_all('div', class_='elephant_555753', recursive=False)
-
-		mainDivs = soup.body.find_all('div', class_='elephant_white', recursive=False)
-		if len(mainDivs) == 2:
-			imgDiv, desc_div = mainDivs
-			footer = desc_div
-			imageURL    = [self._getContentUrlFromPage(imgDiv)]
-		elif len(mainDivs) == 3 or len(mainDivs) == 4:
-			if len(mainDivs) == 3:
-				imgDiv, seqDiv, desc_div = mainDivs
-				footer = desc_div
-			if len(mainDivs) == 4:
-				imgDiv, seqDiv, desc_div, footer = mainDivs
-
-			imageURL = set()
-			base_img = self._getContentUrlFromPage(imgDiv)
-			if base_img:
-				imageURL.add(base_img)
-
-			for img in self._getSeqImageDivs(seqDiv):
-				# print("Adding: ", img)
-				imageURL.add(img)
-			for img in self._getSeqImageDivs(desc_div):
-				# print("Adding: ", img)
-				imageURL.add(img)
-			self.log.info("Found %s item series on page!", len(imageURL))
-		else:
-			raise ValueError("Unknown number of mainDivs! %s" % len(mainDivs))
-
-		# print(imageURL)
-
-		itemTitle   = self._extractTitle(titleBar)
-		itemCaption = self._extractDescription(desc_div, footer)
-
-		# print("Title:")
-		# print(itemTitle)
-		# print("Caption:")
-		# print(itemCaption)
-
-
-		if not imageURL:
-			self.log.error("OH NOES!!! No image on page = " + artPageUrl)
-			raise ValueError("No image found!")
-
-
-		imPaths = []
-		for image in imageURL:
-			recPath = self._fetchImage(image, dlPathBase, itemCaption, itemTitle, artPageUrl)
-			imPaths.append(recPath)
-
-		return plugins.scrapers.ScraperBase.build_page_ret(status="Succeeded", fqDlPath=imPaths, pageDesc=itemCaption, pageTitle=itemTitle)
-
-
-	# ---------------------------------------------------------------------------------------------------------------------------------------------------------
-	# Gallery Scraping
-	# ---------------------------------------------------------------------------------------------------------------------------------------------------------
-
-	def _getTotalArtCount(self, artist):
-
-		basePage = 'https://twitter.com/{user}'.format(user=artist)
-
-		page = self.wg.getSoup(basePage)
-		stats = page.find('span', class_='stat', title='Submissions Uploaded')
-		if stats and stats.strong:
-			return int(stats.strong.get_text().replace(",", ""))
-
-		raise exceptions.AccountDisabledException("Could not retreive artist item quantity!")
-
-
-
-	def _getItemsOnPage(self, inSoup):
-
-		links = set()
-
-		pages = inSoup.find_all("div", class_='widget_thumbnailLargeCompleteFromSubmission')
-		for page in pages:
-			itemUrl = urllib.parse.urljoin(self.urlBase, page.a['href'])
-			links.add(itemUrl)
-
-		nextPage = False
-		button = inSoup.find("span", text='Next Page')
-		if button:
-			url = button.parent['href']
-			nextPage = urllib.parse.urljoin(self.urlBase, url)
-
-		return links, nextPage
-
-	def _getGalleryUrls(self, baseUrl):
-
-		pageSoup = self.wg.getSoup(baseUrl)
-
-		baseGal   = pageSoup.find('a', text='Gallery')
-		scrapsGal = pageSoup.find('a', text='Scraps')
-		csGal     = pageSoup.find('a', text='Character Sheets')
-
-		ret = []
-		if baseGal:
-			ret.append(urllib.parse.urljoin(baseUrl, baseGal['href']))
-		if scrapsGal:
-			ret.append(urllib.parse.urljoin(baseUrl, scrapsGal['href']))
-		if csGal:
-			ret.append(urllib.parse.urljoin(baseUrl, csGal['href']))
-		return ret
-
-	def _getItemsFromGallery(self, nextUrl):
-
-		return []
-
-		ret = set()
-		while nextUrl:
-
-			if not flags.run:
-				break
-
-			self.log.info("Getting = '%s'", nextUrl)
-			pageSoup = self.wg.getSoup(nextUrl)
-			if pageSoup == False:
-				self.log.error("Cannot get Page")
-				return "Failed"
-
-			new, nextUrl = self._getItemsOnPage(pageSoup)
-			new = new - ret
-			self.log.info("Retrieved %s new items on page", len(new))
-			ret |= new
-		return ret
-
 
 	def _getGalleries(self, artist):
+		pass
 
-		return []
+	def _getTotalArtCount(self):
+		pass
 
-		artlinks = set()
-		artist = artist.strip()
+	def _getContentUrlFromPage(self, soup):
+		pass
 
-		baseUrl = 'https://twitter.com/{user}'.format(user=artist)
-		galleries = self._getGalleryUrls(baseUrl)
+	def _getArtPage(self, post_struct, artistName):
+		pass
 
-		artlinks = set()
-		for gal in galleries:
-			artlinks |= self._getItemsFromGallery(gal)
+	# ---------------------------------------------------------------------------------------------------------------------------------------------------------
+	# Timeline Scraping
+	# ---------------------------------------------------------------------------------------------------------------------------------------------------------
 
-		self.log.info("Found %s links" % (len(artlinks)))
-		return artlinks
+	def _check_insert_tweet(self, src_artist, aid, tweet):
+		tweet_artist = tweet['tweet_author']
+		tweet_id     = tweet['tweetId']
+
+		with self.db.context_sess() as sess:
+			is_new = self._upsert_if_new(sess, aid, tweet_id)
+
+		if is_new:
+			self.log.info("Have content for TweetID! %s, %s", tweet_id, src_artist)
+			# return
+
+		tweet_entries = tweet['entries']
+
+		if tweet['isRetweet']:
+			tweet_title = "Retweet from %s by %s" % (tweet_artist, src_artist)
+		else:
+			tweet_title = "Tweet from %s" % (tweet_artist, )
+
+		self._updatePreviouslyRetreived(
+			artist             = src_artist,
+			release_meta       = tweet_id,
+			pageTitle          = tweet_title,
+			pageDesc           = tweet['text'],
+			postTags           = tweet_entries['hashtags'],
+			content_structured = tweet,
+			)
+
+		if tweet_entries['photos'] or tweet_entries['videos'] or tweet_entries['urls']:
+			self.setupDir(tweet_artist)
+		else:
+			# Text-only tweet
+			self._updatePreviouslyRetreived(artist=src_artist, release_meta=tweet_id, state='complete')
+			return
+
+		photos = tweet_entries['photos']
+		videos = tweet_entries['videos']
+		urls   = tweet_entries['urls']
+
+		if urls and not (photos or videos):
+			self.log.warning("Urls entry on tweet (%s). Don't know how to handle this yet!", tweet_entries)
+			self._updatePreviouslyRetreived(artist=src_artist, release_meta=tweet_id, state='complete')
+			return
+		if videos and not (photos or urls):
+			self.log.warning("Videos entry on tweet (%s). Don't know how to handle this yet!", tweet_entries)
+			self._updatePreviouslyRetreived(artist=src_artist, release_meta=tweet_id, state='complete')
+			return
+
+		dlPathBase = self.getDownloadPath(self.dlBasePath, tweet_artist)
+
+		seq = 1
+		for url in photos:
+			content, fName = self.wg.getFileAndName(url)
+			# if len(fName) == 0:
+			# 	raise FetchError("Missing Filename for file '%s' (url: %s)" % (fName, url))
+
+			fName = "%s - %s" % (tweet_id, fName)
+
+			filePath = os.path.join(dlPathBase, fName)
+
+			if isinstance(content, str):
+				content = content.encode(encoding='UTF-8')
+
+			self.log.info("Saving file %s to path %s", fName, filePath)
+			with open(filePath, "wb") as fp:
+				fp.write(content)
+
+			self._updatePreviouslyRetreived(artist=src_artist, release_meta=tweet_id, fqDlPath=filePath, seqNum=seq)
+			seq += 1
+
+		self._updatePreviouslyRetreived(artist=src_artist, release_meta=tweet_id, state='complete')
 
 
+
+
+
+	def getArtist(self, artist, ctrlNamespace):
+		if ctrlNamespace.run == False:
+			self.log.warning("Exiting early from %s due to run flag being unset", artist)
+			return True
+
+		aid = self._artist_name_to_rid(artist)
+
+		self.log.info("GetArtist - %s (ID: %s)", artist, aid)
+
+		intf = vendored_twitter_scrape.TwitterFetcher()
+
+		# while len(artPages) > 0:
+		for tweet in intf.get_tweets(artist):
+
+			self._check_insert_tweet(artist, aid, tweet)
+
+			# self.log.info("Pages for %s remaining = %s", artist, len(artPages))
+			if ctrlNamespace.run == False:
+				break
+
+		# self._updatePreviouslyRetreived(artist, tmp)
+
+		self.log.info("Successfully retreived content for artist %s", artist)
+		return False
+
+
+	def go(self, nameList=None, ctrlNamespace=None):
+		if ctrlNamespace is None:
+			raise ValueError("You need to specify a namespace!")
+		is_another_active = self.getRunningStatus(self.pluginShortName)
+
+		if is_another_active:
+			self.log.error("Another instance of the %s scraper is running.", self.pluginShortName)
+			self.log.error("Not starting")
+			return
+		try:
+			self.updateRunningStatus(self.pluginShortName, True)
+			startTime = datetime.datetime.now()
+			self.updateLastRunStartTime(self.pluginShortName, startTime)
+
+			if not nameList:
+				nameList = self.getNameList()
+
+			haveCookie, dummy_message = self.checkCookie()
+			if not haveCookie:
+				self.log.critical("Tumblr Authentication is failing! Are your API keys correct? Cannot continue!")
+				return False
+
+			errored = False
+
+			random.shuffle(nameList)
+
+			for name in nameList:
+				try:
+					errored |= self.getArtist(artist=name, ctrlNamespace=ctrlNamespace)
+				except Exception:
+					for line in traceback.format_exc().split("\n"):
+						self.log.error(line)
+					errored |= True
+
+			if errored:
+				self.log.warning("Had errors!")
+
+			runTime = datetime.datetime.now()-startTime
+			self.updateLastRunDuration(self.pluginShortName, runTime)
+
+		finally:
+			self.updateRunningStatus(self.pluginShortName, False)
 
