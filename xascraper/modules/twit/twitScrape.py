@@ -147,13 +147,16 @@ class GetTwit(xascraper.modules.scraper_base.ScraperBase):
 
 		dlPathBase = self.getDownloadPath(self.dlBasePath, tweet_artist)
 
+		postd = datetime.datetime(tweet['time'])
+		postd = postd.isoformat().split("T")[0]
+
 		seq = 1
 		for url in photos:
-			content, fName = self.wg.getFileAndName(url)
+			content, fName = self.wg.getFileAndName(url+":orig")
 			# if len(fName) == 0:
 			# 	raise FetchError("Missing Filename for file '%s' (url: %s)" % (fName, url))
 
-			fName = "%s - %s" % (tweet_id, fName)
+			fName = "%s - %s - %s - %s - %s" % (tweet_artist, tweet_id, postd, seq, fName)
 
 			filePath = os.path.join(dlPathBase, fName)
 

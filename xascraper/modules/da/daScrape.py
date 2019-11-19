@@ -24,7 +24,7 @@ class GetDA(xascraper.modules.scraper_base.ScraperBase):
 
 	ovwMode = "Check Files"
 
-	numThreads = 2
+	numThreads = 1
 
 	# ---------------------------------------------------------------------------------------------------------------------------------------------------------
 	# Cookie Management

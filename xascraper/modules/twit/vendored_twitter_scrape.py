@@ -3,7 +3,6 @@ import time
 import traceback
 import logging
 from requests_html import HTMLSession, HTML
-from datetime import datetime
 from urllib.parse import quote
 from lxml.etree import ParserError
 import mechanicalsoup
