@@ -124,7 +124,13 @@ class GetDA(xascraper.modules.scraper_base.ScraperBase):
 	# ---------------------------------------------------------------------------------------------------------------------------------------------------------
 
 	def _checkLoginFromSoup(self, soup):
-		pass
+		ss = str(soup)
+		loggedin_str = '"loggedIn":true,"browseShadows":true,"username":"%s"' % settings["da"]["username"]
+
+		if loggedin_str in ss:
+			return True
+		else:
+			return False
 
 	# ---------------------------------------------------------------------------------------------------------------------------------------------------------
 	# Individual page scraping
@@ -139,7 +145,6 @@ class GetDA(xascraper.modules.scraper_base.ScraperBase):
 			self.log.info("Found DDL Link! - %s", imgurl)
 			return imgurl
 
-		self.log.info("Trying for Manual full-content URL")
 		link = soupIn.find("img", class_="dev-content-full")
 		if link:
 			imgurl = link["src"]
@@ -147,7 +152,6 @@ class GetDA(xascraper.modules.scraper_base.ScraperBase):
 			return imgurl
 
 
-		self.log.info("Trying for Manual normal-content URL")
 		link = soupIn.find("img", class_="dev-content-normal")
 		if link:
 			imgurl = link["src"]
@@ -157,6 +161,14 @@ class GetDA(xascraper.modules.scraper_base.ScraperBase):
 		if soupIn.find("div", class_='journal-wrapper'):
 			self.log.info("Item is prose, rather then art.")
 			return "Prose"
+
+		embed = soupIn.find("iframe", class_='flashtime')
+		if embed:
+			self.log.info("Found flash content - %s. Fetching SWF url", embed['src'])
+			embed_page = self.wg.getSoup(embed['src'])
+			embedurl = embed_page.embed["src"]
+			self.log.info("SWF found at %s", embedurl)
+			return embedurl
 
 		self.log.info("Trying for Video Link")
 		try:
@@ -229,7 +241,7 @@ class GetDA(xascraper.modules.scraper_base.ScraperBase):
 		pageDesc, pageTitle, postTags, postTime = self._getContentDescriptionTitleFromSoup(pageSoup)
 
 		if not imgurl:
-			self.log.critical("OH NOES!!! No image on page = %s", artPageUrl)
+			self.log.critical("No image on page = %s", artPageUrl)
 			if not self._checkLoginFromSoup(pageSoup):
 				# If we've not logged in, relogin.
 				raise xascraper.modules.exceptions.NotLoggedInException("Image missing?")
@@ -360,19 +372,18 @@ if __name__ == '__main__':
 
 
 	ins = GetDA()
-	have_cookie, message = ins.checkCookie()
-	print('have_cookie', have_cookie)
-	if not have_cookie:
-		ins.getCookie()
+	# have_cookie, message = ins.checkCookie()
+	# print('have_cookie', have_cookie)
+	# if not have_cookie:
+	# 	ins.getCookie()
 
 
 
-	ins.go(ctrlNamespace=namespace)
+	# ins.go(ctrlNamespace=namespace)
 
 	# print(ins)
 	# print("Instance: ", ins)
 	# dlPathBase, artPageUrl, artistName
-	# ins._getArtPage("xxxx", 'http://samus9450.deviantart.com/art/SAMUS-ZERO-SUIT-SEXY-3-603835374', 'testtt')
 	# ins.getArtist('testtt', ctrlNamespace=namespace)
 
 
