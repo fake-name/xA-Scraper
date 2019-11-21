@@ -15,7 +15,7 @@
 				<input type="hidden" name="add", value="True">
 				<input type="hidden" name="site", value="{{sitename}}">
 				<div style="display: inline-block;">
-					<td><input type="text" name="artistName", value="" size=50></td>
+					<td><input type="text" name="artistName", value="" size=50 onkeyup="this.value = this.value.toLowerCase();"></td>
 				</div>
 				<input type="submit" value="Add">
 			</form>
