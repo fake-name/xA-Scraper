@@ -175,9 +175,6 @@ class GetTwit(xascraper.modules.scraper_base.ScraperBase):
 		self._updatePreviouslyRetreived(artist=src_artist, release_meta=tweet_id, state='complete')
 
 
-
-
-
 	def getArtist(self, aid, artist, ctrlNamespace):
 		if ctrlNamespace.run == False:
 			self.log.warning("Exiting early from %s due to run flag being unset", artist)
@@ -189,7 +186,7 @@ class GetTwit(xascraper.modules.scraper_base.ScraperBase):
 		intf = vendored_twitter_scrape.TwitterFetcher()
 
 		# while len(artPages) > 0:
-		for tweet in intf.get_tweets(artist):
+		for tweet in intf.get_all_tweets(artist):
 
 			self._check_insert_tweet(artist, aid, tweet)
 

@@ -2,6 +2,8 @@ import re
 import time
 import traceback
 import logging
+import datetime
+import dateparser
 from requests_html import HTMLSession, HTML
 from urllib.parse import quote
 from lxml.etree import ParserError
@@ -97,14 +99,31 @@ class TwitterFetcher(object):
 					}
 				}
 
-	def gen_tweets(self, url, twit_headers, query):
-		r = self.session.get(url, headers=twit_headers)
 
+	def get_joined_date(self, user):
+
+		r = self.session.get("https://twitter.com/{user}".format(user=user))
+		html = r.html
+		joined_items = html.find(".ProfileHeaderCard-joinDateText")
+		assert joined_items, "No joined items?"
+		assert len(joined_items) == 1, "Too many joined items?"
+		joined = joined_items[0]
+
+		posttime = dateparser.parse(joined.attrs['title'])
+
+		self.log.info("User %s joined twitter at %s", user, posttime)
+
+		return posttime
+
+	def gen_tweets(self, url, twit_headers, username):
+		r = self.session.get(url, headers=twit_headers)
+		total_items = 0
 		while True:
+			response_json = r.json()
 			try:
-				html = HTML(html=r.json()['items_html'], url='bunk', default_encoding='utf-8')
+				html = HTML(html=response_json['items_html'], url='bunk', default_encoding='utf-8')
 			except KeyError:
-				raise ValueError(f'Oops! Either "{query}" does not exist or is private.')
+				raise ValueError(f'Oops! Either "{username}" does not exist or is private.')
 			except ParserError:
 				traceback.print_exc()
 				print("Page: ", r, r.json())
@@ -118,28 +137,106 @@ class TwitterFetcher(object):
 
 			last_tweet = html.find('.stream-item')[-1].attrs['data-item-id']
 
+
+			on_page = 0
 			for tweet in tweets:
 				if tweet:
+					on_page += 1
+					total_items += 1
 					tweet['text'] = re.sub(r'\Shttp', ' http', tweet['text'], 1)
 					tweet['text'] = re.sub(r'\Spic\.twitter', ' pic.twitter', tweet['text'], 1)
 					yield tweet
 
-			self.log.info("Sleeping to do rate limiting")
-			time.sleep(5)
-			r = self.session.get(url, params={'max_position': last_tweet}, headers=twit_headers)
+			if 'has_more_items' in response_json and not response_json['has_more_items']:
+				self.log.info("Out of items. Found %s tweets for last username", on_page)
+				break
 
-	def get_tweets(self, query):
-		"""Gets tweets for a given user, via the Twitter frontend API."""
+			self.log.info("Sleeping to do rate limiting. Found %s tweets for last username", on_page)
+			# print("Response.json", response_json)
+			time.sleep(5)
+
+			if "min_position" in response_json:
+				r = self.session.get(url, params={'max_position': response_json["min_position"]}, headers=twit_headers)
+			else:
+				r = self.session.get(url, params={'max_position': last_tweet}, headers=twit_headers)
+
+		self.log.info("Total items found: %s", total_items)
+
+	def gen_tweets_for_date_span(self, username, start_date, end_date):
+		from_date = start_date.isoformat()[:10]
+		to_date   = end_date.isoformat()[:10]
+
+		url = "https://twitter.com/search?q=from%3A{user}%20since%3A{from_date}%20until%3A{to_date}&src=typd".format(
+			user=username, from_date=from_date, to_date=to_date)
+
+		url = "https://twitter.com/i/search/timeline?vertical=default&q=from%3A{user}%20since%3A{from_date}%20until%3A{to_date}&src=typd&include_available_features=1&include_entities=1&reset_error_state=false".format(
+			user=username, from_date=from_date, to_date=to_date)
 
 		twit_headers = {
 			'Accept': 'application/json, text/javascript, */*; q=0.01',
-			'Referer': 'https://twitter.com/{query}'.format(query=query),
+			'Referer': 'https://twitter.com/',
 			'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_12_6) AppleWebKit/603.3.8 (KHTML, like Gecko) Version/10.1.2 Safari/603.3.8',
 			'X-Twitter-Active-User': 'yes',
 			'X-Requested-With': 'XMLHttpRequest',
 			'Accept-Language': 'en-US'
 		}
 
-		url = 'https://twitter.com/i/profiles/show/{query}/timeline/tweets?include_available_features=1&include_entities=1&include_new_items_bar=true'.format(query=query)
+		# print("Url:", url)
+		yield from self.gen_tweets(url, twit_headers, username)
 
-		yield from self.gen_tweets(url, twit_headers, query)
+	def get_recent_tweets(self, username):
+		"""Gets tweets for a given user, via the Twitter frontend API."""
+
+		twit_headers = {
+			'Accept': 'application/json, text/javascript, */*; q=0.01',
+			'Referer': 'https://twitter.com/{username}'.format(username=username),
+			'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_12_6) AppleWebKit/603.3.8 (KHTML, like Gecko) Version/10.1.2 Safari/603.3.8',
+			'X-Twitter-Active-User': 'yes',
+			'X-Requested-With': 'XMLHttpRequest',
+			'Accept-Language': 'en-US'
+		}
+
+		url = 'https://twitter.com/i/profiles/show/{username}/timeline/tweets?include_available_features=1&include_entities=1&include_new_items_bar=true'.format(username=username)
+
+		yield from self.gen_tweets(url, twit_headers, username)
+
+	def get_all_tweets(self, username):
+		"""
+		Gets tweets for a given user, via the Twitter frontend API.
+
+		Note that due to the way the overlapping time intervals are generated, this WILL return duplicates
+		of the same tweet. For my use, I don't care. If this is a problem for your use case, you'll need
+		to handle it yourself.
+		"""
+
+		twit_headers = {
+			'Accept': 'application/json, text/javascript, */*; q=0.01',
+			'Referer': 'https://twitter.com/{username}'.format(username=username),
+			'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_12_6) AppleWebKit/603.3.8 (KHTML, like Gecko) Version/10.1.2 Safari/603.3.8',
+			'X-Twitter-Active-User': 'yes',
+			'X-Requested-With': 'XMLHttpRequest',
+			'Accept-Language': 'en-US'
+		}
+
+		url = 'https://twitter.com/i/profiles/show/{username}/timeline/tweets?include_available_features=1&include_entities=1&include_new_items_bar=true'.format(username=username)
+
+		joined_date = self.get_joined_date(username)
+
+		chunk_interval = datetime.timedelta(days=7)
+		overlap = datetime.timedelta(days=2)
+
+		interval_end = datetime.datetime.now()
+
+		while interval_end > joined_date:
+			tgt_start = interval_end - chunk_interval
+			tgt_end   = interval_end + overlap
+
+			print("Should fetch for ", tgt_start, tgt_end)
+
+			for item in self.gen_tweets_for_date_span(username, tgt_start, tgt_end):
+				yield item
+
+			interval_end = tgt_start
+
+
+		# yield from self.gen_tweets(url, twit_headers, username)
