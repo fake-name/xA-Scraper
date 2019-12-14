@@ -120,6 +120,10 @@ class TwitterFetcher(object):
 		total_items = 0
 		while True:
 			response_json = r.json()
+
+			if not response_json['items_html'].strip():
+				break
+
 			try:
 				html = HTML(html=response_json['items_html'], url='bunk', default_encoding='utf-8')
 			except KeyError:
