@@ -170,10 +170,10 @@ class TwitterFetcher(object):
 		from_date = start_date.isoformat()[:10]
 		to_date   = end_date.isoformat()[:10]
 
-		url = "https://twitter.com/search?q=from%3A{user}%20since%3A{from_date}%20until%3A{to_date}&src=typd".format(
+		url = "https://twitter.com/search?q=from%3A{user}%20since%3A{from_date}%20until%3A{to_date}%20-filter%3Aretweets&src=typd".format(
 			user=username, from_date=from_date, to_date=to_date)
 
-		url = "https://twitter.com/i/search/timeline?vertical=default&q=from%3A{user}%20since%3A{from_date}%20until%3A{to_date}&src=typd&include_available_features=1&include_entities=1&reset_error_state=false".format(
+		url = "https://twitter.com/i/search/timeline?vertical=default&q=from%3A{user}%20since%3A{from_date}%20until%3A{to_date}%20-filter%3Aretweets&src=typd&include_available_features=1&include_entities=1&reset_error_state=false".format(
 			user=username, from_date=from_date, to_date=to_date)
 
 		twit_headers = {
