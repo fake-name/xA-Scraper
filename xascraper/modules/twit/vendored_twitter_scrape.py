@@ -3,19 +3,56 @@ import time
 import traceback
 import logging
 import datetime
+import urllib.parse
 import dateparser
-from requests_html import HTMLSession, HTML
-from urllib.parse import quote
+from requests_html import HTML
 from lxml.etree import ParserError
-import mechanicalsoup
 
 
 class TwitterFetcher(object):
-	def __init__(self):
+	def __init__(self, wg):
 		self.log = logging.getLogger("Main.TwitterInterface")
-		self.session = HTMLSession()
-		self.browser = mechanicalsoup.StatefulBrowser()
-		self.browser.addheaders = [('User-agent', 'Firefox')]
+
+		self.wg = wg
+		self.current_url = None
+
+	# Ugh, I need to clean up the function names in WebGet at some point.
+	def stateful_get(self, url, headers=None, params=None):
+		return self.__stateful_get("getpage", url, headers, params)
+
+	def stateful_get_soup(self, url, headers=None, params=None):
+		return self.__stateful_get("getsoup", url, headers, params)
+
+	def stateful_get_json(self, url, headers=None, params=None):
+		return self.__stateful_get("getJson", url, headers, params)
+
+	def __stateful_get(self, call_name, url, headers, params):
+
+		if headers is None:
+			headers = {}
+
+		if params is not None:
+			assert isinstance(params, dict), "Parameters, if passed, must be a dict. Passed %s" % (type(params), )
+			scheme, netloc, path, query, fragment = urllib.parse.urlsplit(url)[:5]
+
+			qparsed = urllib.parse.parse_qs(query)
+
+			# Update the URL from the passed parameters
+			for key, value in params.items():
+				qparsed[key] = [value]
+
+			query = urllib.parse.urlencode(qparsed, doseq=True)
+
+			url = urllib.parse.urlunsplit((scheme, netloc, path, query, fragment))
+
+		if self.current_url:
+			headers["Referer"] = self.current_url
+		self.current_url = url
+
+		func = getattr(self.wg, call_name)
+		page = func(url, addlHeaders=headers)
+		return page
+
 
 	def __extract_tweet(self, tweet):
 
@@ -102,8 +139,8 @@ class TwitterFetcher(object):
 
 	def get_joined_date(self, user):
 
-		r = self.session.get("https://twitter.com/{user}".format(user=user))
-		html = r.html
+		ctnt = self.stateful_get("https://twitter.com/{user}".format(user=user))
+		html = HTML(html=ctnt)
 		joined_items = html.find(".ProfileHeaderCard-joinDateText")
 		assert joined_items, "No joined items?"
 		assert len(joined_items) == 1, "Too many joined items?"
@@ -116,10 +153,11 @@ class TwitterFetcher(object):
 		return posttime
 
 	def gen_tweets(self, url, twit_headers, username):
-		r = self.session.get(url, headers=twit_headers)
+
+		response_json = self.stateful_get_json(url, headers=twit_headers)
+
 		total_items = 0
 		while True:
-			response_json = r.json()
 
 			if not response_json['items_html'].strip():
 				break
@@ -130,7 +168,7 @@ class TwitterFetcher(object):
 				raise ValueError(f'Oops! Either "{username}" does not exist or is private.')
 			except ParserError:
 				traceback.print_exc()
-				print("Page: ", r, r.json())
+				print("Page: ", response_json)
 				break
 
 			tweets = []
@@ -160,9 +198,9 @@ class TwitterFetcher(object):
 			time.sleep(5)
 
 			if "min_position" in response_json:
-				r = self.session.get(url, params={'max_position': response_json["min_position"]}, headers=twit_headers)
+				response_json = self.stateful_get_json(url, params={'max_position': response_json["min_position"]}, headers=twit_headers)
 			else:
-				r = self.session.get(url, params={'max_position': last_tweet}, headers=twit_headers)
+				response_json = self.stateful_get_json(url, params={'max_position': last_tweet}, headers=twit_headers)
 
 		self.log.info("Total items found: %s", total_items)
 

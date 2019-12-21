@@ -183,7 +183,7 @@ class GetTwit(xascraper.modules.scraper_base.ScraperBase):
 
 		self.log.info("GetArtist - %s (ID: %s)", artist, aid)
 
-		intf = vendored_twitter_scrape.TwitterFetcher()
+		intf = vendored_twitter_scrape.TwitterFetcher(wg=self.wg)
 
 		# while len(artPages) > 0:
 		for tweet in intf.get_all_tweets(artist):
