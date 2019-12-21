@@ -47,10 +47,14 @@ def move_delete_files(sess, from_p, to_p):
 
 	sess.commit()
 
-def reset_run_state():
+def reset_run_state(plugin_name=None):
 
 	resetter = xascraper.status_monitor.StatusResetter()
-	resetter.resetRunState()
+
+	if plugin_name:
+		resetter.reset_specific_plugin_run_state(plugin_name)
+	else:
+		resetter.reset_all_plugins_run_state()
 
 def move_delete_tags(sess, from_p, to_p):
 

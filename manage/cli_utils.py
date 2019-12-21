@@ -41,6 +41,8 @@ def print_help():
 	print("		reset the run-state monitor flags. This is normally done")
 	print("		at start by main.py, but if you're using just the CLI fetch")
 	print("		calls, you can do it manually too.")
+	print("	reset-run-state [sitename]")
+	print("		reset the run-state for a specific plugin only.")
 	print("	'rss-import'")
 	print("		Import tumblr feeds from a ttrss database instance.")
 	print("	'tumblr-import'")

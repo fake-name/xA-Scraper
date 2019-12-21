@@ -92,7 +92,7 @@ def go(managedNamespace):
 
 
 	resetter = xascraper.status_monitor.StatusResetter()
-	resetter.resetRunState()
+	resetter.reset_all_plugins_run_state()
 
 	# statusMgr = manage.statusDbManager.StatusResource()
 	managedNamespace.run = True

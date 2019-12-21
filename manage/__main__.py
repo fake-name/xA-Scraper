@@ -47,6 +47,8 @@ def two_arg_go(command, param):
 	if command == "fetch":
 		do_fetch([param])
 
+	elif command == 'reset-run-state':
+		db_manage.reset_run_state(param)
 	else:
 		cli_utils.print_help()
 

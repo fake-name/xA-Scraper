@@ -99,7 +99,7 @@ class StatusResetter(StatusMixin):
 		super().__init__()
 		self.log = logging.getLogger("Main.StatusMgr")
 
-	def resetRunState(self):
+	def reset_all_plugins_run_state(self):
 		with self.db.context_sess() as sess:
 			rows = sess.query(self.db.ScraperStatus).all()
 			for row in rows:
@@ -108,3 +108,19 @@ class StatusResetter(StatusMixin):
 					row.is_running = False
 					sess.commit()
 
+
+	def reset_specific_plugin_run_state(self, plugin_name):
+		self.log.info("Resetting run state for plugin '%s'", plugin_name)
+
+		with self.db.context_sess() as sess:
+			row = sess.query(self.db.ScraperStatus).filter(self.db.ScraperStatus.site_name == plugin_name).scalar()
+			if not row:
+				self.log.error("No plugin found for plugin name '%s'", plugin_name)
+				return
+
+			if row.is_running:
+				self.log.info("Plugin %s is flagged as running. Clearing flag.", row.site_name)
+				row.is_running = False
+				sess.commit()
+			else:
+				self.log.warning("Plugin %s is flagged as not running already. Nothing to do!", row.site_name)
