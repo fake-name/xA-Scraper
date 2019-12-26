@@ -65,6 +65,8 @@ def insertExtIfNeeded(fqFName, file_bytes):
 	if ext != should_ext and should_ext:
 		if should_ext in ('.jpe', '.jpeg', '.jfif'):
 			should_ext = '.jpg'
+		if should_ext in ('.mp2', ):
+			should_ext = '.mp3'
 		return root + should_ext
 	return fqFName
 
