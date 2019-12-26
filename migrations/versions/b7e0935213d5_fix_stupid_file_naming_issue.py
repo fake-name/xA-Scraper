@@ -173,6 +173,12 @@ def upgrade():
 	reg2 = re.compile(r'httpsimg00\.deviantart\.net[0-9a-z]{14}')
 	reg3 = re.compile(r'httpsorig00\.deviantart\.net[0-9a-z]{14}')
 
+
+	if not 'da' in settings.settings:
+		return
+	if not "shortName" in settings.settings['da']:
+		return
+
 	to_fix_names = sess.query(ScrapeTargets).filter(ScrapeTargets.site_name == settings.settings['da']["shortName"]).all()
 	print("Found %s artists" % len(to_fix_names))
 	for name in tqdm.tqdm(to_fix_names, desc='Artists'):
