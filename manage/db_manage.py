@@ -299,19 +299,19 @@ def export_db_contents(to_path, site_name):
 				tmp = (
 						uname,
 						post.title,
+						str(list(pfile.fspath for pfile in post.files)[0]),
 						post.content,
 						post.content_structured,
-						list((ptag.tag for ptag in post.tags)),
-						list((
+						list(ptag.tag for ptag in post.tags),
+						list(
 							(
 								pfile.item_id,
 								pfile.seqnum,
 								pfile.file_meta,
 								pfile.state,
 								pfile.filename,
-								pfile.fspath,
 							)
-							for pfile in post.files)),
+							for pfile in post.files),
 					)
 				dat.append(tmp)
 
