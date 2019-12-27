@@ -65,7 +65,7 @@ class TwitterFetcher(object):
 
 		tweet_id = tweet.attrs['data-item-id']
 
-		tweet_post_time = int(tweet.find('._timestamp')[0].attrs['data-time-ms']) / 1000.0
+		tweet_post_time = float(tweet.find('._timestamp')[0].attrs['data-time-ms']) / 1000.0
 
 		interactions = [
 			x.text
@@ -177,7 +177,13 @@ class TwitterFetcher(object):
 				if extr_tweet:
 					tweets.append(extr_tweet)
 
-			last_tweet = html.find('.stream-item')[-1].attrs['data-item-id']
+
+			stream_item = html.find('.stream-item')
+			if not stream_item:
+				self.log.warning("No items for query! Did the user not tweet for the relevant interval?")
+				break
+
+			last_tweet = stream_item[-1].attrs['data-item-id']
 
 
 			on_page = 0
@@ -242,7 +248,7 @@ class TwitterFetcher(object):
 
 		yield from self.gen_tweets(url, twit_headers, username)
 
-	def get_all_tweets(self, username):
+	def get_all_tweets(self, username, minimum_date=None):
 		"""
 		Gets tweets for a given user, via the Twitter frontend API.
 
@@ -262,23 +268,27 @@ class TwitterFetcher(object):
 
 		url = 'https://twitter.com/i/profiles/show/{username}/timeline/tweets?include_available_features=1&include_entities=1&include_new_items_bar=true'.format(username=username)
 
-		joined_date = self.get_joined_date(username)
+		interval_start = self.get_joined_date(username)
+
+		if minimum_date and minimum_date > interval_start:
+			self.log.info("Limiting last-scraped interval start to %s (joined date %s)", minimum_date, interval_start)
+			interval_start = minimum_date
 
 		chunk_interval = datetime.timedelta(days=7)
 		overlap = datetime.timedelta(days=2)
 
-		interval_end = datetime.datetime.now()
 
-		while interval_end > joined_date:
-			tgt_start = interval_end - chunk_interval
-			tgt_end   = interval_end + overlap
 
-			print("Should fetch for ", tgt_start, tgt_end)
+		while interval_start < datetime.datetime.now():
+
+			tgt_start = interval_start - overlap
+			tgt_end   = interval_start + chunk_interval
+
 
 			for item in self.gen_tweets_for_date_span(username, tgt_start, tgt_end):
 				yield item
 
-			interval_end = tgt_start
+			interval_start = tgt_end
 
 
 		# yield from self.gen_tweets(url, twit_headers, username)

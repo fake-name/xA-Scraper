@@ -181,23 +181,35 @@ class GetTwit(xascraper.modules.scraper_base.ScraperBase):
 			return True
 
 
+
+
 		self.log.info("GetArtist - %s (ID: %s)", artist, aid)
 
 		intf = vendored_twitter_scrape.TwitterFetcher(wg=self.wg)
 
+		min_date = self.get_last_fetched(artist)
+
 		# while len(artPages) > 0:
-		for tweet in intf.get_all_tweets(artist):
+		for tweet in intf.get_all_tweets(artist, min_date):
 
 			self._check_insert_tweet(artist, aid, tweet)
 
+			if not tweet['isRetweet']:
+				self.update_last_fetched(artist, datetime.datetime.fromtimestamp(tweet['time']))
+
 			# self.log.info("Pages for %s remaining = %s", artist, len(artPages))
-			if ctrlNamespace.run == False:
+			if not ctrlNamespace.run:
 				break
+
+		if ctrlNamespace.run:
+			# Only set the last fetch to now if we completed normally (as opposed to dying due to an exception)
+			self.update_last_fetched(artist, datetime.datetime.now())
 
 		# self._updatePreviouslyRetreived(artist, tmp)
 
 		self.log.info("Successfully retreived content for artist %s", artist)
 		return False
+
 
 
 	def go(self, nameList=None, ctrlNamespace=None):

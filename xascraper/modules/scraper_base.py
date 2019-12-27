@@ -493,15 +493,31 @@ class ScraperBase(module_base.ModuleBase, metaclass=abc.ABCMeta):
 				sess.commit()
 
 
-	def _updateLastFetched(self, artist):
+	def update_last_fetched(self, artist, fetch_time = None):
+		if fetch_time is None:
+			fetch_time = datetime.datetime.now()
+
+		self.log.info("Setting last fetched date to %s for artist %s (site: %s)", fetch_time, artist, self.pluginShortName)
 
 		with self.db.context_sess() as sess:
 			res = sess.query(self.db.ScrapeTargets) \
 				.filter(self.db.ScrapeTargets.site_name == self.pluginShortName) \
 				.filter(self.db.ScrapeTargets.artist_name == artist) \
 				.one()
-			res.last_fetched = datetime.datetime.now()
+			res.last_fetched = fetch_time
 			sess.commit()
+
+
+	def get_last_fetched(self, artist):
+
+		with self.db.context_sess() as sess:
+			res = sess.query(self.db.ScrapeTargets) \
+				.filter(self.db.ScrapeTargets.site_name == self.pluginShortName) \
+				.filter(self.db.ScrapeTargets.artist_name == artist) \
+				.one()
+			ret = res.last_fetched
+			sess.commit()
+		return ret
 
 
 	# ---------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -692,7 +708,7 @@ class ScraperBase(module_base.ModuleBase, metaclass=abc.ABCMeta):
 				if ctrlNamespace.run is False:
 					break
 
-			self._updateLastFetched(artist)
+			self.update_last_fetched(artist)
 			self.log.info("Successfully retreived content for artist %s", artist)
 
 			return False

@@ -552,7 +552,7 @@ class GetPatreon(xascraper.modules.scraper_base.ScraperBase):
 				if ctrlNamespace.run is False:
 					break
 
-			self._updateLastFetched(artist_undecoded)
+			self.update_last_fetched(artist_undecoded)
 			self.log.info("Successfully retreived content for artist %s", artist_name)
 
 			if embeds:
