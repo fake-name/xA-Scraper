@@ -299,7 +299,6 @@ def export_db_contents(to_path, site_name):
 				tmp = (
 						uname,
 						post.title,
-						str(list(pfile.fspath for pfile in post.files)[0]),
 						post.content,
 						post.content_structured,
 						list(ptag.tag for ptag in post.tags),
@@ -309,6 +308,7 @@ def export_db_contents(to_path, site_name):
 								pfile.seqnum,
 								pfile.file_meta,
 								pfile.state,
+								pfile.fspath,
 								pfile.filename,
 							)
 							for pfile in post.files),
