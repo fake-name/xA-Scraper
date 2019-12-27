@@ -75,7 +75,8 @@ def upgrade():
 
 
 	print("Migrated!")
-	conn.execute("COMMIT")
+	if px_releases:
+		conn.execute("COMMIT")
 
 def downgrade():
 	raise RuntimeError("Cannot downgrade!")
