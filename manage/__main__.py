@@ -59,6 +59,8 @@ def three_arg_go(command, param_1, param_2):
 		importer.import_names_from_file(param_1, param_2)
 
 		db_manage.db_name_clean()
+	elif command == "dump":
+		db_manage.export_db_contents(to_path=param_1, site_name=param_2)
 
 	else:
 		cli_utils.print_help()

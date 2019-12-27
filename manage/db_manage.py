@@ -2,6 +2,7 @@
 
 import flags
 import tqdm
+import json
 import os.path
 
 import logSetup
@@ -272,9 +273,51 @@ def db_misrelink_clean():
 				merge_release_set(sess, releases)
 
 
+def export_db_contents(to_path, site_name):
+	print("Dumping contents for site %s to folder %s" % (site_name, to_path))
+
+	ids = {}
+	with db.context_sess() as sess:
+		res = sess.query(db.ScrapeTargets)             \
+			.filter(db.ScrapeTargets.site_name == site_name) \
+			.all()
+		for result in res:
+			ids[result.id] = result.artist_name
+
+	print("Found %s items!" % (len(ids), ))
 
 
+	for uid, uname in tqdm.tqdm(ids.items(), desc="Artists"):
+		with db.context_sess() as sess:
+			posts = sess.query(db.ArtItem) \
+				.filter(db.ArtItem.artist_id == uid) \
+				.order_by(db.ArtItem.addtime) \
+				.all()
 
+			dat = []
+			for post in tqdm.tqdm(posts, desc="Artist posts"):
+				tmp = (
+						uname,
+						post.title,
+						post.content,
+						post.content_structured,
+						list((ptag.tag for ptag in post.tags)),
+						list((
+							(
+								pfile.item_id,
+								pfile.seqnum,
+								pfile.file_meta,
+								pfile.state,
+								pfile.filename,
+								pfile.fspath,
+							)
+							for pfile in post.files)),
+					)
+				dat.append(tmp)
+
+			outp = os.path.join(to_path, "%s-%s-%s-dump.json" % (site_name, uname, uid))
+			with open(outp, "w") as fp:
+				json.dump(dat, fp, indent=4)
 
 
 

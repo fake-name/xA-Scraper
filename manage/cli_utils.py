@@ -67,7 +67,9 @@ def print_help():
 	print("		different mechanism used for supporting pixiv namelist")
 	print("		tracking.")
 	print("		Note: this will call `name-clean` after execution automatically.")
-
+	print("	dump [export_path] [sitename]")
+	print("		Dump the database contents for users from a specific site to [export_path]")
+	print("")
 	print("Plugins (sitename -> Human-Readable name)")
 	print("	Available plugins (will be run by the scheduler):")
 	for key, tup in PLUGINS.items():
