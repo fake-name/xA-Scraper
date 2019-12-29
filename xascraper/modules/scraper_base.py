@@ -497,15 +497,19 @@ class ScraperBase(module_base.ModuleBase, metaclass=abc.ABCMeta):
 		if fetch_time is None:
 			fetch_time = datetime.datetime.now()
 
-		self.log.info("Setting last fetched date to %s for artist %s (site: %s)", fetch_time, artist, self.pluginShortName)
-
 		with self.db.context_sess() as sess:
 			res = sess.query(self.db.ScrapeTargets) \
 				.filter(self.db.ScrapeTargets.site_name == self.pluginShortName) \
 				.filter(self.db.ScrapeTargets.artist_name == artist) \
 				.one()
-			res.last_fetched = fetch_time
-			sess.commit()
+			if (res.last_fetched is None):
+				res.last_fetched = fetch_time
+				sess.commit()
+				self.log.info("Setting last fetched date to %s for artist %s (site: %s)", fetch_time, artist, self.pluginShortName)
+			elif (res.last_fetched < fetch_time):
+				res.last_fetched = fetch_time
+				sess.commit()
+				self.log.info("Setting last fetched date to %s for artist %s (site: %s)", fetch_time, artist, self.pluginShortName)
 
 
 	def get_last_fetched(self, artist):
