@@ -116,7 +116,10 @@ class TwitterFetcher(object):
 			for style in styles:
 				if style.startswith('background'):
 					tmp = style.split('/')[-1]
-					video_id = tmp[:tmp.index('.jpg')]
+					try:
+						video_id = tmp[:tmp.index('.jpg')]
+					except ValueError:
+						video_id = tmp[:tmp.index('.png')]
 					videos.append({'id': video_id})
 
 		return {

@@ -20,12 +20,12 @@ def upgrade():
 	conn = op.get_bind()
 	print("Getting Pixiv DB Entries")
 	px_releases = conn.execute("SELECT id, release_meta FROM art_item WHERE artist_id IN (SELECT id FROM scrape_targets WHERE site_name='px')")
-
+	px_releases = list(px_releases)
 	print("Fixing database entries")
 	# This is dumb, but I should have used a tuple from the outset, because I need to be able to put
 	# the release items in a set for various reasons.
 	tot_changed = 0
-	for rid, postid in tqdm.tqdm(list(px_releases)):
+	for rid, postid in tqdm.tqdm(px_releases):
 		if 'uarea=response_out' in postid:
 			print("Removing '%s'", postid)
 			conn.execute("DELETE FROM art_tag WHERE item_id  = %s", (rid, ))
