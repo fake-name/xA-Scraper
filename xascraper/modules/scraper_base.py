@@ -493,19 +493,26 @@ class ScraperBase(module_base.ModuleBase, metaclass=abc.ABCMeta):
 				sess.commit()
 
 
-	def update_last_fetched(self, artist, fetch_time = None):
+	def update_last_fetched(self, artist, fetch_time = None, force = False):
 		if fetch_time is None:
 			fetch_time = datetime.datetime.now()
 
-		self.log.info("Setting last fetched date to %s for artist %s (site: %s)", fetch_time, artist, self.pluginShortName)
-
 		with self.db.context_sess() as sess:
-			res = sess.query(self.db.ScrapeTargets) \
+			res = sess.query(self.db.ScrapeTargets)                              \
 				.filter(self.db.ScrapeTargets.site_name == self.pluginShortName) \
-				.filter(self.db.ScrapeTargets.artist_name == artist) \
+				.filter(self.db.ScrapeTargets.artist_name == artist)             \
 				.one()
-			res.last_fetched = fetch_time
-			sess.commit()
+			if res.last_fetched is None or res.last_fetched < fetch_time:
+				self.log.info("Setting last fetched date to %s (previously %s) for artist %s (site: %s)", fetch_time, res.last_fetched, artist, self.pluginShortName)
+				res.last_fetched = fetch_time
+				sess.commit()
+
+			elif force:
+				self.log.info("Force setting last fetched date to %s (previously %s) for artist %s (site: %s)", fetch_time, res.last_fetched, artist, self.pluginShortName)
+				res.last_fetched = fetch_time
+				sess.commit()
+
+
 
 
 	def get_last_fetched(self, artist):
@@ -603,7 +610,8 @@ class ScraperBase(module_base.ModuleBase, metaclass=abc.ABCMeta):
 
 			except exceptions.NotLoggedInException:
 				self.log.error("You are not logged in? Checking and re-logging in.")
-				self.getCookie()
+				ok, message = self.getCookie()
+				assert ok, "Failed to log in after NotLoggedInException!"
 
 		self.log.error("Failed to fetch content with args: '%s', kwargs: '%s'", args, kwargs)
 		return self.build_page_ret(status="Failed", fqDlPath=None)
@@ -764,8 +772,9 @@ class ScraperBase(module_base.ModuleBase, metaclass=abc.ABCMeta):
 			haveCookie, dummy_message = self.checkCookie()
 			if not haveCookie:
 				self.log.info("Do not have login cookie. Retreiving one now.")
-				cookieStatus = self.getCookie()
-				self.log.info("Login attempt status = %s.", cookieStatus)
+				cookieStatus, msg = self.getCookie()
+				self.log.info("Login attempt status = %s (%s).", cookieStatus, msg)
+				assert cookieStatus, "Login failed! Cannot continue!"
 
 			haveCookie, dummy_message = self.checkCookie()
 			if not haveCookie:

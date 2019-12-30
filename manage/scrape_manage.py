@@ -1,8 +1,9 @@
 
 
-import flags
+import tqdm
 import traceback
 import os.path
+import datetime
 
 import logSetup
 from settings import settings
@@ -14,6 +15,7 @@ import multiprocessing.managers
 import sys
 
 from . import cli_utils
+import xascraper.database as db
 
 manager = multiprocessing.managers.SyncManager()
 manager.start()
@@ -88,6 +90,32 @@ def do_fetch_all():
 		status = {tmp.name : tmp.is_alive() for tmp in processes}
 		print("Plugin status: ", status)
 
+
+
+
+def reset_last_fetched_times(plugin_name=None):
+
+
+	for key, (plugin_cls, readable_name) in ENABLED_PLUGINS.items():
+		if plugin_name and plugin_name != key:
+			continue
+
+		instance = plugin_cls()
+
+		with db.context_sess() as sess:
+			res = sess.query(db.ScrapeTargets) \
+				.filter(db.ScrapeTargets.site_name == key) \
+				.all()
+
+			names = [row.artist_name for row in res]
+			sess.commit()
+
+		for name in tqdm.tqdm(names):
+			instance.update_last_fetched(artist=name, fetch_time=datetime.datetime.min, force=True)
+		# print("Names:", len(names))
+
+		print(key, plugin_name, readable_name)
+	# update_last_fetched
 
 
 

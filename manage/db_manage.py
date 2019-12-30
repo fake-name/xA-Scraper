@@ -57,6 +57,7 @@ def reset_run_state(plugin_name=None):
 	else:
 		resetter.reset_all_plugins_run_state()
 
+
 def move_delete_tags(sess, from_p, to_p):
 
 	if not from_p.tags:
@@ -318,7 +319,4 @@ def export_db_contents(to_path, site_name):
 			outp = os.path.join(to_path, "%s-%s-%s-dump.json" % (site_name, uname, uid))
 			with open(outp, "w") as fp:
 				json.dump(dat, fp, indent=4)
-
-
-
 

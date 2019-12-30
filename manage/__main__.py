@@ -12,10 +12,9 @@ import warnings
 warnings.filterwarnings("ignore", category=UserWarning, module='psycopg2')
 
 from . import name_importer
-from .scrape_manage import do_fetch_all
-from .scrape_manage import do_fetch
 
 from manage import db_manage
+from manage import scrape_manage
 
 from . import cli_utils
 
@@ -29,15 +28,17 @@ def one_arg_go(command):
 		importer = name_importer.NameImporter()
 		importer.update_names_from_tumblr_followed()
 	elif command == "fetch":
-		do_fetch([])
+		scrape_manage.do_fetch([])
 	elif command == "fetch-all":
-		do_fetch_all()
+		scrape_manage.do_fetch_all()
 	elif command == 'name-clean':
 		db_manage.db_name_clean()
 	elif command == 'db-misrelink-clean':
 		db_manage.db_misrelink_clean()
 	elif command == 'reset-run-state':
 		db_manage.reset_run_state()
+	elif command == 'reset-last-fetched-times':
+		scrape_manage.reset_last_fetched_times()
 	else:
 		cli_utils.print_help()
 
@@ -45,10 +46,12 @@ def one_arg_go(command):
 def two_arg_go(command, param):
 
 	if command == "fetch":
-		do_fetch([param])
+		scrape_manage.do_fetch([param])
 
 	elif command == 'reset-run-state':
 		db_manage.reset_run_state(param)
+	elif command == 'reset-last-fetched-times':
+		scrape_manage.reset_last_fetched_times(param)
 	else:
 		cli_utils.print_help()
 
