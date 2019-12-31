@@ -6,6 +6,7 @@ import urllib.parse
 import concurrent.futures
 import datetime
 import random
+import WebRequest
 
 from settings import settings
 import xascraper.modules.scraper_base
@@ -152,24 +153,33 @@ class GetTwit(xascraper.modules.scraper_base.ScraperBase):
 
 		seq = 1
 		for url in photos:
-			content, fName = self.wg.getFileAndName(url+":orig")
-			# if len(fName) == 0:
-			# 	raise FetchError("Missing Filename for file '%s' (url: %s)" % (fName, url))
+			try:
+				content, fName = self.wg.getFileAndName(url+":orig")
+				# if len(fName) == 0:
+				# 	raise FetchError("Missing Filename for file '%s' (url: %s)" % (fName, url))
 
-			fName = fName.split(":")[0]
+				fName = fName.split(":")[0]
 
-			fName = "%s - %s - %s - %02i - %s" % (tweet_artist, tweet_id, postd, seq, fName)
+				fName = "%s - %s - %s - %02i - %s" % (tweet_artist, tweet_id, postd, seq, fName)
 
-			filePath = os.path.join(dlPathBase, fName)
+				filePath = os.path.join(dlPathBase, fName)
 
-			if isinstance(content, str):
-				content = content.encode(encoding='UTF-8')
+				if isinstance(content, str):
+					content = content.encode(encoding='UTF-8')
 
-			self.log.info("Saving file %s to path %s", fName, filePath)
-			with open(filePath, "wb") as fp:
-				fp.write(content)
+				self.log.info("Saving file %s to path %s", fName, filePath)
+				with open(filePath, "wb") as fp:
+					fp.write(content)
 
-			self._updatePreviouslyRetreived(artist=src_artist, release_meta=tweet_id, fqDlPath=filePath, seqNum=seq)
+				self._updatePreviouslyRetreived(artist=src_artist, release_meta=tweet_id, fqDlPath=filePath, seqNum=seq)
+
+			except WebRequest.FetchFailureError as e:
+				if e.err_code == 404:
+					self.log.warning("%s no longer exists on Twitter, HTTP Response 404", url)
+					self._updatePreviouslyRetreived(artist=src_artist, release_meta=tweet_id, fqDlPath=None, seqNum=seq)
+				else:
+					raise
+
 			seq += 1
 
 		self._updatePreviouslyRetreived(artist=src_artist, release_meta=tweet_id, state='complete')
