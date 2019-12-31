@@ -119,7 +119,10 @@ class TwitterFetcher(object):
 					try:
 						video_id = tmp[:tmp.index('.jpg')]
 					except ValueError:
-						video_id = tmp[:tmp.index('.png')]
+						try:
+							video_id = tmp[:tmp.index('.png')]
+						except ValueError:
+							video_id = tmp[:tmp.index('?')]
 					videos.append({'id': video_id})
 
 		return {
