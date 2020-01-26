@@ -369,22 +369,3 @@ class GetSf(xascraper.modules.scraper_base.ScraperBase):
 
 
 
-
-
-
-if __name__ == '__main__':
-
-	import logSetup
-	logSetup.initLogging()
-
-	ins = GetSf()
-	# ins.getCookie()
-	print(ins)
-	print("Instance: ", ins)
-	# dlPathBase, artPageUrl, artistName
-	ins._getArtPage("xxxx", '{"url":"https://www.sofurry.com/view/857034"}', 'testtt')
-
-
-
-
-

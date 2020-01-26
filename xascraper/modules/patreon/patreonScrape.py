@@ -690,39 +690,3 @@ class GetPatreon(xascraper.modules.scraper_base.ScraperBase):
 		# self.get_pledges()
 		self.fetch_all()
 
-
-
-if __name__ == '__main__':
-
-	import multiprocessing.managers
-	import logSetup
-	logSetup.initLogging()
-
-	manager = multiprocessing.managers.SyncManager()
-	manager.start()
-	namespace = manager.Namespace()
-	namespace.run=True
-
-
-	ins = GetPatreon()
-	# nl = ins.checkCookie()
-	# nl = ins.getCookie()
-	# nl = ins.getNameList()
-
-	# ins.go(ctrlNamespace=namespace)
-
-	# print(nl)
-	# print(ins)
-	# print("Instance: ", ins)
-	# dlPathBase, artPageUrl, artistName
-	# ins.getArtist('["191466", ["Dan Shive", {"campaign": {"links": {"related": "https://www.patreon.com/api/campaigns/96494"}, "data": {"type": "campaign", "id": "96494"}}}]]', ctrlNamespace=namespace)
-
-	# ins._fetch_retrier(13131994, "Dan Shive")
-	# ins.getArtist('["191466", ["Dan Shive", {"campaign": {"links": {"related": "https://www.patreon.com/api/campaigns/96494"}, "data": {"type": "campaign", "id": "96494"}}}]]', namespace)
-	ins._get_art_post('30321123', 'test')
-
-	# nl = ins.getNameList()
-
-	# for artist in nl:
-	# 	print(artist)
-	# print(nl)

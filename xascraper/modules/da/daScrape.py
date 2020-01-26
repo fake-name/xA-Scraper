@@ -8,7 +8,6 @@ import time
 import urllib.request
 
 import WebRequest
-import bs4
 
 import flags
 from settings import settings
@@ -42,8 +41,15 @@ class GetDA(xascraper.modules.scraper_base.ScraperBase):
 		return False, "Do not have DA login Cookies"
 
 	def _is_logged_in(self):
-		soup = self.wg.getSoup("https://www.deviantart.com/")
+		try:
+			content, filename, mimetype = self.wg.getItemChromium("https://www.deviantart.com")
+		except WebRequest.FetchFailureError:
+			# I think they blacklist your cookie if they decide you're a bot. We need to re-auth in that case
+			# Alternatively, there might be a perimeterx cookie somewhere.
+			self.wg.clearCookies()
+			content, filename, mimetype = self.wg.getItemChromium("https://www.deviantart.com")
 
+		soup = WebRequest.as_soup(content)
 		user_1 = soup.find('span', class_='username')
 
 		return user_1 and settings["da"]["username"].lower() in user_1.get_text(strip=True).lower()
@@ -354,36 +360,5 @@ class GetDA(xascraper.modules.scraper_base.ScraperBase):
 				loopCounter += 1
 
 		return ret
-
-
-
-
-if __name__ == '__main__':
-
-	import multiprocessing.managers
-	import logSetup
-	logSetup.initLogging()
-
-	manager = multiprocessing.managers.SyncManager()
-	manager.start()
-	namespace = manager.Namespace()
-	namespace.run=True
-
-
-
-	ins = GetDA()
-	# have_cookie, message = ins.checkCookie()
-	# print('have_cookie', have_cookie)
-	# if not have_cookie:
-	# 	ins.getCookie()
-
-
-
-	# ins.go(ctrlNamespace=namespace)
-
-	# print(ins)
-	# print("Instance: ", ins)
-	# dlPathBase, artPageUrl, artistName
-	# ins.getArtist('testtt', ctrlNamespace=namespace)
 
 

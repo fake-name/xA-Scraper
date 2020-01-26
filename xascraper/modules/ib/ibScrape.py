@@ -463,28 +463,3 @@ class GetIb(xascraper.modules.scraper_base.ScraperBase):
 
 
 
-
-
-if __name__ == '__main__':
-	import multiprocessing.managers
-	import logSetup
-
-	logSetup.initLogging()
-
-
-	manager = multiprocessing.managers.SyncManager()
-	manager.start()
-	namespace = manager.Namespace()
-	namespace.run=True
-
-
-	ins = GetIb()
-	# ins.getCookie()
-	print(ins)
-	print("Instance: ", ins)
-	# dlPathBase, artPageUrl, artistName
-	print("Getting artist")
-	# ins.getCookie()
-	# ins._getGalleries("xskullstomperx")
-	ins._getArtPage("xxxx", 'https://inkbunny.net/s/1653120', 'testtt')
-

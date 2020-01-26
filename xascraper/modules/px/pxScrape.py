@@ -413,26 +413,4 @@ class GetPX(xascraper.modules.scraper_base.ScraperBase):
 
 
 
-if __name__ == '__main__':
-
-	import logSetup
-	logSetup.initLogging()
-
-	ins = GetPX()
-	print("Checking auth")
-	ins.checkLogin()
-	# ins.checkCookie()
-	# ins.getCookie()
-	# ins.getNameList()
-	# print(ins)
-	# print("Instance: ", ins)
-	# dlPathBase, artPageUrl, artistName
-	print("Getting Galleries")
-
-	# count = ins._getTotalArtCount("512775")
-	# print(count)
-	# ret = ins._getArtPage("xxx", '{"type" : "illustration", "id" : 76882251}', "xxx")
-	# print(ret)
-
-
 

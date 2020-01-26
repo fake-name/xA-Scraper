@@ -322,27 +322,3 @@ class GetNg(xascraper.modules.scraper_base.ScraperBase):
 
 		return artlinks
 
-
-if __name__ == '__main__':
-	import multiprocessing.managers
-	import logSetup
-
-	logSetup.initLogging()
-
-
-	manager = multiprocessing.managers.SyncManager()
-	manager.start()
-	namespace = manager.Namespace()
-	namespace.run=True
-
-
-	ins = GetNg()
-	# ins.getCookie()
-	print(ins)
-	print("Instance: ", ins)
-	# dlPathBase, artPageUrl, artistName
-	print("Getting artist")
-	# ins.getCookie()
-	ac = ins._getTotalArtCount("xxx")
-	print("Art count: ", ac)
-

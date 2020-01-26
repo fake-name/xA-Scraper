@@ -265,7 +265,7 @@ class GetYp(xascraper.modules.scraper_base.ScraperBase, xascraper.modules.rpc_ba
 
 		scls = self.serialize_class(remote_cls)
 
-		instance = local_exec.PluginInterface_RemoteExec()
+		instance = local_exec.PluginInterface_RemoteExecLocalProxy()
 		resp_tup = instance.call_code(code_struct=scls, **call_kwargs_out)
 		jid = self.job_counter
 		self.job_counter += 1

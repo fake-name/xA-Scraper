@@ -380,16 +380,3 @@ class GetHF(xascraper.modules.scraper_base.ScraperBase):
 		return artlinks
 
 
-
-if __name__ == '__main__':
-
-	import logSetup
-	logSetup.initLogging()
-
-	ins = GetHF()
-	# ins.getCookie()
-	# print(ins)
-	# print("Instance: ", ins)
-	# dlPathBase, artPageUrl, artistName
-	ins._getArtPage("xxxx", 'xxxx', 'testtt')
-
