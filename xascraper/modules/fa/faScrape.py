@@ -38,14 +38,15 @@ class GetFA(xascraper.modules.scraper_base.ScraperBase):
 			return False, "Do not have FA login Cookies"
 
 		settings_page = self.wg.getpage('http://www.furaffinity.net/controls/user-settings/')
-		if '<a id="my-username" href="' in settings_page:
+		if '<a id="my-username" class="top-heading hideonmobile" href="' in settings_page:
 			return True, "Have FA Cookies:\n	%s\n	%s" % (userID.group(0), sessionID.group(0))
+
+		self.log.warning("Not logged in!")
 
 		return False, "Do not have FA login Cookies"
 
 
 	def getCookie(self):
-
 		if self.checkCookie()[0] is True:
 			self.log.warn("Do not need to log in!")
 			return "Logged In"
@@ -70,7 +71,7 @@ class GetFA(xascraper.modules.scraper_base.ScraperBase):
 			return "Login Failed"
 
 
-		login_pg    = self.wg.getpage('https://www.furaffinity.net/login/')
+		login_pg    = self.wg.getpage('https://www.furaffinity.net/login/?mode=imagecaptcha')
 		captcha_img = self.wg.getpage('https://www.furaffinity.net/captcha.jpg')
 
 		with open("img.jpg", "wb") as fp:
@@ -86,16 +87,16 @@ class GetFA(xascraper.modules.scraper_base.ScraperBase):
 			'g-recaptcha-response' : "",
 			'use_old_captcha'      : 1,
 			'captcha'              : captcha_result,
-			'login'                : 'Login to FurAffinity',
+			'login'                : 'Login to Fur Affinity',
 		}
 
 
-		pagetext = self.wg.getpage('https://www.furaffinity.net/login/?url=/', postData = values)
+		pagetext = self.wg.getpage('https://www.furaffinity.net/login/?ref=https://www.furaffinity.net/', postData = values)
 
 		if self.checkCookie()[0] is True:
-			return "Logged In"
+			return True, "Logged In"
 		else:
-			return "Login Failed"
+			return False, "Login Failed"
 
 
 	# ---------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -141,7 +142,7 @@ class GetFA(xascraper.modules.scraper_base.ScraperBase):
 
 		pageDesc = ""
 		pageTitle = ""
-		commentaryTd = soup.find("td", attrs={"valign":"top", "align":"left", "class":"alt1", "width":"70%"})
+		commentaryTd = soup.find("div", class_='submission-description')
 		if commentaryTd:
 
 			# Pull out all the items in the commentary <td>
@@ -160,7 +161,7 @@ class GetFA(xascraper.modules.scraper_base.ScraperBase):
 		datespan = soup.find('span', class_='popup_date')
 		postTime = dateparser.parse(datespan['title'])
 
-		tagdiv = soup.find('div', id='keywords')
+		tagdiv = soup.find('section', class_='tags-row')
 		if tagdiv:
 			tags = tagdiv.find_all("a")
 			tags = [tag.get_text().strip() for tag in tags]
@@ -209,7 +210,6 @@ class GetFA(xascraper.modules.scraper_base.ScraperBase):
 		self.log.info("			Filename = %s", fname)
 		self.log.info("			File Type = %s", ftype)
 		self.log.info("			FileURL  = %s", imgurl)
-
 
 		try:
 			filePath = os.path.join(dlPathBase, fname)
@@ -280,14 +280,11 @@ class GetFA(xascraper.modules.scraper_base.ScraperBase):
 			self.log.warning("Account not found!")
 			raise exceptions.AccountDisabledException("Could not retreive artist item quantity!")
 
-		tds = page.find("td", align="right", text="Statistics")
+		stats = page.find("div", class_="user-profile-stats")
 
-		stats = tds.parent.parent.text
-		for line in stats.splitlines():
-			line = line.rstrip(" 	").lstrip(" 	")
-			if "Submissions: " in line:
-
-				num = line.split(":")[-1]
+		for div_section in stats.find_all("div", class_='table-cell'):
+			if "Submissions" in div_section.get_text(strip=True):
+				num = div_section.strong.get_text(strip=True)
 				return int(num)
 
 		raise exceptions.AccountDisabledException("Could not retreive artist item quantity!")
@@ -310,24 +307,19 @@ class GetFA(xascraper.modules.scraper_base.ScraperBase):
 		galleries = ["http://www.furaffinity.net/gallery/%s/%s/",     # Format is "..../{artist-name}/{page-no}/"
 					"http://www.furaffinity.net/scraps/%s/%s/"]
 
-
-
-		ret = set()								# Declare array of links
-
+		ret = set()
 
 		for galleryUrlBase in galleries:
-			print("Retreiving gallery", galleryUrlBase)
-			pageNo = 1
-			while 1:
+			self.log.info("Retreiving gallery %s", galleryUrlBase)
 
+			for pageNo in range(999999):
 				if not flags.run:
 					return []
 
 				turl = galleryUrlBase % (artist, pageNo)
-				self.log.info("Getting = " + turl)
 				pageSoup = self.wg.getSoup(turl)							# Request Image
 				if pageSoup == "Failed":
-					self.log.error("Cannot get Page: %s" % turl)
+					self.log.error("Cannot get Page: %s", turl)
 					break
 
 				if 'has voluntarily disabled access to their account and all of its contents.' in str(pageSoup):
@@ -335,40 +327,17 @@ class GetFA(xascraper.modules.scraper_base.ScraperBase):
 					return ret
 
 				new = self._getItemsOnPage(pageSoup)
-				if len(new) == 0 or flags.run == False:
+				if not new or flags.run is False:
 					self.log.info("No more images. At end of gallery.")
 					break
+
 				ret |= new
 				self.log.info("Retreived gallery page with %s links. Total links so far %s.", len(new), len(ret))
-
-				pageNo += 1
 
 				self.log.info("Sleeping %s seconds to avoid rate-limiting", self.sleep_time)
 				time.sleep(self.sleep_time)
 
-		self.log.info("Found %s links" % (len(ret)))
+		self.log.info("Found %s links", len(ret))
 
 		return ret
-
-
-if __name__ == '__main__':
-	print("Testing!")
-	import logSetup
-	logSetup.initLogging()
-
-
-	import multiprocessing.managers
-	import logSetup
-	logSetup.initLogging()
-
-	manager = multiprocessing.managers.SyncManager()
-	manager.start()
-	namespace = manager.Namespace()
-	namespace.run=True
-
-
-	ins = GetFA()
-	have_cookie = ins.checkCookie()
-	print('have_cookie', have_cookie)
-	ins.go(ctrlNamespace=namespace)
 

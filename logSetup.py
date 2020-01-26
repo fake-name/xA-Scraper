@@ -115,7 +115,7 @@ def exceptHook(exc_type, exc_value, exc_traceback):
 
 LOGGING_INITIALIZED = False
 
-def initLogging(logLevel=logging.DEBUG):
+def initLogging(logLevel=logging.INFO):
 
 	global LOGGING_INITIALIZED
 	if LOGGING_INITIALIZED:
