@@ -218,8 +218,6 @@ class RpcMixin():
 
 		self.put_outbound_raw(raw_job)
 
-	# Note: The imports in *this* file determine what's available when
-	# a rpc call is executed.
 	def serialize_class(self, tgt_class, exec_method='go'):
 		ret = {
 			'source'      : dill.source.getsource(tgt_class),

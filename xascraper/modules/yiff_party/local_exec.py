@@ -6,7 +6,7 @@ from . import serialize
 import WebRequest
 
 
-class PluginInterface_RemoteExec():
+class PluginInterface_RemoteExecLocalProxy():
 
 	name = 'RemoteExec'
 	can_send_partials = True
@@ -27,6 +27,7 @@ class PluginInterface_RemoteExec():
 		call_env = {
 			'wg'     : self.wg,
 		}
+
 		if extra_env:
 			for key, value in extra_env.items():
 				extra_env[key] = value
@@ -34,5 +35,7 @@ class PluginInterface_RemoteExec():
 		instantiated = class_def(**call_env)
 		self.log.info("Instantiated instance of %s. Calling member function %s.", class_def, call_name)
 		self.log.info("Call args: '%s', kwargs: '%s'.", call_args, call_kwargs)
+
+		call_kwargs['partial_resp_interface'] = None
 
 		return getattr(instantiated, call_name)(*call_args, **call_kwargs)
