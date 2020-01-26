@@ -7,6 +7,7 @@ import urllib.parse
 import dateparser
 from requests_html import HTML
 from lxml.etree import ParserError
+from xascraper.modules import exceptions
 
 
 class TwitterFetcher(object):
@@ -148,7 +149,10 @@ class TwitterFetcher(object):
 		ctnt = self.stateful_get("https://twitter.com/{user}".format(user=user))
 		html = HTML(html=ctnt)
 		joined_items = html.find(".ProfileHeaderCard-joinDateText")
-		assert joined_items, "No joined items?"
+		if not joined_items:
+			raise exceptions.AccountDisabledException("Could not retreive artist joined date. "
+				"This usually means the account has been disabled!")
+
 		assert len(joined_items) == 1, "Too many joined items?"
 		joined = joined_items[0]
 
