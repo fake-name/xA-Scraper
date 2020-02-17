@@ -282,6 +282,11 @@ class ScraperBase(module_base.ModuleBase, metaclass=abc.ABCMeta):
 
 			except (IOError, OSError):
 				chop = chop - 1
+
+				if chop < 5:
+					raise IOError("Cannot write to output file! This may be a permissions issue! Attempted filename: " +
+						"'%s'. If you do not have disk permissions problems, please report this on github!" % (fqfilename, ))
+
 				filepath, fileN = os.path.split(fqfilename)
 
 				fileN = fileN[:chop]+fileN[-4:]
