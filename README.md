@@ -30,13 +30,7 @@ Todo:
  - da, pat, px
 
 It also has grown a lot of other functions over time. It has a fairly complex,
-interactive web-interface for browsing the local gallery mirrors, and a tool
-for uploading galleries to aggregation sites (currently exhentai) is
-in progress.
-
-It has a lot in common with my other scraping system, [MangaCMS](https://github.com/fake-name/MangaCMS/). They both use
-the same software stack (CherryPy, Pyramid, Mako, BS4). This is actually an older project, but I did not decide to release
-it before now.
+interactive web-interface for browsing the local gallery mirrors.
 
 Dependencies:
 
@@ -47,6 +41,7 @@ Dependencies:
  - Mako
  - BeautifulSoup 4
  - others
+ - `google-chrome` (for da)
 
 The backend can either use a local sqlite database (which has poor performance, particularly
 when cold, but is *very* easy to set up), or a full postgresql instance.

@@ -280,12 +280,15 @@ class GetFA(xascraper.modules.scraper_base.ScraperBase):
 			self.log.warning("Account not found!")
 			raise exceptions.AccountDisabledException("Could not retreive artist item quantity!")
 
-		stats = page.find("div", class_="user-profile-stats")
-
-		for div_section in stats.find_all("div", class_='table-cell'):
-			if "Submissions" in div_section.get_text(strip=True):
-				num = div_section.strong.get_text(strip=True)
-				return int(num)
+		# This is HORRIBLE
+		containers = page.find_all("div", class_="userpage-section-right")
+		for container in containers:
+			if container.h2 and "Stats" in container.h2.get_text(strip=True):
+				for div_section in container.find_all("div", class_='cell'):
+					for span in div_section.find_all("span"):
+						if span and "Submissions" in span.get_text(strip=True):
+							num = str(span.next_sibling)
+							return int(num)
 
 		raise exceptions.AccountDisabledException("Could not retreive artist item quantity!")
 
