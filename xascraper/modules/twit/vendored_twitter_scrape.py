@@ -4,6 +4,7 @@ import traceback
 import logging
 import datetime
 import urllib.parse
+import urllib.request
 import dateparser
 from requests_html import HTML
 from lxml.etree import ParserError
@@ -22,7 +23,7 @@ class TwitterFetcher(object):
 		return self.__stateful_get("getpage", url, headers, params)
 
 	def stateful_get_soup(self, url, headers=None, params=None):
-		return self.__stateful_get("getsoup", url, headers, params)
+		return self.__stateful_get("getSoup", url, headers, params)
 
 	def stateful_get_json(self, url, headers=None, params=None):
 		return self.__stateful_get("getJson", url, headers, params)
@@ -146,7 +147,67 @@ class TwitterFetcher(object):
 
 	def get_joined_date(self, user):
 
-		ctnt = self.stateful_get("https://twitter.com/{user}".format(user=user))
+		ctnt = self.stateful_get_soup("https://mobile.twitter.com/{user}".format(user=user))
+
+		scripts = ctnt.find_all("script", type="text/javascript", src=True)
+		script_url = None
+		for script_tag in scripts:
+			if "/main." in str(script_tag.get("src")):
+				script_url = script_tag.get("src")
+
+		assert script_url
+
+		script = self.stateful_get(script_url).decode("utf-8")
+		print(type(script))
+
+		# print(script)
+
+		search_re = re.compile(r'exports=({queryId:"\w+?",operationName:"UserByScreenName",operationType:"query"})')
+		res = search_re.search(script)
+
+		print(res,)
+
+		return
+
+		# Pulled out of twitter's main.js
+		# This is probably super brittle, and will break
+		query_id = 'P8ph10GzBbdMqWZxulqCfA'
+		params = [
+			('variables', '{"screen_name":"%s","withHighlightedLabel":false}' % user)
+		]
+
+		url = "https://api.twitter.com/graphql/%s/UserByScreenName?%s" % (query_id, urllib.parse.urlencode(params))
+
+
+
+		request = urllib.request.Request(url, method="OPTIONS")
+		request.add_header('referer', 'https://mobile.twitter.com/{}'.format(user))
+		request.add_header('origin', 'https://mobile.twitter.com')
+		request.add_header('pragma', 'no-cache')
+		request.add_header('sec-fetch-mode', 'cors')
+		request.add_header('sec-fetch-mode', 'cors')
+
+		for key, value in self.wg.browserHeaders:
+			request.add_header(key, value)
+
+		try:
+			url = self.wg.opener.open(request)
+		except Exception as e:
+			print("Exception2!")
+			print("E: ", e)
+			import pdb
+			pdb.set_trace()
+
+		print("Url:", url)
+
+		# print(ctnt)
+
+
+		# yield from self.gen_tweets(url, twit_headers, username)
+
+		return
+
+		ctnt = self.stateful_get("https://mobile.twitter.com/{user}".format(user=user))
 		html = HTML(html=ctnt)
 		joined_items = html.find(".ProfileHeaderCard-joinDateText")
 		if not joined_items:

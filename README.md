@@ -16,6 +16,7 @@ This is a automated tool for scraping content from a number of art sites:
 To Add:
 
  - Artstation
+ - https://www.transfur.com/
  - https://beta.furrynetwork.com/?
 
 Decrepit: 

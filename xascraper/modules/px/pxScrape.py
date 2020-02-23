@@ -91,11 +91,13 @@ class GetPX(xascraper.modules.scraper_base.ScraperBase):
 
 	def checkLogin(self):
 
-
-		if not self.checkCookie()[0]:
-			ok, message = self.getCookie()
-			if not ok:
+		ret = self.checkCookie()
+		if ret[0]:
+			ret = self.getCookie()
+			if not ret[0]:
 				raise RuntimeError("Could not log in?")
+
+		return ret
 
 	# ---------------------------------------------------------------------------------------------------------------------------------------------------------
 	# Individual page scraping
@@ -279,7 +281,7 @@ class GetPX(xascraper.modules.scraper_base.ScraperBase):
 			# done here for type, instead of in _getIllustration. However, doing it there doesn't cause additional work, it seems harmless.
 			if item_type in ('illustration', 'manga', 'ugoira'):
 				ret = self._getIllustration(artistName, dlPathBase, item_id)
-				time.sleep(random.triangular(1,3,5))
+				time.sleep(random.triangular(1,5,15))
 				return ret
 
 		except pixivpy3.PixivError as e:
@@ -291,10 +293,15 @@ class GetPX(xascraper.modules.scraper_base.ScraperBase):
 	# Gallery Scraping
 	# ---------------------------------------------------------------------------------------------------------------------------------------------------------
 
-	def _getTotalArtCount(self, artist):
+	def __getTotalArtCount(self, artist):
 		aid = int(artist)
 		items = self.papi.users_works(aid, include_stats=False)
 		if items['status'] != 'success':
+
+			if items.get("errors", {}).get('system', {}).get('message') == 404:
+				raise exceptions.AccountDisabledException("Got 404 when trying to get art count")
+
+
 			self.log.error("Error while attempting to get artist gallery content for ID %s!!", artist)
 			for line in traceback.format_exc().split("\n"):
 				self.log.error(line)
@@ -304,8 +311,17 @@ class GetPX(xascraper.modules.scraper_base.ScraperBase):
 
 			raise exceptions.NotLoggedInException("Failed to get artist page?")
 
-
 		return items['pagination']['total']
+
+
+	def _getTotalArtCount(self, artist):
+		try:
+			return self.__getTotalArtCount(artist)
+		except exceptions.NotLoggedInException:
+			self.log.warning("failed to get art count. Checking login status.")
+			_, status = self.checkLogin()
+			self.log.info("Login status: %s", status)
+			return self.__getTotalArtCount(artist)
 
 
 	def _getItemsOnPage(self, inSoup):
