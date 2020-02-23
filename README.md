@@ -85,7 +85,7 @@ add or modify them.
 ## Notes:  
 
  - There have been reports that things are actively broken on non-linux platforms. Realistically, 
- all development is done on a Ubuntu 16.04 LTS install, and running on anything else is at 
+ all development is done on a Ubuntu 18.04 LTS install, and running on anything else is at 
  your own risk.
 
  - The Yiff-Party scraper requires significant external infrastructure, as it currently depends on
@@ -94,7 +94,7 @@ project. This depends on having both a publically available RabbitMQ instance, a
 an executing instance of the FetchAgent components of the [ReadableWebProxy](https://github.com/fake-name/ReadableWebProxy) 
 fetch-agent RPC service on your local LAN.
 
- -FurAffinity has a login captcha. This requires you either manually log the FA scraper in 
+ - FurAffinity has a login captcha. This requires you either manually log the FA scraper in 
 (via the "Manual FA Login" facility in the web-interface), or you can use a automated captcha service.
 Currently, the only solver service supported is the [2Captcha service](https://2captcha.com/).
 
