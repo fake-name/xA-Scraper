@@ -575,7 +575,7 @@ class ScraperBase(module_base.ModuleBase, metaclass=abc.ABCMeta):
 		totalArt = self._getTotalArtCount(artist)
 		artPages = self._getGalleries(artist)
 
-		self.log.info("Site reports %s total art items, in %s galleries", totalArt, artPages)
+		self.log.info("Site reports %s total art items, in %s pages", totalArt, len(artPages))
 
 		if totalArt is None:
 			self.log.info("Site does not support total art counts. Found total gallery items %s", len(artPages))
