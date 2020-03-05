@@ -144,9 +144,9 @@ class TwitterFetcher(object):
 				}
 
 
-	def get_joined_date(self, user):
+	def get_joined_date(self, user, twit_headers):
 
-		ctnt = self.stateful_get("https://twitter.com/{user}".format(user=user))
+		ctnt = self.stateful_get("https://twitter.com/{user}".format(user=user), headers=twit_headers)
 		html = HTML(html=ctnt)
 		joined_items = html.find(".ProfileHeaderCard-joinDateText")
 		if not joined_items:
@@ -278,7 +278,7 @@ class TwitterFetcher(object):
 
 		url = 'https://twitter.com/i/profiles/show/{username}/timeline/tweets?include_available_features=1&include_entities=1&include_new_items_bar=true'.format(username=username)
 
-		interval_start = self.get_joined_date(username)
+		interval_start = self.get_joined_date(username, twit_headers)
 
 		if minimum_date and minimum_date > interval_start:
 			self.log.info("Limiting last-scraped interval start to %s (joined date %s)", minimum_date, interval_start)
