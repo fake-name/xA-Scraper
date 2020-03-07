@@ -12,6 +12,17 @@ from requests_html import HTML
 from lxml.etree import ParserError
 from xascraper.modules import exceptions
 
+def _get_twitter_headers_for_user(username):
+	twit_headers = {
+		'Accept': 'application/json, text/javascript, */*; q=0.01',
+		'Referer': 'https://twitter.com/{username}'.format(username=username),
+		'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_12_6) AppleWebKit/603.3.8 (KHTML, like Gecko) Version/10.1.2 Safari/603.3.8',
+		'X-Twitter-Active-User': 'yes',
+		'X-Requested-With': 'XMLHttpRequest',
+		'Accept-Language': 'en-US'
+	}
+
+	return twit_headers
 
 class TwitterFetcher(object):
 	def __init__(self, wg):
@@ -30,8 +41,6 @@ class TwitterFetcher(object):
 		if not csrf_cook:
 			raise exceptions.NotLoggedInException("Cannot get csrf cookie!")
 		self.log.info("Done")
-
-
 
 
 	# Ugh, I need to clean up the function names in WebGet at some point.
@@ -161,7 +170,7 @@ class TwitterFetcher(object):
 				}
 
 
-	def get_joined_date(self, user):
+	def get_joined_date_new_api(self, user):
 		ctnt = self.stateful_get_soup("https://mobile.twitter.com/{user}".format(user=user))
 
 		scripts = ctnt.find_all("script", type="text/javascript", src=True)
@@ -261,6 +270,12 @@ class TwitterFetcher(object):
 		return
 
 		ctnt = self.stateful_get("https://mobile.twitter.com/{user}".format(user=user))
+
+	def get_joined_date(self, user):
+
+		twit_headers = _get_twitter_headers_for_user(user)
+
+		ctnt = self.stateful_get("https://twitter.com/{user}".format(user=user), headers=twit_headers)
 		html = HTML(html=ctnt)
 		joined_items = html.find(".ProfileHeaderCard-joinDateText")
 		if not joined_items:
@@ -344,14 +359,9 @@ class TwitterFetcher(object):
 		url = "https://twitter.com/i/search/timeline?vertical=default&q=from%3A{user}%20since%3A{from_date}%20until%3A{to_date}&src=typd&include_available_features=1&include_entities=1&reset_error_state=false".format(
 			user=username, from_date=from_date, to_date=to_date)
 
-		twit_headers = {
-			'Accept': 'application/json, text/javascript, */*; q=0.01',
-			'Referer': 'https://twitter.com/',
-			'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_12_6) AppleWebKit/603.3.8 (KHTML, like Gecko) Version/10.1.2 Safari/603.3.8',
-			'X-Twitter-Active-User': 'yes',
-			'X-Requested-With': 'XMLHttpRequest',
-			'Accept-Language': 'en-US'
-		}
+		twit_headers = _get_twitter_headers_for_user(username)
+
+		twit_headers['Referer'] = 'https://twitter.com/'
 
 		# print("Url:", url)
 		yield from self.gen_tweets(url, twit_headers, username)
@@ -359,14 +369,7 @@ class TwitterFetcher(object):
 	def get_recent_tweets(self, username):
 		"""Gets tweets for a given user, via the Twitter frontend API."""
 
-		twit_headers = {
-			'Accept': 'application/json, text/javascript, */*; q=0.01',
-			'Referer': 'https://twitter.com/{username}'.format(username=username),
-			'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_12_6) AppleWebKit/603.3.8 (KHTML, like Gecko) Version/10.1.2 Safari/603.3.8',
-			'X-Twitter-Active-User': 'yes',
-			'X-Requested-With': 'XMLHttpRequest',
-			'Accept-Language': 'en-US'
-		}
+		twit_headers = _get_twitter_headers_for_user(username)
 
 		url = 'https://twitter.com/i/profiles/show/{username}/timeline/tweets?include_available_features=1&include_entities=1&include_new_items_bar=true'.format(username=username)
 
@@ -381,14 +384,7 @@ class TwitterFetcher(object):
 		to handle it yourself.
 		"""
 
-		twit_headers = {
-			'Accept': 'application/json, text/javascript, */*; q=0.01',
-			'Referer': 'https://twitter.com/{username}'.format(username=username),
-			'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_12_6) AppleWebKit/603.3.8 (KHTML, like Gecko) Version/10.1.2 Safari/603.3.8',
-			'X-Twitter-Active-User': 'yes',
-			'X-Requested-With': 'XMLHttpRequest',
-			'Accept-Language': 'en-US'
-		}
+		twit_headers = _get_twitter_headers_for_user(username)
 
 		url = 'https://twitter.com/i/profiles/show/{username}/timeline/tweets?include_available_features=1&include_entities=1&include_new_items_bar=true'.format(username=username)
 
