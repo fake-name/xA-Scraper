@@ -6,6 +6,7 @@ import re
 import json
 import datetime
 import time
+import random
 import urllib.request
 
 import dateutil.parser
@@ -38,6 +39,14 @@ class GetDA(xascraper.modules.scraper_base.ScraperBase):
 	api_request_id = None
 	runtime_id     = None
 	csrf_token     = None
+
+
+
+	def post_delay(self):
+		duration  = random.triangular(0.2,1.5,5)
+		self.log.info("Sleeping %s seconds", duration)
+		time.sleep(duration)
+
 
 	# ---------------------------------------------------------------------------------------------------------------------------------------------------------
 	# Cookie Management
@@ -294,11 +303,11 @@ class GetDA(xascraper.modules.scraper_base.ScraperBase):
 
 		meta = state['@@entities']
 
-		with open("page.html", "w") as fp:
-			fp.write(pageSoup.prettify())
+		# with open("page.html", "w") as fp:
+		# 	fp.write(pageSoup.prettify())
 
-		with open("page.json", "w") as fp:
-			fp.write(json.dumps(state, indent=4))
+		# with open("page.json", "w") as fp:
+		# 	fp.write(json.dumps(state, indent=4))
 
 		bulk_items = meta.get("deviation", None)
 		item_meta = meta.get("deviationExtended", None)
@@ -432,12 +441,21 @@ class GetDA(xascraper.modules.scraper_base.ScraperBase):
 		'''
 
 
-		res = re.search(r"window\.__INITIAL_STATE__ = JSON\.parse\((.*?)\);", page_text)
+		res = re.search(r"window\.__INITIAL_STATE__ = JSON\.parse\((.*)\);", page_text)
 
 		if not res:
 			raise xascraper.modules.exceptions.AccountDisabledException("Initial state entry not found!!")
 
 		jstr = res.group(1)
+
+
+		# with open("page.html", "w") as fp:
+		# 	fp.write(page_text)
+
+		# with open("page.json", "w") as fp:
+		# 	fp.write(jstr)
+
+
 		# Yes, this is double nested. I have no idea why.
 		meta = json.loads(json.loads(jstr))
 
@@ -502,6 +520,8 @@ class GetDA(xascraper.modules.scraper_base.ScraperBase):
 				link = soup.find("a", class_="torpedo-thumb-link")
 
 				items.append(link['href'])
+
+			self.post_delay()
 
 		self.log.info("Found %s items in gallery folder %s for artist %s", len(items), gallery_id, artist)
 		return set(items)

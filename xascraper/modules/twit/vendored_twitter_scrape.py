@@ -5,7 +5,9 @@ import logging
 import datetime
 import urllib.parse
 import urllib.request
+import json
 import dateparser
+import WebRequest
 from requests_html import HTML
 from lxml.etree import ParserError
 from xascraper.modules import exceptions
@@ -17,6 +19,20 @@ class TwitterFetcher(object):
 
 		self.wg = wg
 		self.current_url = None
+
+
+	def getToken(self):
+		self.log.info("Getting Entrance Cookie")
+		# We need to let the twitter JS set the csrf cookie, so we can use it later
+		self.wg.stepThroughJsWaf(url='https://mobile.twitter.com/Twitter', titleContains="@Twitter")
+
+		csrf_cook = [cook for cook in self.wg.cj if cook.domain.endswith(".twitter.com") and cook.name == 'ct0']
+		if not csrf_cook:
+			raise exceptions.NotLoggedInException("Cannot get csrf cookie!")
+		self.log.info("Done")
+
+
+
 
 	# Ugh, I need to clean up the function names in WebGet at some point.
 	def stateful_get(self, url, headers=None, params=None):
@@ -146,7 +162,6 @@ class TwitterFetcher(object):
 
 
 	def get_joined_date(self, user):
-
 		ctnt = self.stateful_get_soup("https://mobile.twitter.com/{user}".format(user=user))
 
 		scripts = ctnt.find_all("script", type="text/javascript", src=True)
@@ -158,47 +173,85 @@ class TwitterFetcher(object):
 		assert script_url
 
 		script = self.stateful_get(script_url).decode("utf-8")
-		print(type(script))
 
 		# print(script)
 
-		search_re = re.compile(r'exports=({queryId:"\w+?",operationName:"UserByScreenName",operationType:"query"})')
-		res = search_re.search(script)
+		export_search_re = re.compile(r'exports={queryId:"(\w+?)",operationName:"UserByScreenName",operationType:"query"}')
+		authorization_re = re.compile(r'=\"(AAAAAAAA[a-zA-Z0-9\%]*?)\"')
+		export_res = export_search_re.search(script)
+		auth_res   = authorization_re.search(script)
 
-		print(res,)
+		csrf_cook   = [cook for cook in self.wg.cj if cook.domain.endswith(".twitter.com") and cook.name == 'ct0'][0]
+		guest_cook  = [cook for cook in self.wg.cj if cook.domain.endswith(".twitter.com") and cook.name == 'guest_id'][0]
+		guest_token = guest_cook.value.split("A")[-1]
 
-		return
+		print("Export RE result: ", export_res, export_res.groups())
+		print("Auth RE result: ", auth_res, auth_res.groups())
 
 		# Pulled out of twitter's main.js
 		# This is probably super brittle, and will break
-		query_id = 'P8ph10GzBbdMqWZxulqCfA'
+		query_id = export_res.group(1)
 		params = [
 			('variables', '{"screen_name":"%s","withHighlightedLabel":false}' % user)
 		]
 
-		url = "https://api.twitter.com/graphql/%s/UserByScreenName?%s" % (query_id, urllib.parse.urlencode(params))
+		api_url = "https://api.twitter.com/graphql/%s/UserByScreenName?%s" % (query_id, urllib.parse.urlencode(params))
 
 
-
-		request = urllib.request.Request(url, method="OPTIONS")
-		request.add_header('referer', 'https://mobile.twitter.com/{}'.format(user))
-		request.add_header('origin', 'https://mobile.twitter.com')
-		request.add_header('pragma', 'no-cache')
-		request.add_header('sec-fetch-mode', 'cors')
-		request.add_header('sec-fetch-mode', 'cors')
+		request_1 = urllib.request.Request(api_url, method="OPTIONS")
 
 		for key, value in self.wg.browserHeaders:
-			request.add_header(key, value)
+			request_1.add_header(key, value)
+
+		request_1.add_header('accept', '*/*')
+		request_1.add_header('access-control-request-method', 'GET')
+		request_1.add_header('access-control-request-headers', 'authorization,content-type,x-csrf-token,x-guest-token,x-twitter-active-user,x-twitter-client-language')
+		request_1.add_header('cache-control', 'no-cache')
+
+		request_1.add_header('referer', 'https://mobile.twitter.com/{}'.format(user))
+		request_1.add_header('origin', 'https://mobile.twitter.com')
+		request_1.add_header('pragma', 'no-cache')
+		request_1.add_header('sec-fetch-mode', 'cors')
+		request_1.add_header('sec-fetch-site', 'same-site')
+
+
 
 		try:
-			url = self.wg.opener.open(request)
+			resp_1 = self.wg.opener.open(request_1)
+			print("Options request OK")
 		except Exception as e:
-			print("Exception2!")
+			print("Exception1!")
 			print("E: ", e)
 			import pdb
 			pdb.set_trace()
 
-		print("Url:", url)
+
+		request_2 = urllib.request.Request(api_url)
+
+		for key, value in self.wg.browserHeaders:
+			request_2.add_header(key, value)
+
+		request_2.add_header('accept', '*/*')
+		request_2.add_header('referer', 'https://mobile.twitter.com/{}'.format(user))
+		request_2.add_header('origin', 'https://mobile.twitter.com')
+		request_2.add_header('pragma', 'no-cache')
+		request_2.add_header('sec-fetch-mode', 'cors')
+		request_2.add_header('content-type', 'application/json')
+		request_2.add_header('x-twitter-active-user', 'yes')
+		request_2.add_header('x-twitter-client-language', 'en')
+		request_2.add_header('x-csrf-token', csrf_cook.value)
+		request_2.add_header('x-guest-token', guest_token)
+		request_2.add_header('authorization', 'Bearer %s' % auth_res.group(1))
+
+
+		try:
+			resp_2 = self.wg.opener.open(request_2)
+		except Exception as e:
+			print("Exception2!")
+			print("E: ", e)
+			traceback.print_exc()
+			import pdb
+			pdb.set_trace()
 
 		# print(ctnt)
 

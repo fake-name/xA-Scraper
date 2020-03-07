@@ -197,6 +197,14 @@ class ScraperBase(module_base.ModuleBase, metaclass=abc.ABCMeta):
 		pass
 
 	# ---------------------------------------------------------------------------------------------------------------------------------------------------------
+	# Overridable delay facility
+	# ---------------------------------------------------------------------------------------------------------------------------------------------------------
+
+	def post_delay(self):
+		pass
+
+
+	# ---------------------------------------------------------------------------------------------------------------------------------------------------------
 	# Utility
 	# ---------------------------------------------------------------------------------------------------------------------------------------------------------
 
@@ -726,6 +734,7 @@ class ScraperBase(module_base.ModuleBase, metaclass=abc.ABCMeta):
 			self.update_last_fetched(artist)
 			self.log.info("Successfully retreived content for artist %s", artist)
 
+			self.post_delay()
 			return False
 		except exceptions.RetryException:
 			self.log.error("Cannot consume. Will retry next execution")

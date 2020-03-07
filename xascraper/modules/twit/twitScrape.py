@@ -35,19 +35,6 @@ class GetTwit(xascraper.modules.scraper_base.ScraperBase):
 		# else:
 		# 	return False, "Do not have as login Cookies"
 
-
-	def getToken(self):
-		self.log.info("Getting Entrance Cookie")
-		soup = self.wg.getSoup('https://twitter.com/login')
-		inputs = soup.find_all("input")
-
-		for intag in inputs:
-			if 'name' in intag.attrs and intag['name'] == 'authenticity_token':
-				return intag['value']
-
-		raise RuntimeError("No access toke found!")
-
-
 	def getCookie(self):
 		try:
 			accessToken = self.getToken()
@@ -190,12 +177,10 @@ class GetTwit(xascraper.modules.scraper_base.ScraperBase):
 			self.log.warning("Exiting early from %s due to run flag being unset", artist)
 			return True
 
-
-
-
 		self.log.info("GetArtist - %s (ID: %s)", artist, aid)
 
 		intf = vendored_twitter_scrape.TwitterFetcher(wg=self.wg)
+		intf.getToken()
 
 		min_date = self.get_last_fetched(artist)
 
@@ -225,6 +210,7 @@ class GetTwit(xascraper.modules.scraper_base.ScraperBase):
 	def go(self, nameList=None, ctrlNamespace=None):
 		if ctrlNamespace is None:
 			raise ValueError("You need to specify a namespace!")
+
 		is_another_active = self.getRunningStatus(self.pluginShortName)
 
 		if is_another_active:
