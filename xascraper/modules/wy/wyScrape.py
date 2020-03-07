@@ -106,8 +106,11 @@ class GetWy(xascraper.modules.scraper_base.ScraperBase):
 
 		dlBar = soup.find('ul', id='detail-actions')
 
+		li_entries = dlBar.find_all('li')
+		if len(li_entries) != 3:
+			raise exceptions.CannotFindContentException("Invalid number of list items in detail bar! Cannot find content!")
 
-		dummy, dlLink, dummy = dlBar.find_all('li')
+		dummy, dlLink, dummy = li_entries
 		if 'Download' in dlLink.get_text():
 			itemUrl = urllib.parse.urljoin(self.urlBase, dlLink.a['href'])
 
