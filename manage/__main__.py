@@ -39,6 +39,8 @@ def one_arg_go(command):
 		db_manage.reset_run_state()
 	elif command == 'reset-last-fetched-times':
 		scrape_manage.reset_last_fetched_times()
+	elif command == 'dump-json':
+		db_manage.dump_item_meta()
 	else:
 		cli_utils.print_help()
 

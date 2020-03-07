@@ -320,3 +320,40 @@ def export_db_contents(to_path, site_name):
 			with open(outp, "w") as fp:
 				json.dump(dat, fp, indent=4)
 
+def dump_item_meta():
+	print("dump_item_meta")
+	with db.context_sess() as sess:
+		print("Counting")
+		tot = sess.query(db.ArtFile).count()
+
+		print("Have %s rows" % (tot))
+		res_q = sess.query(db.ArtFile)
+
+		print("Doing query")
+		for row in tqdm.tqdm(res_q.yield_per(500), total=tot):
+
+			tags               = [tag.tag for tag in row.item.tags]
+			artist_name        = row.item.artist.artist_name
+			site_name          = row.item.artist.site_name
+			title              = row.item.title
+			content            = row.item.content
+			content_structured = row.item.content_structured
+			filename           = row.fspath
+			src_filename       = row.filename
+
+			write_to = os.path.join(settings['dldCtntPath'], filename+".json")
+
+			with open(write_to, "w") as fp:
+				fp.write(json.dumps(
+						{
+							"tags"               : tags,
+							"artist_name"        : artist_name,
+							"site_name"          : site_name,
+							"title"              : title,
+							"content"            : content,
+							"content_structured" : content_structured,
+							"filename"           : filename,
+							"src_filename"       : src_filename,
+						},
+						indent = 4,
+					))

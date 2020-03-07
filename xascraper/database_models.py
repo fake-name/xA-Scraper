@@ -56,9 +56,9 @@ class ArtItem(Base):
 	content             = Column(Text)
 	content_structured  = Column(sqlalchemy_jsonfield.JSONField())
 
-	artist         = relationship("ScrapeTargets")
-	files          = relationship("ArtFile")
-	tags           = relationship("ArtTags")
+	artist         = relationship("ScrapeTargets", backref='item')
+	files          = relationship("ArtFile", backref='item')
+	tags           = relationship("ArtTags", backref='item')
 
 	__table_args__ = (
 		UniqueConstraint('artist_id', 'release_meta'),
