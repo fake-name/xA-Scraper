@@ -104,12 +104,15 @@ class GetTwit(xascraper.modules.scraper_base.ScraperBase):
 		else:
 			tweet_title = "Tweet from %s" % (tweet_artist, )
 
+		# So some posts have the same hashtag multiple times, because people are idiots or something.
+		unique_tags = list(set(tweet_entries['hashtags']))
+
 		self._updatePreviouslyRetreived(
 			artist             = src_artist,
 			release_meta       = tweet_id,
 			pageTitle          = tweet_title,
 			pageDesc           = tweet['text'],
-			postTags           = tweet_entries['hashtags'],
+			postTags           = unique_tags,
 			content_structured = tweet,
 			)
 
