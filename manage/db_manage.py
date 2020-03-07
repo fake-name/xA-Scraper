@@ -341,19 +341,21 @@ def dump_item_meta():
 			filename           = row.fspath
 			src_filename       = row.filename
 
+			original_file_name = os.path.join(settings['dldCtntPath'], filename)
 			write_to = os.path.join(settings['dldCtntPath'], filename+".json")
 
-			with open(write_to, "w") as fp:
-				fp.write(json.dumps(
-						{
-							"tags"               : tags,
-							"artist_name"        : artist_name,
-							"site_name"          : site_name,
-							"title"              : title,
-							"content"            : content,
-							"content_structured" : content_structured,
-							"filename"           : filename,
-							"src_filename"       : src_filename,
-						},
-						indent = 4,
-					))
+			if os.path.exists(original_file_name):
+				with open(write_to, "w") as fp:
+					fp.write(json.dumps(
+							{
+								"tags"               : tags,
+								"artist_name"        : artist_name,
+								"site_name"          : site_name,
+								"title"              : title,
+								"content"            : content,
+								"content_structured" : content_structured,
+								"filename"           : filename,
+								"src_filename"       : src_filename,
+							},
+							indent = 4,
+						))

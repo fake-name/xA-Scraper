@@ -43,8 +43,8 @@ class GetDA(xascraper.modules.scraper_base.ScraperBase):
 
 
 	def post_delay(self):
-		duration  = random.triangular(0.2,1.5,5)
-		self.log.info("Sleeping %s seconds", duration)
+		duration  = random.triangular(1,4,15)
+		self.log.info("Sleeping %0.2d seconds", duration)
 		time.sleep(duration)
 
 
@@ -59,13 +59,20 @@ class GetDA(xascraper.modules.scraper_base.ScraperBase):
 		return False, "Do not have DA login Cookies"
 
 	def _is_logged_in(self):
+		# So there's a odd bug where I think if DA flags you as a bot, their homepage has a infinite 302 redirect loop.
+		# Anyways, grab a random user gallery instead (it doesn't have that issue).
+		test_url = "https://www.deviantart.com/test"
+		page = self.wg.getpage(test_url)
+		if settings["da"]["username"].lower() in page.lower():
+			return True
+
 		try:
-			content, filename, mimetype = self.wg.getItemChromium("https://www.deviantart.com")
+			content, filename, mimetype = self.wg.getItemChromium(test_url)
 		except WebRequest.FetchFailureError:
 			# I think they blacklist your cookie if they decide you're a bot. We need to re-auth in that case
 			# Alternatively, there might be a perimeterx cookie somewhere.
 			self.wg.clearCookies()
-			content, filename, mimetype = self.wg.getItemChromium("https://www.deviantart.com")
+			content, filename, mimetype = self.wg.getItemChromium(test_url)
 
 
 		return settings["da"]["username"].lower() in content.lower()
@@ -400,6 +407,8 @@ class GetDA(xascraper.modules.scraper_base.ScraperBase):
 		except WebRequest.FetchFailureError as e:
 			if e.err_code == 404:
 				raise xascraper.modules.exceptions.AccountDisabledException("Account seems to have been removed!")
+			if e.err_code == 403:
+				raise exceptions.RetryException("403 error. Will retry later")
 			else:
 				raise xascraper.modules.exceptions.CannotAccessException("Failed to access page for artist %s. HTTP Error %s!" % (artist, e.err_code))
 
