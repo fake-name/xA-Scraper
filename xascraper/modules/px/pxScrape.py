@@ -188,6 +188,13 @@ class GetPX(xascraper.modules.scraper_base.ScraperBase):
 
 
 	def _getSinglePageContent(self, dlPathBase, item_meta):
+
+		meta = item_meta.get('metadata', {})
+		if meta:
+			pages = meta.get('pages', [])
+			if len(pages) > 1:
+				self.log.warning("Item appears to have more then one page for a single-page entry!")
+
 		itemTitle, itemCaption, postTime, postTags = self._extractTitleDescription(item_meta)
 		imgurl   = self._get_best_image_from_set(item_meta['image_urls'])
 
@@ -213,7 +220,7 @@ class GetPX(xascraper.modules.scraper_base.ScraperBase):
 		itemTitle, itemCaption, postTime, postTags = self._extractTitleDescription(item_meta)
 		imgurl   = self._get_best_ugoira_from_set(item_meta['metadata']['zip_urls'])
 
-		pprint.pprint(item_meta)
+		# pprint.pprint(item_meta)
 
 		fcont = self.__papi_download(imgurl)
 
@@ -243,6 +250,9 @@ class GetPX(xascraper.modules.scraper_base.ScraperBase):
 
 		assert len(meta['response']) == 1
 
+		# self.log.info("Metadata:")
+		# pprint.pprint(meta)
+
 		resp = meta['response'][0]
 
 		if resp is None:
@@ -252,7 +262,7 @@ class GetPX(xascraper.modules.scraper_base.ScraperBase):
 			ret = self._getAnimation(dlPathBase, resp)
 			return ret
 
-		if resp['type'] == 'manga':
+		if resp['type'] == 'manga' or resp['is_manga']:
 			ret = self._getManga(dlPathBase, resp)
 			return ret
 
@@ -300,6 +310,10 @@ class GetPX(xascraper.modules.scraper_base.ScraperBase):
 
 			if items.get("errors", {}).get('system', {}).get('message') == 404:
 				raise exceptions.AccountDisabledException("Got 404 when trying to get art count")
+
+			# This /seems/ to indicate suspended accounts.
+			if items.get("errors", {}).get('system', {}).get('code') == 971:
+				raise exceptions.AccountDisabledException("Account suspended?")
 
 
 			self.log.error("Error while attempting to get artist gallery content for ID %s!!", artist)
