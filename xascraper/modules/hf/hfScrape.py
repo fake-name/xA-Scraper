@@ -235,8 +235,18 @@ class GetHF(xascraper.modules.scraper_base.ScraperBase):
 
 	def _getArtPage(self, dlPathBase, artPageUrl, artistName):
 
+		try:
+			pgSoup = self.wg.getSoup(artPageUrl)					# Get Webpage
+		except WebRequest.FetchFailureError:
+			return self.build_page_ret(status="Failed", fqDlPath=None)
 
-		pgSoup = self.wg.getSoup(artPageUrl)					# Get Webpage
+		except:
+			print("What?")
+			print("What?")
+			print("What?")
+			print("What?")
+			print("What?")
+			raise
 
 		if pgSoup == "Failed":
 			self.log.error("cannot get page")

@@ -31,7 +31,11 @@ class ModuleBase(xascraper.status_monitor.StatusMixin, metaclass=abc.ABCMeta):
 
 
 		self.log = logging.getLogger("Main.%s" % self.pluginName)
-		self.wg = WebGetRobust(custom_ua=self.custom_ua)
+		self.wg = WebGetRobust(
+			custom_ua           = self.custom_ua,
+			twocaptcha_api_key  = settings.get("captcha", {}).get('2captcha', {})    .get("api_key", None),
+			anticaptcha_api_key = settings.get("captcha", {}).get('anti-captcha', {}).get("api_key", None),
+			)
 
 		print("Starting up?")
 

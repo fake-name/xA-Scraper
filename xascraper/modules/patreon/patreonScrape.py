@@ -6,10 +6,13 @@ import pytz
 import dateutil.parser
 import bs4
 import WebRequest
+import cloudscraper
 import urllib.parse
 import json
 import time
 import pprint
+import requests
+import IPython
 from settings import settings
 
 import xascraper.modules.scraper_base
@@ -33,10 +36,10 @@ class GetPatreon(xascraper.modules.scraper_base.ScraperBase):
 
 	numThreads = 1
 
-	custom_ua = [('User-Agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:61.0) Gecko/20100101 Firefox/61.0'),
-				 ('Accept-Language', 'en-US'),
-				 ('Accept', 'application/xml, application/xhtml+xml, text/html;q=0.9,  text/plain;q=0.8, image/png, */*;q=0.5'),
-				 ('Accept-Encoding', 'deflate,sdch,gzip')]
+	custom_ua = [('User-Agent', 'Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/80.0.3987.163 Safari/537.36'),
+				 ('Accept-Language', 'en-US,en;q=0.9'),
+				 ('Accept', 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9'),
+				 ('Accept-Encoding', 'gzip, deflate, br')]
 
 	# Stubbed functions
 	_getGalleries = None
@@ -49,25 +52,61 @@ class GetPatreon(xascraper.modules.scraper_base.ScraperBase):
 	def __init__(self, *args, **kwargs):
 		super().__init__(*args, **kwargs)
 
+		self.wg = WebRequest.WebGetRobust(chromium_headless=False)
+
 		# This is.... kind of horrible.
 		self.wg.errorOutCount = 1
 
+		# proxy = SocksProxy.ProxyLauncher([TwoCaptchaSolver.TWOCAPTCHA_IP])
+		recaptcha_params = {
+				'provider': 'anticaptcha',
+				'api_key': settings["captcha"]["anti-captcha"]['api_key'],
 
+				# 'proxy'       : proxy.get_wan_address(),
+				# 'proxytype'   : "SOCKS5",
+			}
+
+		self.req = cloudscraper.CloudScraper(
+				recaptcha = recaptcha_params,
+			)
+
+		self.req.headers.update(self.wg.browserHeaders)
+
+
+	def get_soup(self, url):
+		# resp = self.req.get(url)
+		# assert 'text/html' in resp.headers.get("content-type", ""), "response isn't text/html, it's %s" % resp.headers.get("content-type")
+		# return WebRequest.as_soup(resp.text)
+
+		self.cr.blocking_navigate(url)
+		content = self.cr.get_rendered_page_source()
+
+		return WebRequest.as_soup(content)
 
 	def checkCookie(self):
 		print("Checking login!")
 		try:
-			current = self.get_api_json("/current_user", retries=1)
+			page = self.get_soup("https://www.patreon.com/home")
+			page_str = str(page)
 		except Exception:
-			print("Not logged in!")
+			# print("Not logged in!")
 			current = False
+			traceback.print_exc()
 
-		if not current or current['data']['id'] == 0:
-			return False, "Not logged in"
-		else:
+
+		if settings[self.pluginShortName]['username'] in page_str:
 			return True, "Autheticated OK"
 
+		# print("Page str:", page_str)
+
+		with open("page.html", "w") as fp:
+			fp.write(page_str)
+
+		return False, "Not logged in"
+
+
 	def handle_recaptcha(self, soup, containing_page, referrer_url):
+		raise RuntimeError("Oooold")
 		self.log.warning("Hit recaptcha. Attempting to solve.")
 
 		key = settings['captcha']['anti-captcha']['api_key']
@@ -95,8 +134,40 @@ class GetPatreon(xascraper.modules.scraper_base.ScraperBase):
 				addlHeaders = {'Referer': referrer_url},
 			)
 
-		return solved_soup
+		return WebRequest.as_soup(solved_soup)
 
+
+
+	def handle_hcaptcha(self, soup, containing_page, referrer_url):
+		self.log.warning("Hit hcaptcha. Attempting to solve.")
+
+		key = settings['captcha']['anti-captcha']['api_key']
+		solver = WebRequest.AntiCaptchaSolver(api_key=key, wg=self.wg)
+		form = soup.find("form", id="challenge-form")
+
+		args = {}
+		for input_tag in form.find_all('input'):
+			if input_tag.get('name'):
+				args[input_tag['name']] = input_tag['value']
+
+
+		captcha_key = form.script['data-sitekey']
+
+		self.log.info("Captcha key: %s with input values: %s", captcha_key, args)
+
+		recaptcha_response = solver.solve_hcaptcha(website_key=captcha_key, page_url=containing_page)
+
+		self.log.info("Captcha solved with response: %s", recaptcha_response)
+		args['g-recaptcha-response'] = recaptcha_response
+
+
+		self.cr.execute_javascript_statement("document.querySelector(\"textarea[name='h-captcha-response']\").value = '{}'".format(recaptcha_response))
+		self.cr.execute_javascript_statement("document.querySelector(\"form#challenge-form\").submit()")
+
+		solved_soup = self.cr.get_rendered_page_source()
+		ret = WebRequest.as_soup(solved_soup)
+
+		return ret
 
 
 	def getCookie(self):
@@ -108,38 +179,61 @@ class GetPatreon(xascraper.modules.scraper_base.ScraperBase):
 
 		self.log.info("Not logged in. Doing login.")
 
+
 		home  = "https://www.patreon.com/home"
 		login = "https://www.patreon.com/login"
-		soup = self.wg.getSoup(home)
+		try:
+			soup = self.get_soup(home)
+		except Exception as e:
+
+			import pdb
+			print(e)
+			pdb.set_trace()
+			print(e)
 
 		# These won't work for the particular recaptcha flavor patreon uses. Sigh.
 		if soup.find_all("div", class_="g-recaptcha"):
-			soup = WebRequest.as_soup(self.handle_recaptcha(soup, home, login))
+			soup = self.handle_recaptcha(soup, home, login)
+
+		if soup.find_all("div", id="hcaptcha_widget"):
+			soup = self.handle_hcaptcha(soup, home, login)
 
 		if soup.find_all("div", class_="g-recaptcha"):
 			self.log.error("Failed after attempting to solve recaptcha!")
 			raise exceptions.NotLoggedInException("Login failed due to recaptcha!")
 
-		login_data = {
-			'type' : 'user',
-			'relationships' : {},
-			'attributes' : {
-					"email"    : settings[self.pluginShortName]['username'],
-					"password" : settings[self.pluginShortName]['password'],
-				}
-		}
+		if soup.find_all("div", class_="hcaptcha_widget"):
+			self.log.error("Failed after attempting to solve recaptcha!")
+			raise exceptions.NotLoggedInException("Login failed due to recaptcha!")
+
+
+		# So patreon uses RavenJS, which does a bunch of really horrible change-watching crap on input
+		# fields. I couldn't figure out how to properly fire the on-change events, so let's just
+		# use the debug-protocol interface to type our login info in manually.
+		self.cr.execute_javascript_function("document.querySelector(\"input[id='email']\").focus()")
+		for char in settings[self.pluginShortName]['username']:
+			self.cr.Input_dispatchKeyEvent(type='char', text=char)
+		self.cr.execute_javascript_statement("document.querySelector(\"input[id='password']\").focus()")
+		for char in settings[self.pluginShortName]['password']:
+			self.cr.Input_dispatchKeyEvent(type='char', text=char)
+
+
+		content = self.cr.get_rendered_page_source()
+		if not settings[self.pluginShortName]['username'] in content:
+			raise exceptions.CannotAccessException("Could not log in?")
+
 		try:
-			current = self.get_api_json("/login?json-api-version=1.0", postData=login_data, retries=1)
+			current = self.get_api_json("/login?include=campaign%2Cuser_location&json-api-version=1.0", postData=login_data, retries=1)
 			self.log.info("Login results: %s", current)
 		finally:
-			self.log.info("Flushing cookies unconditionally.")
+			self.log.info("Saving cookies unconditionally.")
 			self.wg.saveCookies()
 
 		return self.checkCookie()
 
-	# # ---------------------------------------------------------------------------------------------------------------------------------------------------------
-	# # Internal utilities stuff
-	# # ---------------------------------------------------------------------------------------------------------------------------------------------------------
+	# ---------------------------------------------------------------------------------------------------------------------------------------------------------
+	# Internal utilities stuff
+	# ---------------------------------------------------------------------------------------------------------------------------------------------------------
 	def __cf_check(self, url, *args, **kwargs):
 		try:
 			content = self.wg.getpage(url, *args, **kwargs)
@@ -156,6 +250,7 @@ class GetPatreon(xascraper.modules.scraper_base.ScraperBase):
 			raise
 		return content
 
+
 	def get_api_json(self, endpoint, postData = None, retries=1):
 		if postData:
 			postData = {"data" : postData}
@@ -164,9 +259,10 @@ class GetPatreon(xascraper.modules.scraper_base.ScraperBase):
 		assert endpoint.startswith("/"), "Endpoint isn't a relative path! Passed: '%s'" % endpoint
 
 		try:
-			content = self.__cf_check(
+			# content = self.__cf_check(
+			content = self.cr.xhr_fetch(
 					"https://www.patreon.com/api{endpoint}".format(endpoint=endpoint),
-					addlHeaders={
+					headers ={
 						"Accept"          : "application/json",
 						"Origin"          : "https://www.patreon.com",
 						"Host"            : "www.patreon.com",
@@ -178,21 +274,75 @@ class GetPatreon(xascraper.modules.scraper_base.ScraperBase):
 						# "Pragma"          : "no-cache",
 						# "Cache-Control"   : "no-cache",
 						},
-					postData      = postData,
-					retryQuantity = retries
+					post_data      = postData,
+					post_type='application/json'
 				)
+
+
 		except Exception as e:
 			traceback.print_exc()
 			raise exceptions.UnrecoverableFailureException("Wat?")
 
+		try:
+			if content['mimetype'] != 'application/vnd.api+json':
+				self.log.error("Response isn't JSON. What?")
+				with open("bogus_response.json", "w") as fp:
+					json.dump(content, fp)
 
-		if content is None:
-			self.log.error("Couldn't login! Please check username and password!")
-			raise LoginFailure("Failed to login. Please check your username and password are correct!")
+				IPython.embed()
+				raise exceptions.UnrecoverableFailureException("API Response that is not json!")
+			ret = json.loads(content['response'])
+			return ret
 
-		content = content.decode("utf-8")
-		vals = json.loads(content)
-		return vals
+		except json.JSONDecodeError as e:
+			self.log.error("Failure decoding JSON content:")
+			self.log.error("	'%s'", content)
+
+			with open("undecodable_response.json", "w") as fp:
+				json.dump(content, fp)
+			traceback.print_exc()
+			raise exceptions.UnrecoverableFailureException("Wat?")
+
+
+
+		# try:
+
+		# 	headers = {
+		# 				"Accept"          : "*/*",
+		# 				"Origin"          : "https://www.patreon.com",
+		# 				"Host"            : "www.patreon.com",
+		# 				"Content-Type"    : "application/json",
+		# 				"Accept-Encoding" : "gzip, deflate",
+		# 				"Authority"       : "www.patreon.com",
+		# 				"Scheme"          : "https",
+		# 				# "Referer"         : "https://www.patreon.com/login",
+		# 				# "Pragma"          : "no-cache",
+		# 				# "Cache-Control"   : "no-cache",
+		# 		}
+
+		# 	resp = self.req.post(
+		# 			"https://www.patreon.com/api{endpoint}".format(endpoint=endpoint),
+		# 			data    = postData,
+		# 			headers = headers,
+		# 		)
+
+		# except Exception as e:
+		# 	traceback.print_exc()
+		# 	raise exceptions.UnrecoverableFailureException("Wat?")
+
+
+		# if resp is None:
+		# 	self.log.error("Couldn't login! Please check username and password!")
+		# 	raise LoginFailure("Failed to login. Please check your username and password are correct!")
+
+		# ret = resp.json()
+
+		# if 'errors' in ret and ret['errors']:
+		# 	self.log.error("error?")
+		# 	self.log.error(ret)
+		# 	raise RuntimeError
+
+		# return ret
 
 
 	def current_user_info(self):
@@ -504,8 +654,8 @@ class GetPatreon(xascraper.modules.scraper_base.ScraperBase):
 				try:
 					ret = self._fetch_retrier(postid, artist_name)
 
-					assert isinstance(ret, dict)
-					assert 'status'     in ret
+					assert isinstance(ret, dict), "Response is not a dict?"
+					assert 'status'     in ret, "Status not in response!"
 
 					if 'post_embeds' in ret:
 						embeds.extend(ret['post_embeds'])
@@ -603,7 +753,11 @@ class GetPatreon(xascraper.modules.scraper_base.ScraperBase):
 
 		self.log.info("Getting list of favourite artists.")
 
-		artist_lut = self.get_artist_lut()
+		try:
+
+			artist_lut = self.get_artist_lut()
+		except Exception as e:
+			IPython.embed()
 
 		self.log.info("Found %d Names", len(artist_lut))
 		for key, value in artist_lut.items():
@@ -690,3 +844,8 @@ class GetPatreon(xascraper.modules.scraper_base.ScraperBase):
 		# self.get_pledges()
 		self.fetch_all()
 
+	def go(self, *args, **kwargs):
+
+		with self.wg.chromiumContext('https://www.patreon.com/') as cr:
+			self.cr = cr
+			super().go(*args, **kwargs)

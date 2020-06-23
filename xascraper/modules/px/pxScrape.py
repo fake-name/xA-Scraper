@@ -174,7 +174,8 @@ class GetPX(xascraper.modules.scraper_base.ScraperBase):
 			fname = regx4.sub("" , imgurl)
 			fname = fname.rsplit("?")[0]
 			fname = fname.rsplit("/")[-1]
-			fname = "%04d - %s" % (index, fname)
+			fname, ext = os.path.splitext(fname)
+			fname = "%s - %04d%s" % (fname, index, ext)
 			index += 1
 			self.log.info("			Filename = %s", fname)
 			self.log.info("			FileURL = %s", imgurl)
@@ -310,6 +311,8 @@ class GetPX(xascraper.modules.scraper_base.ScraperBase):
 
 			if items.get("errors", {}).get('system', {}).get('message') == 404:
 				raise exceptions.AccountDisabledException("Got 404 when trying to get art count")
+			if items.get("errors", {}).get('system', {}).get('message') == '404 Not Found':
+				raise exceptions.AccountDisabledException("Got 404 when trying to get art count")
 
 			# This /seems/ to indicate suspended accounts.
 			if items.get("errors", {}).get('system', {}).get('code') == 971:
@@ -321,7 +324,6 @@ class GetPX(xascraper.modules.scraper_base.ScraperBase):
 				self.log.error(line)
 			for line in pprint.pformat(items).split("\n"):
 				self.log.error(line)
-
 
 			raise exceptions.NotLoggedInException("Failed to get artist page?")
 

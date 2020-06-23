@@ -79,12 +79,10 @@ JOB_MAP = {
 	}
 
 def job_evt_listener(event):
-	if event.exception:
+	if hasattr(event, "exception") and event.exception:
 		log.info('Job crashed: %s', event.job_id)
 		log.info('Traceback: %s', event.traceback)
-
 	else:
-
 		log.info('Job event code: %s, job: %s', JOB_MAP[event.code], event.job_id)
 
 def go(managedNamespace):

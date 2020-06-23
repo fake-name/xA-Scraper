@@ -5,6 +5,7 @@ import logSetup
 import multiprocessing
 import flags
 import signal
+import logging
 
 
 # Shut up fucking annoying psycopg2 vomit every exec.
@@ -106,6 +107,7 @@ def go():
 		three_arg_go(sys.argv[1], sys.argv[2], sys.argv[3])
 
 if __name__ == "__main__":
+	# logSetup.initLogging(logLevel=logging.DEBUG)
 	logSetup.initLogging()
 	go()
 
