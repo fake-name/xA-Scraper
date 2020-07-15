@@ -375,7 +375,7 @@ class GetPatreon(xascraper.modules.scraper_base.ScraperBase):
 			os.makedirs(fqpath)
 		fqpath = os.path.join(fqpath, 'itemid-{id}.pyson'.format(id=itemid))
 		with open(fqpath, "wb") as fp:
-			fstr = pprint.pformat(filecontent)
+			# fstr = pprint.pformat(filecontent)
 			fp.write(fstr.encode("utf-8"))
 
 	def save_image(self, aname, pid, fname, furl):
@@ -483,6 +483,23 @@ class GetPatreon(xascraper.modules.scraper_base.ScraperBase):
 			"?include=media"
 			)
 
+		if 'status' in post and post['status'] == '404':
+			self.log.warning("Post is not found!")
+			fail = {
+				'status' : ''
+				}
+			return fail
+
+
+		if not 'data' in post:
+			self.log.warning("No 'data' member in post!")
+			pprint.pprint(post)
+			fail = {
+				'status' : ''
+				}
+			return fail
+
+
 		post_content = post['data']
 		post_info = post_content['attributes']
 
@@ -513,7 +530,7 @@ class GetPatreon(xascraper.modules.scraper_base.ScraperBase):
 			raise exceptions.CannotAccessException("You can't view that content!")
 
 		# if not 'content' in post_info:
-		pprint.pprint(post_content)
+		# pprint.pprint(post_content)
 
 		ret = {
 			'page_desc'   : post_info['content'],

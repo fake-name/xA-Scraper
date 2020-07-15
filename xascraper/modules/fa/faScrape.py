@@ -68,7 +68,7 @@ class GetFA(xascraper.modules.scraper_base.ScraperBase):
 
 		if not solver:
 			self.log.error("No captcha solver configured (or no solver with a non-zero balance)! Cannot continue!")
-			return "Login Failed"
+			return False, "Login Failed"
 
 
 		login_pg    = self.wg.getpage('https://www.furaffinity.net/login/?mode=imagecaptcha')
