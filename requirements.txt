@@ -47,4 +47,5 @@ ugoira
 apng
 chromecontroller==0.3.17
 cloudscraper==1.2.36
+IPython
 
