@@ -12,7 +12,6 @@ import json
 import time
 import pprint
 import requests
-import IPython
 from settings import settings
 
 import xascraper.modules.scraper_base
@@ -217,17 +216,14 @@ class GetPatreon(xascraper.modules.scraper_base.ScraperBase):
 		for char in settings[self.pluginShortName]['password']:
 			self.cr.Input_dispatchKeyEvent(type='char', text=char)
 
+		self.cr.execute_javascript_statement("document.querySelector(\"button[type='submit']\").click()")
 
 		content = self.cr.get_rendered_page_source()
+
 		if not settings[self.pluginShortName]['username'] in content:
 			raise exceptions.CannotAccessException("Could not log in?")
 
-		try:
-			current = self.get_api_json("/login?include=campaign%2Cuser_location&json-api-version=1.0", postData=login_data, retries=1)
-			self.log.info("Login results: %s", current)
-		finally:
-			self.log.info("Saving cookies unconditionally.")
-			self.wg.saveCookies()
+		self.wg.saveCookies()
 
 		return self.checkCookie()
 
@@ -289,6 +285,8 @@ class GetPatreon(xascraper.modules.scraper_base.ScraperBase):
 				with open("bogus_response.json", "w") as fp:
 					json.dump(content, fp)
 
+
+				import IPython
 				IPython.embed()
 				raise exceptions.UnrecoverableFailureException("API Response that is not json!")
 			ret = json.loads(content['response'])
@@ -774,6 +772,7 @@ class GetPatreon(xascraper.modules.scraper_base.ScraperBase):
 
 			artist_lut = self.get_artist_lut()
 		except Exception as e:
+			import IPython
 			IPython.embed()
 
 		self.log.info("Found %d Names", len(artist_lut))
