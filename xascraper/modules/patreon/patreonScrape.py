@@ -65,11 +65,11 @@ class GetPatreon(xascraper.modules.scraper_base.ScraperBase):
 				# 'proxytype'   : "SOCKS5",
 			}
 
-		self.req = cloudscraper.CloudScraper(
-				recaptcha = recaptcha_params,
-			)
+		# self.req = cloudscraper.CloudScraper(
+		# 		recaptcha = recaptcha_params,
+		# 	)
 
-		self.req.headers.update(self.wg.browserHeaders)
+		# self.req.headers.update(self.wg.browserHeaders)
 
 
 	def get_soup(self, url):
