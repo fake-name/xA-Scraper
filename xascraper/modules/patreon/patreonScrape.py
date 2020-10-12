@@ -653,14 +653,14 @@ class GetPatreon(xascraper.modules.scraper_base.ScraperBase):
 			# check if setting exists
 			if 'blacklisted_artists' in settings[self.pluginShortName]:
 			# check the names here and only add if in configured array
-			if artist_name in settings[self.pluginShortName]['blacklisted_artists']:
-				self.log.info("skipping: %s  by name as it is configured in blacklist", artist_name)
-				return False
+				if artist_name in settings[self.pluginShortName]['blacklisted_artists']:
+					self.log.info("skipping: %s  by name as it is configured in blacklist", artist_name)
+					return False
 			# check if setting exists
 			if 'blacklisted_artists_ids' in settings[self.pluginShortName]:
-			if patreon_aid in settings[self.pluginShortName]['blacklisted_artists_ids']:
-				self.log.info("skipping: %s by id as it is configured in blacklist", artist_name)
-				return False
+				if patreon_aid in settings[self.pluginShortName]['blacklisted_artists_ids']:
+					self.log.info("skipping: %s by id as it is configured in blacklist", artist_name)
+					return False
 			self.setupDir(artist_name)
 
 			if 'campaign' in artist_meta and artist_meta['campaign']['data']['type'] == 'campaign':
@@ -797,14 +797,14 @@ class GetPatreon(xascraper.modules.scraper_base.ScraperBase):
 				# check if setting exists
 				if 'blacklisted_artists' in settings[self.pluginShortName]:
 				# check the names here and only add if in configured array
-				if name[1][0] in settings[self.pluginShortName]['blacklisted_artists']:
-					self.log.info("skipping: %s", name[1][0])
-					continue
+					if name[1][0] in settings[self.pluginShortName]['blacklisted_artists']:
+						self.log.info("skipping: %s", name[1][0])
+						continue
 				# check if setting exists
 				if 'blacklisted_artists_ids' in settings[self.pluginShortName]:
-				if name[0] in settings[self.pluginShortName]['blacklisted_artists_ids']:
-					self.log.info("skipping: %s", name[1][0])
-					continue
+					if name[0] in settings[self.pluginShortName]['blacklisted_artists_ids']:
+						self.log.info("skipping: %s", name[1][0])
+						continue
 				res = sess.query(self.db.ScrapeTargets.id)             \
 					.filter(self.db.ScrapeTargets.site_name == self.pluginShortName) \
 					.filter(self.db.ScrapeTargets.artist_name == name)              \
