@@ -67,14 +67,14 @@ Disabling of select plugins can be accomplished by commenting out the appropriat
 line in `main.py`. The `JOBS` list dictates the various scheduled scraper tasks 
 that are placed into the scheduling system.
 
-The preferred bootstrap method is to use `run_scraper.sh` from the repository root. It will
+The preferred bootstrap method is to use `run_scrape.sh` from the repository root. It will
 ensure the required packages are available (build-essential, libxml2 libxslt1-dev 
 python3-dev libz-dev), and then install all the required python modules in a local 
 virtualenv. Additonally, it checks if the virtualenv is present, so once it's created,
-`./run_scraper.sh` will just source the venv, and run the scraper witout any reinstallation.
+`./run_scrape.sh` will just source the venv, and run the scraper witout any reinstallation.
 
 To run the web UI (which handles adding names to scrape, viewing fetched files, etc...), 
-run `run_web.sh`. The expected use is to have both `run_scraper.sh` and `run_web.sh` 
+run `run_web.sh`. The expected use is to have both `run_scrape.sh` and `run_web.sh` 
 executed as daemons.
 
 Currently, there are some aspects that need work. The artist selection system is currently a bit 
