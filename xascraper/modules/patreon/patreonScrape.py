@@ -805,24 +805,25 @@ class GetPatreon(xascraper.modules.scraper_base.ScraperBase):
 
 		postids = set()
 		types = ['posts', 'poll']
+
+		req_url = "/stream?" + \
+			"include=recent_comments.commenter%2Crecent_comments.parent%2Crecent_comments.post%2Crecent_comments.first_reply.commenter%2Crecent_comments.first_reply.parent%2Crecent_comments.first_reply.post" + \
+			"&fields[post]=change_visibility_at%2Ccomment_count%2Ccontent%2Ccurrent_user_can_delete%2Ccurrent_user_can_view%2Ccurrent_user_has_liked%2Cearly_access_min_cents%2Cembed%2Cimage%2Cis_paid%2Clike_count%2Cmin_cents_pledged_to_view%2Cpost_file%2Cpublished_at%2Cpatron_count%2Cpatreon_url%2Cpost_type%2Cpledge_url%2Cthumbnail_url%2Ctitle%2Cupgrade_url%2Curl" + \
+			"&fields[user]=image_url%2Cfull_name%2Curl" + \
+			"&fields[campaign]=earnings_visibility" + \
+			"&filter[is_by_creator]=true" + \
+			"&filter[is_following]=false" + \
+			"&filter[creator_id]={patreon_aid}".format(patreon_aid=patreon_aid) + \
+			"&filter[contains_exclusive_posts]=true" + \
+			"&json-api-use-default-includes=false" + \
+			"&json-api-version=1.0" + \
+			"&fields[comment]=body%2Ccreated%2Cdeleted_at%2Cis_by_patron%2Cis_by_creator%2Cvote_sum%2Ccurrent_user_vote%2Creply_count" + \
+			"&fields[post]=comment_count" + \
+			"&fields[user]=image_url%2Cfull_name%2Curl"
+					
+
 		while True:
-			current = self.get_api_json("/stream?" +
-				"include=recent_comments.commenter%2Crecent_comments.parent%2Crecent_comments.post%2Crecent_comments.first_reply.commenter%2Crecent_comments.first_reply.parent%2Crecent_comments.first_reply.post" +
-				"&fields[post]=change_visibility_at%2Ccomment_count%2Ccontent%2Ccurrent_user_can_delete%2Ccurrent_user_can_view%2Ccurrent_user_has_liked%2Cearly_access_min_cents%2Cembed%2Cimage%2Cis_paid%2Clike_count%2Cmin_cents_pledged_to_view%2Cpost_file%2Cpublished_at%2Cpatron_count%2Cpatreon_url%2Cpost_type%2Cpledge_url%2Cthumbnail_url%2Ctitle%2Cupgrade_url%2Curl" +
-				"&fields[user]=image_url%2Cfull_name%2Curl" +
-				"&fields[campaign]=earnings_visibility" +
-				"&page[cursor]={now}".format(now=str(now.isoformat())) +
-				"&filter[is_by_creator]=true" +
-				"&filter[is_following]=false" +
-				"&filter[creator_id]={patreon_aid}".format(patreon_aid=patreon_aid) +
-				"&filter[contains_exclusive_posts]=true" +
-				"&json-api-use-default-includes=false" +
-				"&json-api-version=1.0" +
-				"&fields[comment]=body%2Ccreated%2Cdeleted_at%2Cis_by_patron%2Cis_by_creator%2Cvote_sum%2Ccurrent_user_vote%2Creply_count" +
-				"&fields[post]=comment_count" +
-				"&fields[user]=image_url%2Cfull_name%2Curl" +
-				""
-				)
+			current = self.get_api_json(req_url)
 
 			had_post = False
 			for release in current['data']:
@@ -850,6 +851,12 @@ class GetPatreon(xascraper.modules.scraper_base.ScraperBase):
 			self.log.info("iterating over listing of campaign posts. Found %s so far, have new: %s.", len(postids), had_post)
 			if not had_post:
 				break
+
+			links = current['links']
+			if 'next' in links:
+				req_url = links['next']
+				if req_url.startswith('www.patreon.com/api'):
+					req_url = req_url[19:]
 
 		return postids
 
