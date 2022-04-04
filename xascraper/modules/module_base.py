@@ -24,6 +24,8 @@ class ModuleBase(xascraper.status_monitor.StatusMixin, metaclass=abc.ABCMeta):
 
 	custom_ua = None
 
+	extra_wg_params = {}
+
 	def __init__(self):
 		print("Starting up")
 		self.loggers = {}
@@ -35,6 +37,7 @@ class ModuleBase(xascraper.status_monitor.StatusMixin, metaclass=abc.ABCMeta):
 			custom_ua           = self.custom_ua,
 			twocaptcha_api_key  = settings.get("captcha", {}).get('2captcha', {})    .get("api_key", None),
 			anticaptcha_api_key = settings.get("captcha", {}).get('anti-captcha', {}).get("api_key", None),
+			**self.extra_wg_params
 			)
 
 		print("Starting up?")

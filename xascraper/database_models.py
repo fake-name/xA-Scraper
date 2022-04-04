@@ -1,9 +1,17 @@
 
 
-import settings
+import datetime
+import logging
+import threading
+import copy
 
 from sqlalchemy import Table
 
+from sqlalchemy import Column
+from sqlalchemy import Text
+from sqlalchemy import DateTime
+from sqlalchemy import Boolean
+from sqlalchemy import BigInteger
 from sqlalchemy import Column
 from sqlalchemy import BigInteger
 from sqlalchemy import Integer
@@ -23,6 +31,14 @@ from sqlalchemy.types import Enum
 import sqlalchemy_jsonfield
 
 from sqlalchemy.ext.compiler import compiles
+
+
+import cachetools
+
+# from common.db_engine import session_context
+from xascraper.database_calls import context_sess
+
+import settings
 
 # This is craptacularly retarded. Sqlite is retarded
 # see https://bitbucket.org/zzzeek/sqlalchemy/issues/2074/map-biginteger-type-to-integer-to-allow
@@ -132,6 +148,90 @@ class ScraperStatus(Base):
 	is_running        = Column(Boolean,  nullable=False, default=False)
 
 	status_text       = Column(Text)
+
+
+
+
+
+##########################################################################################
+##########################################################################################
+
+KV_META_CACHE = cachetools.TTLCache(maxsize=5000, ttl=60 * 5)
+
+kv_log = logging.getLogger("Main.KV_Store")
+
+class KeyValueStore(Base):
+	__tablename__ = 'key_value_store'
+
+	id          = Column(BigInteger, primary_key=True)
+
+	key    = Column(Text, nullable=False, index=True, unique=True)
+	value  = Column(sqlalchemy_jsonfield.JSONField())
+
+
+def get_from_db_key_value_store(key):
+	global KV_META_CACHE
+	if key in KV_META_CACHE:
+		kv_log.info("Getting '%s' from kv store in RAM", key)
+		return KV_META_CACHE[key]
+
+	kv_log.info("Getting '%s' from kv store in DB", key)
+	with context_sess() as sess:
+		have = sess.query(KeyValueStore).filter(KeyValueStore.key == key).scalar()
+		if have:
+			kv_log.info("KV store had entry")
+			ret = have.value
+		else:
+			kv_log.info("KV store did not have entry")
+			ret = {}
+
+		sess.commit()
+
+	return ret
+
+
+def set_in_db_key_value_store(key, new_data):
+	global KV_META_CACHE
+
+	new_s = str(new_data)
+	if len(new_s) > 40:
+		new_s = new_s[:35] + "..."
+
+	kv_log.info("Setting kv key '%s' to '%s'", key, new_s)
+	if key in KV_META_CACHE:
+		if KV_META_CACHE[key] == new_data:
+			return
+
+
+	with context_sess() as sess:
+		have = sess.query(KeyValueStore).filter(KeyValueStore.key == key).scalar()
+		if have:
+			if have.value != new_data:
+				kv_log.info("Updating item: '%s', '%s'", have, have.key)
+				kv_log.info("	old -> %s", have.value)
+				kv_log.info("	new -> %s", new_s)
+				have.value = new_data
+			else:
+				kv_log.info("Item has not changed. Nothing to do!")
+		else:
+			kv_log.info("New item: '%s', %s", key, new_s)
+			new = KeyValueStore(
+				key   = key,
+				value = new_data,
+				)
+			sess.add(new)
+
+		sess.commit()
+
+	try:
+		KV_META_CACHE[key] = copy.copy(new_data)
+	except KeyError:
+		KV_META_CACHE = cachetools.TTLCache(maxsize=5000, ttl=60 * 5)
+		KV_META_CACHE[key] = copy.copy(new_data)
+
+
+##########################################################################################
+##########################################################################################
 
 
 

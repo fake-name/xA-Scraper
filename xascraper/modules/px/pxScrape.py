@@ -6,10 +6,10 @@ import re
 import pprint
 import time
 import json
-import datetime
 import urllib.request
 import urllib.parse
 import random
+import pprint
 
 import dateparser
 import bs4
@@ -20,6 +20,57 @@ from settings import settings
 import xascraper.modules.scraper_base
 from xascraper.modules import exceptions
 
+
+#####################################################
+
+import base64
+import hashlib
+import secrets
+import urllib.parse
+
+# Latest app version can be found using GET /v1/application-info/android
+USER_AGENT = "PixivAndroidApp/5.0.234 (Android 11; Pixel 5)"
+REDIRECT_URI = "https://app-api.pixiv.net/web/v1/users/auth/pixiv/callback"
+LOGIN_URL = "https://app-api.pixiv.net/web/v1/login"
+AUTH_TOKEN_URL = "https://oauth.secure.pixiv.net/auth/token"
+CLIENT_ID = "MOBrBDS8blbauoSck0ZfDbtuzpyT"
+CLIENT_SECRET = "lsACyCD94FhDUtGTXi3QzcFE2uU1hqtDaKeqrdwj"
+
+
+def s256(data):
+	"""S256 transformation method."""
+
+	return base64.urlsafe_b64encode(hashlib.sha256(data).digest()).rstrip(b"=").decode("ascii")
+
+
+def oauth_pkce(transform):
+	"""Proof Key for Code Exchange by OAuth Public Clients (RFC7636)."""
+
+	code_verifier = secrets.token_urlsafe(32)
+	code_challenge = transform(code_verifier.encode("ascii"))
+
+	return code_verifier, code_challenge
+
+
+def print_auth_token_response(response):
+	data = response.json()
+
+	try:
+		access_token = data["access_token"]
+		refresh_token = data["refresh_token"]
+	except KeyError:
+		print("error:")
+		pprint.pprint(data)
+		exit(1)
+
+	print("access_token:", access_token)
+	print("refresh_token:", refresh_token)
+	print("expires_in:", data.get("expires_in", 0))
+
+
+#####################################################
+
+
 class GetPX(xascraper.modules.scraper_base.ScraperBase):
 
 	pluginShortName = "px"
@@ -29,6 +80,8 @@ class GetPX(xascraper.modules.scraper_base.ScraperBase):
 	ovwMode         = "Check Files"
 
 	numThreads      = 1
+
+	extra_wg_params = {"chromium_headless" : False}
 
 	def __init__(self, *args, **kwargs):
 		super().__init__(*args, **kwargs)
@@ -68,8 +121,95 @@ class GetPX(xascraper.modules.scraper_base.ScraperBase):
 			return False, "Do not have Pixiv Cookies"
 
 
+
+
+
 	def getCookie(self):
 		self.log.info("Pixiv Getting cookie")
+
+		def content_handler(container, req_url, response_body):
+			print("Content:", req_url)
+
+		with self.wg.chromiumContext('about:blank') as cr:
+
+			cr.clear_cookies()
+
+			self.log.info("Installing listener")
+			cr.install_listener_for_content(content_handler)
+
+			code_verifier, code_challenge = oauth_pkce(s256)
+			login_params = {
+				"code_challenge": code_challenge,
+				"code_challenge_method": "S256",
+				"client": "pixiv-android",
+			}
+
+			login_url = f"{LOGIN_URL}?{urllib.parse.urlencode(login_params)}"
+			cr.blocking_navigate(login_url)
+
+			time.sleep(4)
+			self.log.info("Clicking continue button (if present)")
+			cr.execute_javascript_statement("""
+				document.querySelectorAll('button').forEach( (e)=>{
+				    if (e.textContent.includes('Continue using this account')) {
+				        e.click();
+				    }
+				});
+				""")
+
+
+			current_url = cr.get_current_url()
+			self.log.info("Current URL: %s", current_url)
+
+
+			cr.execute_javascript_function("document.querySelector(\"input[type='text']\").focus()")
+			for char in settings[self.pluginShortName]['username']:
+				cr.Input_dispatchKeyEvent(type='char', text=char)
+			cr.execute_javascript_statement("document.querySelector(\"input[type='password']\").focus()")
+			for char in settings[self.pluginShortName]['password']:
+				cr.Input_dispatchKeyEvent(type='char', text=char)
+
+			time.sleep(4)
+			self.log.info("Clicking login.")
+			cr.execute_javascript_statement("document.querySelector(\"button[type='submit']\").click()")
+			time.sleep(4)
+
+			# process events as a result of the click.
+			try:
+				cr.handle_page_location_changed(2.0)
+			except Exception:
+				# page_location_changed can be broken by redurects to external app handlers
+				pass
+
+			current_url = cr.get_current_url()
+			self.log.info("Current URL: %s", current_url)
+
+			# import IPython
+			# IPython.embed()
+
+
+
+			# try:
+			# 	code = input("code: ").strip()
+			# except (EOFError, KeyboardInterrupt):
+			# 	return
+
+			response = requests.post(
+				AUTH_TOKEN_URL,
+				data={
+					"client_id": CLIENT_ID,
+					"client_secret": CLIENT_SECRET,
+					"code": code,
+					"code_verifier": code_verifier,
+					"grant_type": "authorization_code",
+					"include_policy": "true",
+					"redirect_uri": REDIRECT_URI,
+				},
+				headers={"User-Agent": USER_AGENT},
+			)
+
+			print_auth_token_response(response)
+
 
 		self.papi.login(username=settings[self.pluginShortName]["username"], password=settings[self.pluginShortName]["password"])
 		# self.aapi.login(username=settings[self.pluginShortName]["username"], password=settings[self.pluginShortName]["password"])

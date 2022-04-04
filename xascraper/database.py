@@ -16,4 +16,7 @@ from xascraper.database_models import ArtTags
 from xascraper.database_models import ScrapeTargets
 from xascraper.database_models import ScraperStatus
 
+from xascraper.database_models import get_from_db_key_value_store
+from xascraper.database_models import set_in_db_key_value_store
+
 from xascraper.database_models import Base

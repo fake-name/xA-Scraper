@@ -10,6 +10,7 @@ import cloudscraper
 import urllib.parse
 import json
 import time
+import random
 import pprint
 import requests
 from settings import settings
@@ -44,6 +45,8 @@ class GetPatreon(xascraper.modules.scraper_base.ScraperBase):
 	_getGalleries = None
 	_getTotalArtCount = None
 
+	extra_wg_params = {"chromium_headless" : False}
+
 	# # ---------------------------------------------------------------------------------------------------------------------------------------------------------
 	# # Cookie Management
 	# # ---------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -51,7 +54,6 @@ class GetPatreon(xascraper.modules.scraper_base.ScraperBase):
 	def __init__(self, *args, **kwargs):
 		super().__init__(*args, **kwargs)
 
-		self.wg = WebRequest.WebGetRobust(chromium_headless=False)
 
 		# This is.... kind of horrible.
 		self.wg.errorOutCount = 1
@@ -190,6 +192,21 @@ class GetPatreon(xascraper.modules.scraper_base.ScraperBase):
 			pdb.set_trace()
 			print(e)
 
+
+		content = self.cr.get_rendered_page_source()
+
+		if not settings[self.pluginShortName]['username'] in content:
+			self.log.info("Not logged in, attempting to do so.")
+
+		try:
+			soup = self.get_soup(login)
+		except Exception as e:
+
+			import pdb
+			print(e)
+			pdb.set_trace()
+			print(e)
+
 		# These won't work for the particular recaptcha flavor patreon uses. Sigh.
 		if soup.find_all("div", class_="g-recaptcha"):
 			soup = self.handle_recaptcha(soup, home, login)
@@ -221,6 +238,8 @@ class GetPatreon(xascraper.modules.scraper_base.ScraperBase):
 		content = self.cr.get_rendered_page_source()
 
 		if not settings[self.pluginShortName]['username'] in content:
+			import IPython
+			IPython.embed()
 			raise exceptions.CannotAccessException("Could not log in?")
 
 		self.wg.saveCookies()
@@ -285,6 +304,11 @@ class GetPatreon(xascraper.modules.scraper_base.ScraperBase):
 				with open("bogus_response.json", "w") as fp:
 					json.dump(content, fp)
 
+				if content['code'] == 504:
+					raise exceptions.RetryException("Gateway time out. Sleeping for a bit.")
+
+				if content['code'] == 502:
+					raise exceptions.RetryException("Gateway time out. Sleeping for a bit.")
 
 				import IPython
 				IPython.embed()
@@ -373,7 +397,7 @@ class GetPatreon(xascraper.modules.scraper_base.ScraperBase):
 			os.makedirs(fqpath)
 		fqpath = os.path.join(fqpath, 'itemid-{id}.pyson'.format(id=itemid))
 		with open(fqpath, "wb") as fp:
-			# fstr = pprint.pformat(filecontent)
+			fstr = pprint.pformat(filecontent)
 			fp.write(fstr.encode("utf-8"))
 
 	def save_image(self, aname, pid, fname, furl):
@@ -610,8 +634,31 @@ class GetPatreon(xascraper.modules.scraper_base.ScraperBase):
 	def _getArtPage(self, post_meta, artistName):
 		item_type, postid = post_meta
 
+
+
 		if item_type == 'post':
-			return self._get_art_post(postid, artistName)
+			item_key = "{}-{}-{}-fetchtime".format("pat", item_type, postid)
+			have = self.db.get_from_db_key_value_store(item_key)
+
+			# If we've fetched it in the last 2 weeks, don't retry it.
+			if have and 'last_fetch' in have and have['last_fetch'] and have['last_fetch'] > (time.time() - 60*60*24*7*2):
+				fail = {
+					'status' : ''
+					}
+				return fail
+
+			try:
+				return self._get_art_post(postid, artistName)
+			finally:
+
+				self.db.set_in_db_key_value_store(item_key, {'last_fetch' : time.time()})
+
+				sleeptime = random.triangular(5, 15, 60)
+				self.log.info("Sleeping %0.2d seconds", sleeptime)
+				time.sleep(sleeptime)
+
+
+
 		else:
 			self.log.error("Unknown post type: '%s'", item_type)
 			raise RuntimeError("Wat?")
@@ -850,6 +897,10 @@ class GetPatreon(xascraper.modules.scraper_base.ScraperBase):
 			self.log.info("iterating over listing of campaign posts. Found %s so far, have new: %s.", len(postids), had_post)
 			if not had_post:
 				break
+
+			sleeptime = random.triangular(2,4,15)
+			self.log.info("Sleeping %0.2d seconds", sleeptime)
+			time.sleep(sleeptime)
 
 		return postids
 
