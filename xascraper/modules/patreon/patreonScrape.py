@@ -654,7 +654,7 @@ class GetPatreon(xascraper.modules.scraper_base.ScraperBase):
 				self.db.set_in_db_key_value_store(item_key, {'last_fetch' : time.time()})
 
 				sleeptime = random.triangular(5, 15, 60)
-				self.log.info("Sleeping %0.2d seconds", sleeptime)
+				self.log.info("Sleeping %0.2f seconds", sleeptime)
 				time.sleep(sleeptime)
 
 
@@ -899,7 +899,7 @@ class GetPatreon(xascraper.modules.scraper_base.ScraperBase):
 				break
 
 			sleeptime = random.triangular(2,4,15)
-			self.log.info("Sleeping %0.2d seconds", sleeptime)
+			self.log.info("Sleeping %0.2f seconds", sleeptime)
 			time.sleep(sleeptime)
 
 		return postids

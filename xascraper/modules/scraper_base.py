@@ -340,7 +340,14 @@ class ScraperBase(module_base.ModuleBase, metaclass=abc.ABCMeta):
 				.filter(self.db.ArtItem.state == 'new') \
 				.all()
 
-			return set([item for sublist in res for item in sublist])
+			tmp = set([item for sublist in res for item in sublist])
+
+			# Sort the return, so we run in the same order in all cases.
+			tmp = list(tmp)
+			tmp.sort()
+
+			return tmp
+
 
 	# Insert recently retreived items into the database
 	def _updatePreviouslyRetreived(self,
