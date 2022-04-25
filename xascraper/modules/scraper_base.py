@@ -573,12 +573,14 @@ class ScraperBase(module_base.ModuleBase, metaclass=abc.ABCMeta):
 		with self.db.context_sess() as sess:
 			res = sess.query(self.db.ScrapeTargets) \
 				.filter(self.db.ScrapeTargets.site_name == self.pluginShortName) \
+				.filter(self.db.ScrapeTargets.enabled == True) \
 				.order_by(self.db.ScrapeTargets.last_fetched) \
 				.all()
 
 			ret = [(row.id, row.artist_name) for row in res]
 			sess.commit()
 
+		self.log.info("Have %s targets to scrape!", len(ret))
 		return ret
 
 	# ---------------------------------------------------------------------------------------------------------------------------------------------------------

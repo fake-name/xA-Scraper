@@ -827,7 +827,8 @@ class GetPatreon(xascraper.modules.scraper_base.ScraperBase):
 			print((key, value))
 
 		resultList = [json.dumps((key, value), sort_keys=True) for key, value in artist_lut.items()]
-		# Push the pixiv name list into the DB
+
+
 		with self.db.context_sess() as sess:
 			for name in resultList:
 				res = sess.query(self.db.ScrapeTargets.id)             \
@@ -838,6 +839,25 @@ class GetPatreon(xascraper.modules.scraper_base.ScraperBase):
 					self.log.info("Need to insert name: %s", name)
 					sess.add(self.db.ScrapeTargets(site_name=self.pluginShortName, artist_name=name))
 					sess.commit()
+
+		with self.db.context_sess() as sess:
+			res = sess.query(self.db.ScrapeTargets)             \
+				.filter(self.db.ScrapeTargets.site_name == self.pluginShortName) \
+				.all()
+
+			for row in res:
+				if row.artist_name in resultList:
+					if not row.enabled:
+						self.log.info("Enabling artist: %s", row.artist_name)
+						row.enabled = True
+				else:
+					if row.enabled:
+						self.log.info("Disabling artist: %s", row.artist_name)
+						row.enabled = False
+
+			sess.commit()
+
+
 
 		return super().getNameList()
 

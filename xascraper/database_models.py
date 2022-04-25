@@ -125,6 +125,7 @@ class ScrapeTargets(Base):
 	extra_meta      = Column(sqlalchemy_jsonfield.JSONField())
 
 	release_cnt     = Column(Integer, default='0')
+	enabled         = Column(Boolean,  nullable=False, default=True)
 
 	posts           = relationship("ArtItem")
 
