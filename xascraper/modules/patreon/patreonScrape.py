@@ -73,6 +73,18 @@ class GetPatreon(xascraper.modules.scraper_base.ScraperBase):
 
 		# self.req.headers.update(self.wg.browserHeaders)
 
+	def random_sleep(self, start, mid, stop):
+
+		sleeptime = random.triangular(start, mid, stop)
+
+		# 1 in 10 chance of longer sleep
+		if random.randrange(0, 10) == 0:
+			sleeptime = random.triangular(60, 60*3, 60*5)
+
+		self.log.info("Sleeping %0.2f seconds", sleeptime)
+		time.sleep(sleeptime)
+
+
 
 	def get_soup(self, url):
 		# resp = self.req.get(url)
@@ -176,7 +188,7 @@ class GetPatreon(xascraper.modules.scraper_base.ScraperBase):
 			return True, "Already logged in"
 
 		self.log.info("Trying to avoid rate limiting!")
-		time.sleep(5)
+		self.random_sleep(4,5,6)
 
 		self.log.info("Not logged in. Doing login.")
 
@@ -648,14 +660,12 @@ class GetPatreon(xascraper.modules.scraper_base.ScraperBase):
 				return fail
 
 			try:
-				return self._get_art_post(postid, artistName)
+				ret = self._get_art_post(postid, artistName)
+				self.db.set_in_db_key_value_store(item_key, {'last_fetch' : time.time()})
+				return ret
 			finally:
 
-				self.db.set_in_db_key_value_store(item_key, {'last_fetch' : time.time()})
-
-				sleeptime = random.triangular(5, 15, 60)
-				self.log.info("Sleeping %0.2f seconds", sleeptime)
-				time.sleep(sleeptime)
+				self.random_sleep(5, 15, 60)
 
 
 
@@ -918,9 +928,8 @@ class GetPatreon(xascraper.modules.scraper_base.ScraperBase):
 			if not had_post:
 				break
 
-			sleeptime = random.triangular(2,4,15)
-			self.log.info("Sleeping %0.2f seconds", sleeptime)
-			time.sleep(sleeptime)
+
+			self.random_sleep(2,4,15)
 
 		return postids
 
