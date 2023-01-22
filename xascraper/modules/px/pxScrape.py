@@ -11,6 +11,7 @@ import urllib.parse
 import random
 import pprint
 
+import requests
 import dateparser
 import bs4
 import pixivpy3
@@ -52,20 +53,24 @@ def oauth_pkce(transform):
 	return code_verifier, code_challenge
 
 
-def print_auth_token_response(response):
+def extract_auth_token_response(response):
 	data = response.json()
 
 	try:
 		access_token = data["access_token"]
 		refresh_token = data["refresh_token"]
+
+		print("access_token:", access_token)
+		print("refresh_token:", refresh_token)
+		print("expires_in:", data.get("expires_in", 0))
+
+		return access_token, refresh_token
+
 	except KeyError:
 		print("error:")
 		pprint.pprint(data)
-		exit(1)
 
-	print("access_token:", access_token)
-	print("refresh_token:", refresh_token)
-	print("expires_in:", data.get("expires_in", 0))
+		return None, None
 
 
 #####################################################
@@ -86,14 +91,14 @@ class GetPX(xascraper.modules.scraper_base.ScraperBase):
 	def __init__(self, *args, **kwargs):
 		super().__init__(*args, **kwargs)
 		self.aapi = pixivpy3.AppPixivAPI()
-		self.papi = pixivpy3.PixivAPI()
+		# self.papi = pixivpy3.PixivAPI()
 
 		saved_auth = self.get_param_cache()
 
 		if saved_auth:
 			self.log.info("Using cached auth")
 			self.aapi.set_auth(access_token=saved_auth['a_access_token'], refresh_token=saved_auth['a_refresh_token'])
-			self.papi.set_auth(access_token=saved_auth['p_access_token'], refresh_token=saved_auth['p_refresh_token'])
+			# self.papi.set_auth(access_token=saved_auth['p_access_token'], refresh_token=saved_auth['p_refresh_token'])
 
 
 	# ---------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -101,18 +106,15 @@ class GetPX(xascraper.modules.scraper_base.ScraperBase):
 	# ---------------------------------------------------------------------------------------------------------------------------------------------------------
 
 	def checkCookie(self):
-		if not self.papi.access_token:
+		if not self.aapi.access_token:
 			return False, "Do not have Pixiv Cookies"
 
 		try:
-			following = self.papi.me_following()
-			# {'errors': {'system': {'message': 'The access token provided is invalid.'}},
-			#  'has_error': True,
-			#  'status': 'failure'}
+			# I believe this will fail if the auth isn't valid.
+			# I have not tested this assumption!
 
-			if 'has_error' in following and following['has_error'] == True:
-				tried = self.papi.auth()
-				return False, "Auth failed!"
+			following = self.aapi.illust_follow(restrict="private")
+
 
 
 			return True, "Have Pixiv Auth Token:\n	-> %s" % (self.papi.access_token)
@@ -127,15 +129,81 @@ class GetPX(xascraper.modules.scraper_base.ScraperBase):
 	def getCookie(self):
 		self.log.info("Pixiv Getting cookie")
 
+		sent_reqs = []
+
+		auth_keys = {}
+
 		def content_handler(container, req_url, response_body):
 			print("Content:", req_url)
 
+
+
+		def install_msg_handler(ctx, message):
+			if 'method' in message and message['method'] == "Network.requestWillBeSent":
+				sent_reqs.append(message)
+
+				if "params" not in message:
+					return
+
+				if "documentURL" not in message['params']:
+					return
+
+				if not message['params']['documentURL'].startswith("pixiv"):
+					return
+
+				auth_url = message['params']['documentURL']
+
+
+				if not auth_url:
+					self.log.error("Authentication failed, no oauth code found!")
+					return False, "Login Failed"
+
+				qs = urllib.parse.urlparse(auth_url).query
+				parsed = urllib.parse.parse_qs(qs)
+
+				if 'code' not in parsed:
+					self.log.error("Oauth code missing from URL: %s!", auth_url)
+					return False, "Login Failed"
+
+				if not parsed['code']:
+					self.log.error("Oauth code field empty from URL: %s!", auth_url)
+					return False, "Login Failed"
+
+				code = parsed['code'][0]
+
+				self.log.info("Login auth code: %s", code)
+
+
+
+
+				response = requests.post(
+					AUTH_TOKEN_URL,
+					data={
+						"client_id": CLIENT_ID,
+						"client_secret": CLIENT_SECRET,
+						"code": code,
+						"code_verifier": code_verifier,
+						"grant_type": "authorization_code",
+						"include_policy": "true",
+						"redirect_uri": REDIRECT_URI,
+					},
+					headers={"User-Agent": USER_AGENT},
+				)
+
+				access_token, refresh_token = extract_auth_token_response(response)
+
+				auth_keys['access_token']  = access_token
+				auth_keys['refresh_token'] = refresh_token
+
+
+
+
 		with self.wg.chromiumContext('about:blank') as cr:
 
-			cr.clear_cookies()
+			# cr.clear_cookies()
 
 			self.log.info("Installing listener")
-			cr.install_listener_for_content(content_handler)
+			cr.install_message_handler(install_msg_handler)
 
 			code_verifier, code_challenge = oauth_pkce(s256)
 			login_params = {
@@ -161,65 +229,90 @@ class GetPX(xascraper.modules.scraper_base.ScraperBase):
 			current_url = cr.get_current_url()
 			self.log.info("Current URL: %s", current_url)
 
-
 			cr.execute_javascript_function("document.querySelector(\"input[type='text']\").focus()")
 			for char in settings[self.pluginShortName]['username']:
 				cr.Input_dispatchKeyEvent(type='char', text=char)
+
 			cr.execute_javascript_statement("document.querySelector(\"input[type='password']\").focus()")
 			for char in settings[self.pluginShortName]['password']:
 				cr.Input_dispatchKeyEvent(type='char', text=char)
 
 			time.sleep(4)
 			self.log.info("Clicking login.")
-			cr.execute_javascript_statement("document.querySelector(\"button[type='submit']\").click()")
+
+			cr.execute_javascript_statement("""
+				document.querySelectorAll(\"button[type='submit']\").forEach( (e)=>{
+				        e.click();
+				});
+				""")
+
 			time.sleep(4)
 
 			# process events as a result of the click.
-			try:
-				cr.handle_page_location_changed(2.0)
-			except Exception:
-				# page_location_changed can be broken by redurects to external app handlers
-				pass
+			# We wait for 90 seconds because the login can involve solving a captcha and other messyness
+			LOGIN_DELAY = 90
+			starttime = time.time()
 
-			current_url = cr.get_current_url()
-			self.log.info("Current URL: %s", current_url)
+			while 1:
+				if (starttime + LOGIN_DELAY) < time.time():
+					break
 
-			# import IPython
-			# IPython.embed()
+				if  'access_token' in auth_keys:
+					break
+
+				resp = cr.execute_javascript_statement("""
+					document.querySelectorAll(\"button[type='submit']\").forEach( (e)=>{
+					        e.click();
+					})
+					""")
+				self.log.info("Click response: '%s'", resp)
+
+				try:
+					cr.handle_page_location_changed()
+				except Exception:
+					# page_location_changed can be broken by redurects to external app handlers
+					pass
+
+				resp = cr.execute_javascript_statement("""
+					document.querySelectorAll('button').forEach( (e)=>{
+					    if (e.textContent.includes('Continue using this account')) {
+					        e.click();
+					    }
+					})
+					""")
+
+				self.log.info("Button response: '%s'", resp)
+
+				try:
+					cr.handle_page_location_changed()
+				except Exception:
+					# page_location_changed can be broken by redurects to external app handlers
+					pass
+
+				remaining = (starttime + LOGIN_DELAY) - time.time()
+
+				self.log.info("Waiting %s more seconds.", remaining)
 
 
-
-			# try:
-			# 	code = input("code: ").strip()
-			# except (EOFError, KeyboardInterrupt):
-			# 	return
-
-			response = requests.post(
-				AUTH_TOKEN_URL,
-				data={
-					"client_id": CLIENT_ID,
-					"client_secret": CLIENT_SECRET,
-					"code": code,
-					"code_verifier": code_verifier,
-					"grant_type": "authorization_code",
-					"include_policy": "true",
-					"redirect_uri": REDIRECT_URI,
-				},
-				headers={"User-Agent": USER_AGENT},
-			)
-
-			print_auth_token_response(response)
+			self.log.info("Auth info at exit: %s", auth_keys)
 
 
-		self.papi.login(username=settings[self.pluginShortName]["username"], password=settings[self.pluginShortName]["password"])
-		# self.aapi.login(username=settings[self.pluginShortName]["username"], password=settings[self.pluginShortName]["password"])
+			if  'access_token' not in auth_keys or 'refresh_token' not in auth_keys:
+				return False, None
 
-		if self.papi.access_token and self.aapi.access_token:
+
+			self.aapi.set_auth(access_token=auth_keys['access_token'], refresh_token=auth_keys['refresh_token'])
+
+			ok = self.aapi.trending_tags_illust()
+
+
+			import IPython
+			IPython.embed()
+
+		if self.aapi.access_token and self.aapi.access_token:
 
 			config = {
-				'p_access_token'  : self.papi.access_token,
 				'a_access_token'  : self.aapi.access_token,
-				'p_refresh_token' : self.papi.refresh_token,
 				'a_refresh_token' : self.aapi.refresh_token,
 				}
 			self.set_param_cache(config)
@@ -231,13 +324,13 @@ class GetPX(xascraper.modules.scraper_base.ScraperBase):
 
 	def checkLogin(self):
 
-		ret = self.checkCookie()
-		if ret[0]:
-			ret = self.getCookie()
-			if not ret[0]:
+		logged_in, message = self.checkCookie()
+		if logged_in:
+			logged_in, message = self.getCookie()
+			if not logged_in:
 				raise RuntimeError("Could not log in?")
 
-		return ret
+		return logged_in, message
 
 	# ---------------------------------------------------------------------------------------------------------------------------------------------------------
 	# Individual page scraping

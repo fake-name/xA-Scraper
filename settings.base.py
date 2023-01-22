@@ -28,7 +28,7 @@ settings = {
 		'thread-pool-size'    : 20,
 	},
 
-
+	"dldCtntPath" : "absolute_path_downloads_will_go_here",
 
 	"captcha" : {
 
@@ -69,7 +69,6 @@ settings = {
 		"2Captcha-API-key" : '<key goes here>',
 	},
 
-	"dldCtntPath" : "absolute_path_downloads_will_go_here",
 
 	# These are built by the little script at the bottom of the file.
 	"artSites"    : [],
