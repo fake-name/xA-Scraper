@@ -36,9 +36,9 @@ class GetPatreon(xascraper.modules.scraper_base.ScraperBase):
 
 	numThreads = 1
 
-	custom_ua = [('User-Agent', 'Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/80.0.3987.163 Safari/537.36'),
+	custom_ua = [('User-Agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/109.0.0.0 Safari/537.36'),
 				 ('Accept-Language', 'en-US,en;q=0.9'),
-				 ('Accept', 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9'),
+				 ('Accept', 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9'),
 				 ('Accept-Encoding', 'gzip, deflate, br')]
 
 	# Stubbed functions
@@ -82,7 +82,11 @@ class GetPatreon(xascraper.modules.scraper_base.ScraperBase):
 			sleeptime = random.triangular(60, 60*3, 60*5)
 
 		self.log.info("Sleeping %0.2f seconds", sleeptime)
-		time.sleep(sleeptime)
+		for _ in range(int(sleeptime)):
+			time.sleep(1)
+
+		# Remaining sleep. Protbably silly.
+		time.sleep(sleeptime % 1.0)
 
 
 
@@ -112,8 +116,8 @@ class GetPatreon(xascraper.modules.scraper_base.ScraperBase):
 
 		# print("Page str:", page_str)
 
-		with open("page.html", "w") as fp:
-			fp.write(page_str)
+		with open("page.html", "wb") as fp:
+			fp.write(page_str.encode("UTF-8"))
 
 		return False, "Not logged in"
 
@@ -195,20 +199,29 @@ class GetPatreon(xascraper.modules.scraper_base.ScraperBase):
 
 		home  = "https://www.patreon.com/home"
 		login = "https://www.patreon.com/login"
-		try:
-			soup = self.get_soup(home)
-		except Exception as e:
 
-			import pdb
-			print(e)
-			pdb.set_trace()
-			print(e)
+		# try:
+		# 	self.cr.blocking_navigate(login)
+		# except Exception as e:
+
+		# 	import pdb
+		# 	print(e)
+		# 	pdb.set_trace()
+		# 	print(e)
 
 
-		content = self.cr.get_rendered_page_source()
+		# try:
+		# 	content = self.cr.get_rendered_page_source()
+		# except Exception as e:
 
-		if not settings[self.pluginShortName]['username'] in content:
-			self.log.info("Not logged in, attempting to do so.")
+		# 	import pdb
+		# 	print(e)
+		# 	pdb.set_trace()
+		# 	print(e)
+
+		# if not settings[self.pluginShortName]['username'] in content:
+		# 	self.log.info("Not logged in, attempting to do so.")
+
 
 		try:
 			soup = self.get_soup(login)
@@ -238,10 +251,10 @@ class GetPatreon(xascraper.modules.scraper_base.ScraperBase):
 		# So patreon uses RavenJS, which does a bunch of really horrible change-watching crap on input
 		# fields. I couldn't figure out how to properly fire the on-change events, so let's just
 		# use the debug-protocol interface to type our login info in manually.
-		self.cr.execute_javascript_function("document.querySelector(\"input[id='email']\").focus()")
+		self.cr.execute_javascript_function("document.querySelector(\"input[type='email']\").focus()")
 		for char in settings[self.pluginShortName]['username']:
 			self.cr.Input_dispatchKeyEvent(type='char', text=char)
-		self.cr.execute_javascript_statement("document.querySelector(\"input[id='password']\").focus()")
+		self.cr.execute_javascript_statement("document.querySelector(\"input[type='password']\").focus()")
 		for char in settings[self.pluginShortName]['password']:
 			self.cr.Input_dispatchKeyEvent(type='char', text=char)
 
@@ -644,6 +657,7 @@ class GetPatreon(xascraper.modules.scraper_base.ScraperBase):
 
 
 	def _getArtPage(self, post_meta, artistName):
+
 		item_type, postid = post_meta
 
 
@@ -673,10 +687,74 @@ class GetPatreon(xascraper.modules.scraper_base.ScraperBase):
 			self.log.error("Unknown post type: '%s'", item_type)
 			raise RuntimeError("Wat?")
 
-	def _load_art(self, patreon_aid, artist_raw):
-		aid = self._artist_name_to_rid(artist_raw)
+	def get_art_item(self, artist_undecoded, artist_name, postid):
 
-		artPages = self.get_campaign_posts(patreon_aid)
+		postid_s = json.dumps(postid)
+
+		extends = []
+
+		try:
+			ret = self._fetch_retrier(postid, artist_name)
+
+			assert isinstance(ret, dict), "Response is not a dict?"
+			assert 'status'     in ret, "Status not in response!"
+
+			if 'post_embeds' in ret:
+				extends = ret['post_embeds']
+
+
+			if ret['status'] == "Succeeded" or ret['status'] == "Exists":
+
+				assert 'dl_path'    in ret
+				assert 'page_desc'  in ret
+				assert 'page_title' in ret
+				assert 'post_time'  in ret
+				assert 'post_tags'  in ret
+
+				assert isinstance(ret['dl_path'], list)
+				seq = 0
+				for item in ret['dl_path']:
+					self._updatePreviouslyRetreived(
+							artist             = artist_undecoded,
+							state              = 'complete',
+							release_meta       = json.dumps(postid),
+							fqDlPath           = item,
+							pageDesc           = ret['page_desc'],
+							pageTitle          = ret['page_title'],
+							seqNum             = seq,
+							addTime            = ret['post_time'],
+							postTags           = ret['post_tags'],
+							content_structured = ret,
+						)
+					seq += 1
+			elif ret['status'] == "Ignore":  # Used for compound pages (like Pixiv's manga pages), where the page has multiple sub-pages that are managed by the plugin
+				self.log.info("Ignoring root URL, since it has child-pages.")
+			else:
+				self._updateUnableToRetrieve(artist_undecoded, postid_s)
+
+		except urllib.error.URLError:  # WebGetRobust throws urlerrors
+			self.log.error("Page Retrieval failed!")
+			self.log.error("PostID = '%s'", postid)
+			self.log.error(traceback.format_exc())
+		except:
+			self.log.error("Unknown error in page retrieval!")
+			self.log.error("PostID = '%s'", postid)
+			self.log.error(traceback.format_exc())
+
+		return extends
+
+
+	def _load_art(self, patreon_aid, artist_undecoded, artist_name):
+		local_aid = self._artist_name_to_rid(artist_undecoded)
+
+		oldArt = self._getPreviouslyRetreived(artist_undecoded)
+		# oldart is a set of dumped lists:
+		#  '["post", "42951172"]', '["post", "50659317"]', '["post", "25308029"]',
+
+		# import pdb
+		# pdb.set_trace()
+
+		artPages = self.get_campaign_posts(local_aid, patreon_aid, artist_undecoded, artist_name, oldArt)
 
 		self.log.info("Total gallery items %s", len(artPages))
 
@@ -684,15 +762,14 @@ class GetPatreon(xascraper.modules.scraper_base.ScraperBase):
 		with self.db.context_sess() as sess:
 			for item in artPages:
 				item_json = json.dumps(item, sort_keys=True)
-				new += self._upsert_if_new(sess, aid, item_json)
+				new += self._upsert_if_new(sess, local_aid, item_json)
 
 		self.log.info("%s new art pages, %s total", new, len(artPages))
 
-		oldArt = self._getPreviouslyRetreived(artist_raw)
 		newArt = artPages - oldArt
 		self.log.info("Old art items = %s, newItems = %s", len(oldArt), len(newArt))
 
-		new_raw = self._getNewToRetreive(aid=aid)
+		new_raw = self._getNewToRetreive(aid=local_aid)
 
 		return [json.loads(tmp) for tmp in new_raw]
 
@@ -712,7 +789,7 @@ class GetPatreon(xascraper.modules.scraper_base.ScraperBase):
 			if 'campaign' in artist_meta and artist_meta['campaign']['data']['type'] == 'campaign':
 				campaign_id = artist_meta['campaign']['data']['id']
 
-				newArt = self._load_art(patreon_aid, artist_undecoded)
+				newArt = self._load_art(patreon_aid, artist_undecoded, artist_name)
 			else:
 				newArt = []
 
@@ -720,59 +797,16 @@ class GetPatreon(xascraper.modules.scraper_base.ScraperBase):
 			embeds = []
 
 
-			while len(newArt) > 0:
-				postid = newArt.pop()
-				postid_s = json.dumps(postid)
-				try:
-					ret = self._fetch_retrier(postid, artist_name)
+			# while len(newArt) > 0:
+			# 	postid = newArt.pop()
 
-					assert isinstance(ret, dict), "Response is not a dict?"
-					assert 'status'     in ret, "Status not in response!"
-
-					if 'post_embeds' in ret:
-						embeds.extend(ret['post_embeds'])
-
-					if ret['status'] == "Succeeded" or ret['status'] == "Exists":
-
-						assert 'dl_path'    in ret
-						assert 'page_desc'  in ret
-						assert 'page_title' in ret
-						assert 'post_time'  in ret
-						assert 'post_tags'  in ret
-
-						assert isinstance(ret['dl_path'], list)
-						seq = 0
-						for item in ret['dl_path']:
-							self._updatePreviouslyRetreived(
-									artist=artist_undecoded,
-									state='complete',
-									release_meta=json.dumps(postid),
-									fqDlPath=item,
-									pageDesc=ret['page_desc'],
-									pageTitle=ret['page_title'],
-									seqNum=seq,
-									addTime=ret['post_time'],
-									postTags=ret['post_tags'],
-								)
-							seq += 1
-					elif ret['status'] == "Ignore":  # Used for compound pages (like Pixiv's manga pages), where the page has multiple sub-pages that are managed by the plugin
-						self.log.info("Ignoring root URL, since it has child-pages.")
-					else:
-						self._updateUnableToRetrieve(artist_undecoded, postid_s)
-
-				except urllib.error.URLError:  # WebGetRobust throws urlerrors
-					self.log.error("Page Retrieval failed!")
-					self.log.error("PostID = '%s'", postid)
-					self.log.error(traceback.format_exc())
-				except:
-					self.log.error("Unknown error in page retrieval!")
-					self.log.error("PostID = '%s'", postid)
-					self.log.error(traceback.format_exc())
+			# 	ret = self.get_art_item(artist_undecoded, artist_name, postid)
+			# 	embeds.extend(ret)
 
 
-				self.log.info("Pages for %s remaining = %s", artist_name, len(newArt))
-				if ctrlNamespace.run is False:
-					break
+			# 	self.log.info("Pages for %s remaining = %s", artist_name, len(newArt))
+			# 	if ctrlNamespace.run is False:
+			# 		break
 
 			self.update_last_fetched(artist_undecoded)
 			self.log.info("Successfully retreived content for artist %s", artist_name)
@@ -877,7 +911,7 @@ class GetPatreon(xascraper.modules.scraper_base.ScraperBase):
 	# Gallery Scraping
 	# ---------------------------------------------------------------------------------------------------------------------------------------------------------
 
-	def get_campaign_posts(self, patreon_aid, count=10):
+	def get_campaign_posts(self, local_aid, patreon_aid, artist_undecoded, artist_name, oldArt):
 		now = datetime.datetime.utcnow().replace(tzinfo = pytz.utc).replace(microsecond=0)
 
 		postids = set()
@@ -916,6 +950,17 @@ class GetPatreon(xascraper.modules.scraper_base.ScraperBase):
 						postids.add(post_tup)
 						had_post = True
 
+
+					post_s = json.dumps(post_tup)
+
+					if post_s not in oldArt:
+						print("New post:", post_s)
+						self.get_art_item(artist_undecoded, artist_name, post_tup)
+
+						with self.db.context_sess() as sess:
+							item_json = json.dumps(post_tup, sort_keys=True)
+							self._upsert_if_new(sess, local_aid, item_json)
+
 					if release['type'] != "post":
 						self.log.warning("Non post release!")
 				else:
@@ -945,3 +990,42 @@ class GetPatreon(xascraper.modules.scraper_base.ScraperBase):
 		with self.wg.chromiumContext('https://www.patreon.com/') as cr:
 			self.cr = cr
 			super().go(*args, **kwargs)
+
+def signal_handler(dummy_signal, dummy_frame):
+	if flags.namespace.run:
+		flags.namespace.run = False
+		print("Telling threads to stop")
+	else:
+		print("Multiple keyboard interrupts. Raising")
+		raise KeyboardInterrupt
+
+
+def run_local():
+	import multiprocessing
+	import flags
+	import signal
+
+	manager = multiprocessing.Manager()
+	flags.namespace = manager.Namespace()
+	flags.namespace.run = True
+
+	signal.signal(signal.SIGINT, signal_handler)
+
+	print(sys.argv)
+	ins = GetPatreon()
+	# ins.getCookie()
+	print(ins)
+	print("Instance: ", ins)
+
+	# ins.go(ctrlNamespace=flags.namespace, update_namelist=True)
+	ins.go(ctrlNamespace=flags.namespace)
+
+
+if __name__ == '__main__':
+
+	import sys
+	import logSetup
+	import logging
+	logSetup.initLogging(logLevel=logging.DEBUG)
+
+	run_local()

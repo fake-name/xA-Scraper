@@ -66,9 +66,14 @@ class URLifyExtension(Extension):
 		md.preprocessors.add('urlify', URLify(md), '_end')
 
 from flaskext.markdown import Markdown
-Markdown(app, safe_mode='escape', extensions=[URLifyExtension()])
+md = Markdown(app, safe_mode='escape', extensions=[])
+
+md._instance.preprocessors.register(URLify(md._instance), "urlify", 10)
 
 # ========================================================
+
+# import pdb
+# pdb.set_trace()
 
 
 from . import views

@@ -640,8 +640,7 @@ class ScraperBase(module_base.ModuleBase, metaclass=abc.ABCMeta):
 		self.log.error("Failed to fetch content with args: '%s', kwargs: '%s'", args, kwargs)
 		return self.build_page_ret(status="Failed", fqDlPath=None)
 
-
-	def getArtist(self, artist, ctrlNamespace):
+	def fetch_art_item(self, dlPathBase, pageURL, artist):
 
 		valid_ret_keys = [
 			'status',
@@ -653,8 +652,75 @@ class ScraperBase(module_base.ModuleBase, metaclass=abc.ABCMeta):
 			'content_structured',
 		]
 
+		try:
+			ret = self._fetch_retrier(dlPathBase, pageURL, artist)
+			# ret = self._getArtPage(dlPathBase, pageURL, artist)
+
+			assert isinstance(ret, dict)
+			assert 'status'     in ret
+
+			assert all([tmp in valid_ret_keys for tmp in ret.keys()]), "Invalid key in return. Allowed %s. Received %s (Bad: %s)" % (
+				valid_ret_keys, list(ret.keys()), [tmp for tmp in ret.keys() if tmp not in valid_ret_keys])
+
+
+			if ret['status'] == "Prose":
+				assert 'dl_path'    in ret
+				assert 'page_desc'  in ret
+				assert 'page_title' in ret
+				assert 'post_time'  in ret
+				assert isinstance(ret['dl_path'], list)
+				seq = 0
+				self._updatePreviouslyRetreived(
+						artist       = artist,
+						state        = 'complete',
+						release_meta = pageURL,
+						fqDlPath     = None,
+						pageDesc     = ret['page_desc'],
+						pageTitle    = ret['page_title'],
+						addTime      = ret['post_time'],
+						postTags     = ret['post_tags'],
+					)
+			elif ret['status'] == "Succeeded" or ret['status'] == "Exists":
+				assert 'dl_path'    in ret
+				assert 'page_desc'  in ret
+				assert 'page_title' in ret
+				assert 'post_time'  in ret
+				assert 'content_structured'  in ret
+				assert isinstance(ret['dl_path'], list)
+				seq = 0
+				for item in ret['dl_path']:
+					self._updatePreviouslyRetreived(
+							artist             = artist,
+							state              = 'complete',
+							release_meta       = pageURL,
+							fqDlPath           = item,
+							pageDesc           = ret['page_desc'],
+							pageTitle          = ret['page_title'],
+							seqNum             = seq,
+							addTime            = ret['post_time'],
+							postTags           = ret['post_tags'],
+							content_structured = ret['content_structured'],
+						)
+					seq += 1
+			elif ret['status'] == "Ignore":  # Used for compound pages (like Pixiv's manga pages), where the page has multiple sub-pages that are managed by the plugin
+				self.log.info("Ignoring root URL, since it has child-pages.")
+			elif ret['status'] == 'Deleted':
+				self._updateUnableToRetrieve(artist, pageURL, state='removed')
+			else:
+				self._updateUnableToRetrieve(artist, pageURL)
+
+		except urllib.error.URLError:  # WebGetRobust throws urlerrors
+			self.log.error("Page Retrieval failed!")
+			self.log.error("Source URL = '%s'", pageURL)
+			self.log.error(traceback.format_exc())
+
+
+	def getArtist(self, artist, ctrlNamespace):
+
+
 		if artist != artist.strip():
 			artist = artist.strip()
+
 			self.log.warning("Artist name seems to have trailing or leading whitespace!")
 
 		if ctrlNamespace.run is False:
@@ -672,68 +738,7 @@ class ScraperBase(module_base.ModuleBase, metaclass=abc.ABCMeta):
 
 			while len(newArt) > 0:
 				pageURL = newArt.pop()
-				try:
-					ret = self._fetch_retrier(dlPathBase, pageURL, artist)
-					# ret = self._getArtPage(dlPathBase, pageURL, artist)
-
-					assert isinstance(ret, dict)
-					assert 'status'     in ret
-
-					assert all([tmp in valid_ret_keys for tmp in ret.keys()]), "Invalid key in return. Allowed %s. Received %s (Bad: %s)" % (
-						valid_ret_keys, list(ret.keys()), [tmp for tmp in ret.keys() if tmp not in valid_ret_keys])
-
-
-					if ret['status'] == "Prose":
-						assert 'dl_path'    in ret
-						assert 'page_desc'  in ret
-						assert 'page_title' in ret
-						assert 'post_time'  in ret
-						assert isinstance(ret['dl_path'], list)
-						seq = 0
-						self._updatePreviouslyRetreived(
-								artist       = artist,
-								state        = 'complete',
-								release_meta = pageURL,
-								fqDlPath     = None,
-								pageDesc     = ret['page_desc'],
-								pageTitle    = ret['page_title'],
-								addTime      = ret['post_time'],
-								postTags     = ret['post_tags'],
-							)
-					elif ret['status'] == "Succeeded" or ret['status'] == "Exists":
-						assert 'dl_path'    in ret
-						assert 'page_desc'  in ret
-						assert 'page_title' in ret
-						assert 'post_time'  in ret
-						assert 'content_structured'  in ret
-						assert isinstance(ret['dl_path'], list)
-						seq = 0
-						for item in ret['dl_path']:
-							self._updatePreviouslyRetreived(
-									artist             = artist,
-									state              = 'complete',
-									release_meta       = pageURL,
-									fqDlPath           = item,
-									pageDesc           = ret['page_desc'],
-									pageTitle          = ret['page_title'],
-									seqNum             = seq,
-									addTime            = ret['post_time'],
-									postTags           = ret['post_tags'],
-									content_structured = ret['content_structured'],
-								)
-							seq += 1
-					elif ret['status'] == "Ignore":  # Used for compound pages (like Pixiv's manga pages), where the page has multiple sub-pages that are managed by the plugin
-						self.log.info("Ignoring root URL, since it has child-pages.")
-					elif ret['status'] == 'Deleted':
-						self._updateUnableToRetrieve(artist, pageURL, state='removed')
-					else:
-						self._updateUnableToRetrieve(artist, pageURL)
-
-				except urllib.error.URLError:  # WebGetRobust throws urlerrors
-					self.log.error("Page Retrieval failed!")
-					self.log.error("Source URL = '%s'", pageURL)
-					self.log.error(traceback.format_exc())
-
+				self.fetch_art_item(dlPathBase, pageURL, artist)
 
 				self.log.info("Pages for %s remaining = %s", artist, len(newArt))
 
