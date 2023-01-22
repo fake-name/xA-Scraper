@@ -3,7 +3,7 @@ Babel==2.11.0
 beautifulsoup4==4.11.1
 CherryPy==18.8.0
 colorama==0.4.6
-future==0.18.2
+future==0.18.3
 httpretty==1.1.4
 lxml==4.9.2
 Mako==1.2.4
