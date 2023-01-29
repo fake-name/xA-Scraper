@@ -42,6 +42,8 @@ def one_arg_go(command):
 		scrape_manage.reset_last_fetched_times()
 	elif command == 'dump-json':
 		db_manage.dump_item_meta()
+	elif command == 'reset-missing':
+		db_manage.reset_missing()
 	else:
 		cli_utils.print_help()
 

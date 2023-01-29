@@ -359,3 +359,23 @@ def dump_item_meta():
 							},
 							indent = 4,
 						))
+
+
+def reset_missing():
+	print("reset_missing")
+
+	with db.context_sess() as sess:
+		total_items = sess.query(db.ArtItem).count()
+
+		for item in tqdm.tqdm(sess.query(db.ArtItem).yield_per(100), total=total_items):
+
+			if item.artist.site_name in ['pat', 'twit', 'tum', 'yp', 'da']:
+				continue
+			if item.state == 'new':
+				continue
+
+
+			if not len(item.files):
+				print("Item has no files: ", item.artist.site_name, item.state, item.title)
+				item.state = 'new'
+				sess.commit()

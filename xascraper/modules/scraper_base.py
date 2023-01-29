@@ -189,7 +189,7 @@ class ScraperBase(module_base.ModuleBase, metaclass=abc.ABCMeta):
 	# ---------------------------------------------------------------------------------------------------------------------------------------------------------
 
 	@abc.abstractmethod
-	def _getTotalArtCount(self, artist):
+	def _getTotalArtCount(self, aid):
 		pass
 
 	@abc.abstractmethod
@@ -207,6 +207,23 @@ class ScraperBase(module_base.ModuleBase, metaclass=abc.ABCMeta):
 	# ---------------------------------------------------------------------------------------------------------------------------------------------------------
 	# Utility
 	# ---------------------------------------------------------------------------------------------------------------------------------------------------------
+
+
+	def random_sleep(self, start, mid, stop, include_long=True):
+
+		sleeptime = random.triangular(start, mid, stop)
+
+		# 1 in 10 chance of longer sleep
+		if random.randrange(0, 10) == 0 and include_long:
+			sleeptime = random.triangular(start*60, mid*60, stop*60)
+
+		self.log.info("Sleeping %0.2f seconds", sleeptime)
+		for _ in range(int(sleeptime)):
+			time.sleep(1)
+
+		# Remaining sleep. Protbably silly.
+		time.sleep(sleeptime % 1.0)
+
 
 	def get_param_cache(self):
 		if not os.path.exists(self.config_file_name):
@@ -270,7 +287,7 @@ class ScraperBase(module_base.ModuleBase, metaclass=abc.ABCMeta):
 
 		fqfilename = prep_check_fq_filename(fqfilename)
 		filepath, fileN = os.path.split(fqfilename)
-		self.log.info("Complete filepath: %s", fqfilename)
+		self.log.info("	Complete filepath: %s", fqfilename)
 
 		chop = len(fileN)-4
 
@@ -370,13 +387,17 @@ class ScraperBase(module_base.ModuleBase, metaclass=abc.ABCMeta):
 		aid = self._artist_name_to_rid(artist)
 
 		with self.db.context_sess() as sess:
-			for _ in range(5):
+			for loop_cnt in range(5):
 				try:
 					row = sess.query(self.db.ArtItem) \
 						.filter(self.db.ArtItem.artist_id == aid) \
 						.filter(self.db.ArtItem.release_meta == release_meta) \
 						.scalar()
-					if not row:
+					if row:
+						self.log.info("Updating Item %s -> %s (%s).", aid, release_meta, loop_cnt)
+
+					else:
+						self.log.info("Item %s -> %s not present in DB. Adding", aid, release_meta)
 						row = self.db.ArtItem(
 								state        = 'new',
 								artist_id    = aid,
@@ -432,6 +453,8 @@ class ScraperBase(module_base.ModuleBase, metaclass=abc.ABCMeta):
 
 					sess.commit()
 
+					return
+
 				except sqlalchemy.exc.InvalidRequestError:
 					print("InvalidRequest error!")
 					sess.rollback()
@@ -456,6 +479,14 @@ class ScraperBase(module_base.ModuleBase, metaclass=abc.ABCMeta):
 
 					traceback.print_exc()
 					sess.rollback()
+
+				except TypeError as e:
+					print("Exception?")
+					import traceback
+					traceback.print_exc()
+
+					import IPython
+					IPython.embed()
 
 
 	def _checkHaveUrl(self, artist, url):
@@ -608,14 +639,13 @@ class ScraperBase(module_base.ModuleBase, metaclass=abc.ABCMeta):
 			for item in artPages:
 				new += self._upsert_if_new(sess, aid, item)
 
-		self.log.info("%s new art pages, %s total", new, len(artPages))
+		self.log.info("DB Updated with %s new art pages, %s total", new, len(artPages))
 
-		# oldArt = self._getPreviouslyRetreived(artist)
-		# newArt = artPages - oldArt
-		# self.log.info("Old art items = %s, newItems = %s", len(oldArt), len(newArt))
+		ret = self._getNewToRetreive(artist)
 
+		self.log.info("Have %s items that have not been retreived", len(ret))
 
-		return self._getNewToRetreive(artist)
+		return ret
 
 	def _fetch_retrier(self, *args, **kwargs):
 		for _ in range(3):
@@ -623,19 +653,29 @@ class ScraperBase(module_base.ModuleBase, metaclass=abc.ABCMeta):
 				ret = self._getArtPage(*args, **kwargs)
 				return ret
 			except exceptions.ContentRemovedException as e:
-				return self.build_page_ret(status="Failed", fqDlPath=None, pageTitle="Error: %s" % e)
+				return self.build_page_ret(status="Failed: ContentRemovedException", fqDlPath=None, pageTitle="Error: %s" % e)
 			except exceptions.CannotAccessException as e:
-				return self.build_page_ret(status="Failed", fqDlPath=None, pageTitle="Error: %s" % e)
+				return self.build_page_ret(status="Failed: CannotAccessException", fqDlPath=None, pageTitle="Error: %s" % e)
 			except exceptions.CannotFindContentException as e:
-				return self.build_page_ret(status="Failed", fqDlPath=None, pageTitle="Error: %s" % e)
+				return self.build_page_ret(status="Failed: CannotFindContentException", fqDlPath=None, pageTitle="Error: %s" % e)
 
 			except exceptions.RetryException:
 				time.sleep(random.triangular(1,3,10))
+				self.checkCookie()
 
 			except exceptions.NotLoggedInException:
 				self.log.error("You are not logged in? Checking and re-logging in.")
 				ok, message = self.getCookie()
 				assert ok, "Failed to log in after NotLoggedInException!"
+
+			except Exception as e:
+
+				print("Exception in _fetch_retrier: ", e)
+				import traceback
+				traceback.print_exc()
+
+				import IPython
+				IPython.embed()
 
 		self.log.error("Failed to fetch content with args: '%s', kwargs: '%s'", args, kwargs)
 		return self.build_page_ret(status="Failed", fqDlPath=None)
@@ -654,7 +694,6 @@ class ScraperBase(module_base.ModuleBase, metaclass=abc.ABCMeta):
 
 		try:
 			ret = self._fetch_retrier(dlPathBase, pageURL, artist)
-			# ret = self._getArtPage(dlPathBase, pageURL, artist)
 
 			assert isinstance(ret, dict)
 			assert 'status'     in ret
@@ -680,6 +719,7 @@ class ScraperBase(module_base.ModuleBase, metaclass=abc.ABCMeta):
 						addTime      = ret['post_time'],
 						postTags     = ret['post_tags'],
 					)
+
 			elif ret['status'] == "Succeeded" or ret['status'] == "Exists":
 				assert 'dl_path'    in ret
 				assert 'page_desc'  in ret
@@ -687,6 +727,10 @@ class ScraperBase(module_base.ModuleBase, metaclass=abc.ABCMeta):
 				assert 'post_time'  in ret
 				assert 'content_structured'  in ret
 				assert isinstance(ret['dl_path'], list)
+
+				# If we're not prose, we should have at least one file.
+				assert ret['dl_path']
+
 				seq = 0
 				for item in ret['dl_path']:
 					self._updatePreviouslyRetreived(

@@ -1,5 +1,6 @@
 
 import os
+import io
 import os.path
 import traceback
 import re
@@ -15,11 +16,32 @@ import requests
 import dateparser
 import bs4
 import pixivpy3
+import pixivpy3.utils
 
 import flags
 from settings import settings
 import xascraper.modules.scraper_base
 from xascraper.modules import exceptions
+
+
+
+def convert_pixiv_object(pixiv_object):
+	'''
+	PixivPy has an obnoxious custom dict type they use. That'd be fine, if it
+	didn't break sqlalchemy dict fields.
+
+	Anyways, recursively convert those.
+	'''
+	if isinstance(pixiv_object, (pixivpy3.utils.JsonDict, dict)):
+		return {
+			key : convert_pixiv_object(value) for key, value in pixiv_object.items()
+		}
+
+	if isinstance(pixiv_object, (list, tuple)):
+		return [convert_pixiv_object(value) for value in pixiv_object]
+
+	return pixiv_object
+
 
 
 #####################################################
@@ -37,6 +59,24 @@ AUTH_TOKEN_URL = "https://oauth.secure.pixiv.net/auth/token"
 CLIENT_ID = "MOBrBDS8blbauoSck0ZfDbtuzpyT"
 CLIENT_SECRET = "lsACyCD94FhDUtGTXi3QzcFE2uU1hqtDaKeqrdwj"
 
+'''
+cr.execute_javascript_statement("""
+document.querySelectorAll('button').forEach( (e)=>{
+    if (e.textContent.includes('Continue using this account')) {
+        e.click();
+    }
+})
+""")
+
+cr.execute_javascript_statement("""
+document.querySelectorAll('button')
+""")
+
+
+cr.execute_javascript_statement("""
+document.querySelectorAll('button').forEach( (e)=>{})
+""")
+'''
 
 def s256(data):
 	"""S256 transformation method."""
@@ -97,8 +137,8 @@ class GetPX(xascraper.modules.scraper_base.ScraperBase):
 
 		if saved_auth:
 			self.log.info("Using cached auth")
+
 			self.aapi.set_auth(access_token=saved_auth['a_access_token'], refresh_token=saved_auth['a_refresh_token'])
-			# self.papi.set_auth(access_token=saved_auth['p_access_token'], refresh_token=saved_auth['p_refresh_token'])
 
 
 	# ---------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -107,19 +147,31 @@ class GetPX(xascraper.modules.scraper_base.ScraperBase):
 
 	def checkCookie(self):
 		if not self.aapi.access_token:
+			self.log.info("No auth present. Need to log in!")
 			return False, "Do not have Pixiv Cookies"
 
 		try:
-			# I believe this will fail if the auth isn't valid.
-			# I have not tested this assumption!
 
-			following = self.aapi.illust_follow(restrict="private")
+			data = self.aapi.illust_follow(restrict="private")
+
+			if "error" in data:
+
+				try:
+					self.log.info("Not logged in: %s", data['error']['message'])
+				except KeyError:
+					self.log.error("No error message in response? Response: %s", data)
 
 
+				return False, "Not logged in!"
 
-			return True, "Have Pixiv Auth Token:\n	-> %s" % (self.papi.access_token)
+
+			return True, "Have Pixiv Auth Token:\n	-> %s" % (self.aapi.access_token)
 
 		except Exception as e:
+			self.log.error("Failure when checking cookie: %s", e)
+			import IPython
+			IPython.embed()
+
 			return False, "Do not have Pixiv Cookies"
 
 
@@ -304,10 +356,7 @@ class GetPX(xascraper.modules.scraper_base.ScraperBase):
 			self.aapi.set_auth(access_token=auth_keys['access_token'], refresh_token=auth_keys['refresh_token'])
 
 			ok = self.aapi.trending_tags_illust()
-
-
-			import IPython
-			IPython.embed()
+			assert "error" not in ok
 
 		if self.aapi.access_token and self.aapi.access_token:
 
@@ -325,7 +374,7 @@ class GetPX(xascraper.modules.scraper_base.ScraperBase):
 	def checkLogin(self):
 
 		logged_in, message = self.checkCookie()
-		if logged_in:
+		if not logged_in:
 			logged_in, message = self.getCookie()
 			if not logged_in:
 				raise RuntimeError("Could not log in?")
@@ -346,23 +395,21 @@ class GetPX(xascraper.modules.scraper_base.ScraperBase):
 	def _extractTitleDescription(self, meta):
 		itemTitle   = meta['title']
 		itemCaption = meta['caption']
-		postTime    = dateparser.parse(meta['reuploaded_time'])
-		postTags    = [tmp for tmp in meta['tags']]
+		postTime    = dateparser.parse(meta['create_date']).replace(tzinfo=None)
+
+		postTags    = [tmp['name'] for tmp in meta['tags'] if tmp['name']] + \
+			[tmp['translated_name'] for tmp in meta['tags'] if 'translated_name' in tmp and tmp['translated_name']] + \
+			["tool " + tmp for tmp in meta['tools'] if tmp]
 		postTags.append("sanity level %s" % meta['sanity_level'])
 		return itemTitle, itemCaption, postTime, postTags
 
 	def _get_best_ugoira_from_set(self, imgset):
 		if 'ugoira1920x1080' in imgset:
 			return imgset['ugoira1920x1080']
-		if 'ugoira600x600' in imgset:
-			self.log.warning("No large image (found ugoira600x600)?")
-			return imgset['ugoira600x600']
-		raise RuntimeError("No ugoira1920x1080 or ugoira600x600 images!")
-
-	def _get_best_image_from_set(self, imgset):
+		if 'original' in imgset:
+			return imgset['original']
 		if 'large' in imgset:
-			if not 'img-original' in imgset['large']:
-				self.log.warning("large image isn't marked original?")
+			self.log.warning("No original image (found large)?")
 			return imgset['large']
 		if 'medium' in imgset:
 			self.log.warning("No large image (found medium)?")
@@ -370,46 +417,97 @@ class GetPX(xascraper.modules.scraper_base.ScraperBase):
 		if 'small' in imgset:
 			self.log.warning("No large image (found small)?")
 			return imgset['small']
+		if 'ugoira600x600' in imgset:
+			self.log.warning("No large image (found ugoira600x600)?")
+			return imgset['ugoira600x600']
+		raise RuntimeError("No ugoira1920x1080 or ugoira600x600 images!")
+
+	def _get_best_image_from_set(self, imgset):
+		if 'original_image_url' in imgset:
+			return imgset['original_image_url']
+		if 'original' in imgset:
+			return imgset['original']
+		if 'large' in imgset:
+			self.log.warning("No original image (found large)?")
+			return imgset['large']
+		if 'medium' in imgset:
+			self.log.warning("No large image (found medium)?")
+			return imgset['medium']
+		if 'small' in imgset:
+			self.log.warning("No large image (found small)?")
+			return imgset['small']
+
 		raise RuntimeError("No large, medium or small images!")
 
-	def _getManga(self, dlPathBase, item_meta):
-		itemTitle, itemCaption, postTime, postTags = self._extractTitleDescription(item_meta)
+
+	def _getAnimation(self, dlPathBase, item_meta):
+		# TODO: Unpack ugoira unto a apng/gif (or at least a set of files)
+
+		imgurl   = self._get_best_ugoira_from_set(item_meta['ugoira_metadata']['zip_urls'])
+
+		buf = io.BytesIO()
+		assert self.aapi.download(imgurl, fname=buf)
+		fcont = buf.getvalue()
+
+		regx4 = re.compile(r"http://.+/")				# FileName RE
+		fname = regx4.sub("" , imgurl)
+		fname = fname.rsplit("?")[0] 		# Sometimes there is some PHP stuff tacked on the end of the Image URL. Split on the indicator("?"), and throw away everything after it.
+		fname = fname.rsplit("/")[-1]
+
+		self.log.info("			Filename = %s", fname)
+		self.log.info("			FileURL = %s", imgurl)
+
+		file_path = os.path.join(dlPathBase, fname)
+		saved_to = self.save_file(file_path, fcont)
+
+		return [saved_to]
+
+
+	def _extract_images(self, item_meta, dlPathBase):
+
+		images = []
 
 		regx4 = re.compile(r"http://.+/")				# FileName RE
 
-		self.log.info("			postTime = %s", postTime)
-		self.log.info("			postTags = %s", postTags)
-		self.log.info("Saving image set")
+		if 'meta_single_page' in item_meta and item_meta['meta_single_page']:
 
-		if 'metadata' not in item_meta:
-			self.log.warning("Missing 'metadata' member!")
-			if item['page_count'] == 1:
-				self.log.warning("Treating as single-image item!")
-				return self._getSinglePageContent(dlPathBase, item_mete)
-			pprint.pprint(item_meta)
-			raise exceptions.CannotFindContentException("Missing 'metadata' member!")
+			imgurl   = self._get_best_image_from_set(item_meta['meta_single_page'])
 
-		if item_meta['metadata'] is None:
-			self.log.error("Item metadata is None!")
-			pprint.pprint(item_meta)
-			raise exceptions.CannotFindContentException("'metadata' member is None!")
 
-		if 'pages' not in item_meta['metadata']:
-			self.log.error("Missing 'pages' member!")
-			pprint.pprint(item_meta)
-			raise exceptions.CannotFindContentException("Missing 'pages' member!")
+			buf = io.BytesIO()
+			assert self.aapi.download(imgurl, fname=buf)
+			fcont = buf.getvalue()
 
-		images = []
+
+			fname = regx4.sub("" , imgurl)
+			fname = fname.rsplit("?")[0] 		# Sometimes there is some PHP stuff tacked on the end of the Image URL. Split on the indicator("?"), and throw away everything after it.
+			fname = fname.rsplit("/")[-1]
+
+			self.log.info("			Filename = %s", fname)
+			self.log.info("			FileURL = %s",  imgurl)
+
+			file_path = os.path.join(dlPathBase, fname)
+			saved_to = self.save_file(file_path, fcont)
+
+			images.append(saved_to)
+
+
+
 		index = 1
-		for imagedat in item_meta['metadata']['pages']:
+		for imagedat in item_meta['meta_pages']:
 			imgurl = self._get_best_image_from_set(imagedat['image_urls'])
-			fcont = self.__papi_download(imgurl)
+
+			buf = io.BytesIO()
+			assert self.aapi.download(imgurl, fname=buf)
+			fcont = buf.getvalue()
+
 			fname = regx4.sub("" , imgurl)
 			fname = fname.rsplit("?")[0]
 			fname = fname.rsplit("/")[-1]
 			fname, ext = os.path.splitext(fname)
 			fname = "%s - %04d%s" % (fname, index, ext)
 			index += 1
+
 			self.log.info("			Filename = %s", fname)
 			self.log.info("			FileURL = %s", imgurl)
 			file_path = os.path.join(dlPathBase, fname)
@@ -417,95 +515,7 @@ class GetPX(xascraper.modules.scraper_base.ScraperBase):
 
 			images.append(saved_to)
 
-		return self.build_page_ret(status="Succeeded", fqDlPath=images, pageDesc=itemCaption, pageTitle=itemTitle, postTags=postTags, postTime=postTime)
-
-
-
-	def _getSinglePageContent(self, dlPathBase, item_meta):
-
-		meta = item_meta.get('metadata', {})
-		if meta:
-			pages = meta.get('pages', [])
-			if len(pages) > 1:
-				self.log.warning("Item appears to have more then one page for a single-page entry!")
-
-		itemTitle, itemCaption, postTime, postTags = self._extractTitleDescription(item_meta)
-		imgurl   = self._get_best_image_from_set(item_meta['image_urls'])
-
-		fcont = self.__papi_download(imgurl)
-
-		regx4 = re.compile(r"http://.+/")				# FileName RE
-		fname = regx4.sub("" , imgurl)
-		fname = fname.rsplit("?")[0] 		# Sometimes there is some PHP stuff tacked on the end of the Image URL. Split on the indicator("?"), and throw away everything after it.
-		fname = fname.rsplit("/")[-1]
-
-		self.log.info("			Filename = %s", fname)
-		self.log.info("			FileURL = %s", imgurl)
-		self.log.info("			postTime = %s", postTime)
-		self.log.info("			postTags = %s", postTags)
-
-		file_path = os.path.join(dlPathBase, fname)
-		saved_to = self.save_file(file_path, fcont)
-
-		return self.build_page_ret(status="Succeeded", fqDlPath=[saved_to], pageDesc=itemCaption, pageTitle=itemTitle, postTags=postTags, postTime=postTime, content_structured={'metadata':item_meta['metadata']})
-
-
-	def _getAnimation(self, dlPathBase, item_meta):
-		itemTitle, itemCaption, postTime, postTags = self._extractTitleDescription(item_meta)
-		imgurl   = self._get_best_ugoira_from_set(item_meta['metadata']['zip_urls'])
-
-		# pprint.pprint(item_meta)
-
-		fcont = self.__papi_download(imgurl)
-
-		regx4 = re.compile(r"http://.+/")				# FileName RE
-		fname = regx4.sub("" , imgurl)
-		fname = fname.rsplit("?")[0] 		# Sometimes there is some PHP stuff tacked on the end of the Image URL. Split on the indicator("?"), and throw away everything after it.
-		fname = fname.rsplit("/")[-1]
-
-		self.log.info("			Filename = %s", fname)
-		self.log.info("			FileURL = %s", imgurl)
-		self.log.info("			postTime = %s", postTime)
-		self.log.info("			postTags = %s", postTags)
-
-		file_path = os.path.join(dlPathBase, fname)
-		saved_to = self.save_file(file_path, fcont)
-
-		# TODO: Unpack ugoira unto a apng/gif (or at least a set of files)
-		return self.build_page_ret(status="Succeeded", fqDlPath=[saved_to], pageDesc=itemCaption, pageTitle=itemTitle, postTags=postTags, postTime=postTime, content_structured={'metadata':item_meta['metadata']})
-
-
-	def _getIllustration(self, artistName, dlPathBase, item_id):
-		meta = self.papi.works(item_id)
-		# pprint.pprint(meta)
-
-		if not meta['status'] == 'success':
-			return self.build_page_ret(status="Failed", fqDlPath=None)
-
-		assert len(meta['response']) == 1
-
-		# self.log.info("Metadata:")
-		# pprint.pprint(meta)
-
-		resp = meta['response'][0]
-
-		if resp is None:
-			self.log.error("No metadata in response!")
-
-		if resp['type'] == 'ugoira':
-			ret = self._getAnimation(dlPathBase, resp)
-			return ret
-
-		if resp['type'] == 'manga' or resp['is_manga']:
-			ret = self._getManga(dlPathBase, resp)
-			return ret
-
-		if resp['type'] == 'illustration':
-			ret = self._getSinglePageContent(dlPathBase, resp)
-			return ret
-
-		raise RuntimeError("Content type not known: '%s'" % resp['type'])
-
+		return images
 
 
 
@@ -521,12 +531,71 @@ class GetPX(xascraper.modules.scraper_base.ScraperBase):
 
 		try:
 
-			# So my previous migration just categorized EVERYTHING as a illustration. Properly, the dispatch should be
-			# done here for type, instead of in _getIllustration. However, doing it there doesn't cause additional work, it seems harmless.
-			if item_type in ('illustration', 'manga', 'ugoira'):
-				ret = self._getIllustration(artistName, dlPathBase, item_id)
-				time.sleep(random.triangular(1,5,15))
-				return ret
+			self.log.info("Fetching details for post: https://www.pixiv.net/en/artworks/%s", item_id)
+
+			illust_deets = self.aapi.illust_detail(item_id)
+
+			if 'error' in illust_deets:
+				try:
+					self.log.info("Error fetching item: %s", illust_deets['error']['message'])
+					return self.build_page_ret(status="Failed: %s" % illust_deets['error']['message'], fqDlPath=None)
+
+				except KeyError as e:
+					return self.build_page_ret(status="Failed: %s" % e, fqDlPath=None)
+
+			if not 'illust' in illust_deets:
+				print("No illust field in illust_deets?")
+				print(illust_deets)
+
+				import IPython
+				IPython.embed()
+
+
+			illust    = illust_deets['illust']
+			item_type = illust['type']
+
+			itemTitle, itemCaption, postTime, postTags = self._extractTitleDescription(illust)
+
+			self.log.info("			postTime = %s", postTime)
+			self.log.info("			postTags = %s", postTags)
+
+
+			if item_type == 'ugoira':
+				self.log.info("Saving animation")
+				ugoira_meta = self.aapi.ugoira_metadata(item_id)
+
+				images = self._getAnimation(dlPathBase, ugoira_meta)
+
+				return self.build_page_ret(status="Succeeded",
+						fqDlPath           = images,
+						pageDesc           = itemCaption,
+						pageTitle          = itemTitle,
+						postTags           = postTags,
+						postTime           = postTime,
+						content_structured = convert_pixiv_object(ugoira_meta),
+					)
+
+
+
+			elif item_type in ['manga', 'illust']:
+
+				images = self._extract_images(illust, dlPathBase)
+
+				self.random_sleep(1,5,15, include_long=False)
+				return self.build_page_ret(status="Succeeded",
+						fqDlPath  = images,
+						pageDesc  = itemCaption,
+						pageTitle = itemTitle,
+						postTags  = postTags,
+						postTime  = postTime
+					)
+
+
+			else:
+				print("Item that isn't ugoira or image! This needs to be handled!")
+				import IPython
+				IPython.embed()
+
 
 		except pixivpy3.PixivError as e:
 			raise exceptions.RetryException("Error: '%s'" % e)
@@ -537,52 +606,41 @@ class GetPX(xascraper.modules.scraper_base.ScraperBase):
 	# Gallery Scraping
 	# ---------------------------------------------------------------------------------------------------------------------------------------------------------
 
-	def __getTotalArtCount(self, artist):
-		aid = int(artist)
-		items = self.papi.users_works(aid, include_stats=False)
-		if items['status'] != 'success':
-
-			if items.get("errors", {}).get('system', {}).get('message') == 404:
-				raise exceptions.AccountDisabledException("Got 404 when trying to get art count")
-			if items.get("errors", {}).get('system', {}).get('message') == '404 Not Found':
-				raise exceptions.AccountDisabledException("Got 404 when trying to get art count")
-
-			# This /seems/ to indicate suspended accounts.
-			if items.get("errors", {}).get('system', {}).get('code') == 971:
-				raise exceptions.AccountDisabledException("Account suspended?")
+	def __getTotalArtCount(self, aid):
 
 
-			self.log.error("Error while attempting to get artist gallery content for ID %s!!", artist)
-			for line in traceback.format_exc().split("\n"):
-				self.log.error(line)
-			for line in pprint.pformat(items).split("\n"):
-				self.log.error(line)
+		user_details = self.aapi.user_detail(aid)
 
-			raise exceptions.NotLoggedInException("Failed to get artist page?")
+		if "error" in user_details and user_details["error"]['user_message'] == 'The creator has limited who can view this content':
+			raise exceptions.AccountDisabledException("Account is locked for viewing!")
 
-		return items['pagination']['total']
+		if "error" in user_details and user_details["error"]['user_message'] == 'Your access is currently restricted.':
+			raise exceptions.AccountDisabledException("Need to reauthenticate!")
 
 
-	def _getTotalArtCount(self, artist):
+		if not "profile" in user_details:
+			import IPython
+			IPython.embed()
+
+
+
+		if user_details["profile"]['total_novels']:
+			print("User has novels. TODO: Handle this!")
+			import IPython
+			IPython.embed()
+
+		return user_details["profile"]['total_illusts'] + user_details["profile"]['total_manga']
+
+	def _getTotalArtCount(self, aid):
 		try:
-			return self.__getTotalArtCount(artist)
+			return self.__getTotalArtCount(aid)
 		except exceptions.NotLoggedInException:
 			self.log.warning("failed to get art count. Checking login status.")
 			_, status = self.checkLogin()
 			self.log.info("Login status: %s", status)
-			return self.__getTotalArtCount(artist)
+			return self.__getTotalArtCount(aid)
 
 
-	def _getItemsOnPage(self, inSoup):
-
-		links = set()
-
-		imgItems = inSoup.find_all("li", class_="image-item")
-		for tag in imgItems:
-			url = urllib.parse.urljoin(self.urlBase, tag.a["href"])
-			links.add(url)
-
-		return links
 
 
 	def _getGalleries(self, artist):
@@ -590,24 +648,38 @@ class GetPX(xascraper.modules.scraper_base.ScraperBase):
 
 		artlinks = set()
 
+
 		try:
-			items = self.papi.users_works(aid, include_stats=False)
-			artlinks.update(json.dumps({
-					"id":   tmp["id"],
-					"type": tmp["type"],
-				}, sort_keys=True) for tmp in items['response'])
+			art_types = ['illust', 'manga']
 
-			while items['pagination']['next']:
-				items = self.papi.users_works(aid, page=items['pagination']['next'], include_stats=False)
-				artlinks.update(json.dumps({
-						"id":   tmp["id"],
-						"type": tmp["type"],
-					}, sort_keys=True) for tmp in items['response'])
-				self.log.info("Found %s links so far", len(artlinks))
+			for art_type in art_types:
 
-				time.sleep(random.triangular(3,5,15))
 
-			self.log.info("Found %s links", (len(artlinks)))
+				qs = {
+					'user_id' : aid,
+					'type'    : art_type,
+				}
+
+				while qs:
+
+					self.log.info("Fetching items: %s", qs)
+					json_result = self.aapi.user_illusts(**qs)
+					qs = self.aapi.parse_qs(json_result.next_url)
+
+					artlinks.update(
+							json.dumps({
+								"id":   tmp["id"],
+
+								# This is gross, but I've been calling the "illust" type "illustration" in the db.
+								"type": "illustration" if tmp["type"] == "illust" else tmp["type"],
+							}, sort_keys=True) for tmp in json_result.illusts
+						)
+
+					self.random_sleep(1,2,5, include_long=False)
+
+
+			self.log.info("Found %s links", len(artlinks))
+
 		except KeyError:
 			self.log.error("Error while attempting to get gallery listing!")
 			for line in traceback.format_exc().split("\n"):
@@ -629,49 +701,48 @@ class GetPX(xascraper.modules.scraper_base.ScraperBase):
 		self.log.info("Getting list of favourite artists.")
 
 
-		self.log.info("Fetching public follows")
-		following = self.papi.me_following()
-		resultList = set(str(tmp['id']) for tmp in following['response'])
-		while following['pagination']['next']:
-			following = self.papi.me_following(page=following['pagination']['next'])
-			if not following['status'] == 'success':
-				self.log.error("Failed on fetch!")
-				pprint.pprint(following)
-				raise RuntimeError("Wat?")
 
-			resultList |= set(str(tmp['id']) for tmp in following['response'])
-			self.log.info("Names found so far - %s", len(resultList))
-			time.sleep(1)
+		# resultlist = set()
+
+		# modes = ['public', 'private']
+
+		# for mode in modes:
+		# 	self.log.info("Fetching %s follows", mode)
+
+		# 	qs = {"restrict" : mode}
+
+		# 	while qs:
+
+		# 		json_result = self.aapi.illust_follow(**qs)
+
+		# 		new_ids = [entry['user']['id'] for entry in json_result['illusts']]
+		# 		resultlist.update(new_ids)
+
+		# 		qs = self.aapi.parse_qs(json_result.next_url)
+		# 		self.log.info("Found %s names so far (%s on page)", len(resultlist), len(new_ids))
+
+		# 		self.random_sleep(1,2,5, include_long=False)
 
 
+		# self.log.info("Found %d Names", len(resultlist))
 
-		self.log.info("Fetching private follows")
-		following = self.papi.me_following(publicity='private')
-		resultList |= set(str(tmp['id']) for tmp in following['response'])
-		while following['pagination']['next']:
-			following = self.papi.me_following(page=following['pagination']['next'], publicity='private')
-			if not following['status'] == 'success':
-				self.log.error("Failed on fetch!")
-				pprint.pprint(following)
-				raise RuntimeError("Wat?")
-			resultList |= set(str(tmp['id']) for tmp in following['response'])
-			self.log.info("Names found so far - %s", len(resultList))
-			time.sleep(1)
+		# self.log.info("Inserting IDs into DB")
+		# # Push the pixiv name list into the DB
+		# with self.db.context_sess() as sess:
+		# 	for name in resultlist:
 
-		self.log.info("Found %d Names", len(resultList))
+		# 		# Name entries are strings in the DB.
+		# 		# Yeeaaaaaaah
+		# 		name = str(name)
 
-		self.log.info("Inserting IDs into DB")
-		# Push the pixiv name list into the DB
-		with self.db.context_sess() as sess:
-			for name in resultList:
-				res = sess.query(self.db.ScrapeTargets.id)             \
-					.filter(self.db.ScrapeTargets.site_name == self.pluginShortName) \
-					.filter(self.db.ScrapeTargets.artist_name == name)              \
-					.scalar()
-				if not res:
-					self.log.info("Need to insert name: %s", name)
-					sess.add(self.db.ScrapeTargets(site_name=self.pluginShortName, artist_name=name))
-					sess.commit()
+		# 		res = sess.query(self.db.ScrapeTargets.id)             \
+		# 			.filter(self.db.ScrapeTargets.site_name == self.pluginShortName) \
+		# 			.filter(self.db.ScrapeTargets.artist_name == name)              \
+		# 			.scalar()
+		# 		if not res:
+		# 			self.log.info("Need to insert name: %s", name)
+		# 			sess.add(self.db.ScrapeTargets(site_name=self.pluginShortName, artist_name=name))
+		# 			sess.commit()
 
 
 		return super().getNameList()

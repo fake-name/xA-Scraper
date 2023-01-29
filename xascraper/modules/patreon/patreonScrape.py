@@ -73,21 +73,6 @@ class GetPatreon(xascraper.modules.scraper_base.ScraperBase):
 
 		# self.req.headers.update(self.wg.browserHeaders)
 
-	def random_sleep(self, start, mid, stop):
-
-		sleeptime = random.triangular(start, mid, stop)
-
-		# 1 in 10 chance of longer sleep
-		if random.randrange(0, 10) == 0:
-			sleeptime = random.triangular(60, 60*3, 60*5)
-
-		self.log.info("Sleeping %0.2f seconds", sleeptime)
-		for _ in range(int(sleeptime)):
-			time.sleep(1)
-
-		# Remaining sleep. Protbably silly.
-		time.sleep(sleeptime % 1.0)
-
 
 
 	def get_soup(self, url):

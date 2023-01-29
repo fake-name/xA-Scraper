@@ -72,7 +72,7 @@ class ArtItem(Base):
 	content             = Column(Text)
 	content_structured  = Column(sqlalchemy_jsonfield.JSONField())
 
-	artist         = relationship("ScrapeTargets", backref='item')
+	artist         = relationship("ScrapeTargets", backref='posts')
 	files          = relationship("ArtFile", backref='item')
 	tags           = relationship("ArtTags", backref='item')
 
@@ -127,7 +127,7 @@ class ScrapeTargets(Base):
 	release_cnt     = Column(Integer, default='0')
 	enabled         = Column(Boolean,  nullable=False, default=True)
 
-	posts           = relationship("ArtItem")
+	# posts           = relationship("ArtItem")
 
 	in_progress     = Column(Boolean, default=False)
 
