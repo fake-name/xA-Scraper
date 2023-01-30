@@ -52,12 +52,12 @@ import secrets
 import urllib.parse
 
 # Latest app version can be found using GET /v1/application-info/android
-USER_AGENT = "PixivAndroidApp/5.0.234 (Android 11; Pixel 5)"
-REDIRECT_URI = "https://app-api.pixiv.net/web/v1/users/auth/pixiv/callback"
-LOGIN_URL = "https://app-api.pixiv.net/web/v1/login"
+USER_AGENT     = "PixivAndroidApp/5.0.234 (Android 11; Pixel 5)"
+REDIRECT_URI   = "https://app-api.pixiv.net/web/v1/users/auth/pixiv/callback"
+LOGIN_URL      = "https://app-api.pixiv.net/web/v1/login"
 AUTH_TOKEN_URL = "https://oauth.secure.pixiv.net/auth/token"
-CLIENT_ID = "MOBrBDS8blbauoSck0ZfDbtuzpyT"
-CLIENT_SECRET = "lsACyCD94FhDUtGTXi3QzcFE2uU1hqtDaKeqrdwj"
+CLIENT_ID      = "MOBrBDS8blbauoSck0ZfDbtuzpyT"
+CLIENT_SECRET  = "lsACyCD94FhDUtGTXi3QzcFE2uU1hqtDaKeqrdwj"
 
 '''
 cr.execute_javascript_statement("""
@@ -537,11 +537,15 @@ class GetPX(xascraper.modules.scraper_base.ScraperBase):
 
 			if 'error' in illust_deets:
 				try:
+
+					if 'Error occurred at the OAuth process. Please check your Access Token to fix this. Error Message: invalid_grant' in illust_deets['error']['message']:
+						raise exceptions.NotLoggedInException("Login expired!")
+
 					self.log.info("Error fetching item: %s", illust_deets['error']['message'])
-					return self.build_page_ret(status="Failed: %s" % illust_deets['error']['message'], fqDlPath=None)
+					return self.build_page_ret(status="Failed", pageTitle="Failed: %s" % illust_deets['error']['message'], fqDlPath=None)
 
 				except KeyError as e:
-					return self.build_page_ret(status="Failed: %s" % e, fqDlPath=None)
+					return self.build_page_ret(status="Failed", pageTitle="Failed: %s" % e, fqDlPath=None)
 
 			if not 'illust' in illust_deets:
 				print("No illust field in illust_deets?")
@@ -623,13 +627,7 @@ class GetPX(xascraper.modules.scraper_base.ScraperBase):
 			IPython.embed()
 
 
-
-		if user_details["profile"]['total_novels']:
-			print("User has novels. TODO: Handle this!")
-			import IPython
-			IPython.embed()
-
-		return user_details["profile"]['total_illusts'] + user_details["profile"]['total_manga']
+		return user_details["profile"]['total_illusts'] + user_details["profile"]['total_manga'] + user_details["profile"]['total_novels']
 
 	def _getTotalArtCount(self, aid):
 		try:
@@ -698,54 +696,70 @@ class GetPX(xascraper.modules.scraper_base.ScraperBase):
 
 	def getNameList(self):
 		self.checkLogin()
-		self.log.info("Getting list of favourite artists.")
+
+		item_key = "px:last_artist_list_update"
+
+		have = self.db.get_from_db_key_value_store(item_key)
+
+		# If we've fetched it in the last 2 days, don't grab the item again.
+		if have and 'last_fetch' in have and have['last_fetch'] and have['last_fetch'] > (time.time() - 60*60*24*2):
+			self.log.info("Fetched artist list within the last two days. Skipping.")
+
+
+		else:
+			self.log.info("Getting list of favourite artists.")
+
+			resultlist = set()
+
+			modes = ['public', 'private']
+
+			for mode in modes:
+				self.log.info("Fetching %s follows", mode)
+
+				qs = {"restrict" : mode}
+
+				while qs:
+
+					json_result = self.aapi.illust_follow(**qs)
+
+					new_ids = [entry['user']['id'] for entry in json_result['illusts']]
+					resultlist.update(new_ids)
+
+					qs = self.aapi.parse_qs(json_result.next_url)
+					self.log.info("Found %s names so far (%s on page)", len(resultlist), len(new_ids))
+
+					self.random_sleep(1,2,5, include_long=False)
+
+			assert not any('-' in str(tmp) for tmp in resultlist)
+
+			self.log.info("Found %d Names", len(resultlist))
+
+			self.log.info("Inserting IDs into DB")
+			# Push the pixiv name list into the DB
+			with self.db.context_sess() as sess:
+				for name in resultlist:
+
+					# Name entries are strings in the DB.
+					# Yeeaaaaaaah
+					name = str(name)
+
+					res = sess.query(self.db.ScrapeTargets.id)             \
+						.filter(self.db.ScrapeTargets.site_name == self.pluginShortName) \
+						.filter(self.db.ScrapeTargets.artist_name == name)              \
+						.scalar()
+					if not res:
+						self.log.info("Need to insert name: %s", name)
+						sess.add(self.db.ScrapeTargets(site_name=self.pluginShortName, artist_name=name))
+						sess.commit()
+
+			self.db.set_in_db_key_value_store(item_key, {'last_fetch' : time.time()})
+
+		ret = super().getNameList()
 
 
 
-		# resultlist = set()
 
-		# modes = ['public', 'private']
-
-		# for mode in modes:
-		# 	self.log.info("Fetching %s follows", mode)
-
-		# 	qs = {"restrict" : mode}
-
-		# 	while qs:
-
-		# 		json_result = self.aapi.illust_follow(**qs)
-
-		# 		new_ids = [entry['user']['id'] for entry in json_result['illusts']]
-		# 		resultlist.update(new_ids)
-
-		# 		qs = self.aapi.parse_qs(json_result.next_url)
-		# 		self.log.info("Found %s names so far (%s on page)", len(resultlist), len(new_ids))
-
-		# 		self.random_sleep(1,2,5, include_long=False)
-
-
-		# self.log.info("Found %d Names", len(resultlist))
-
-		# self.log.info("Inserting IDs into DB")
-		# # Push the pixiv name list into the DB
-		# with self.db.context_sess() as sess:
-		# 	for name in resultlist:
-
-		# 		# Name entries are strings in the DB.
-		# 		# Yeeaaaaaaah
-		# 		name = str(name)
-
-		# 		res = sess.query(self.db.ScrapeTargets.id)             \
-		# 			.filter(self.db.ScrapeTargets.site_name == self.pluginShortName) \
-		# 			.filter(self.db.ScrapeTargets.artist_name == name)              \
-		# 			.scalar()
-		# 		if not res:
-		# 			self.log.info("Need to insert name: %s", name)
-		# 			sess.add(self.db.ScrapeTargets(site_name=self.pluginShortName, artist_name=name))
-		# 			sess.commit()
-
-
-		return super().getNameList()
+		return ret
 
 
 

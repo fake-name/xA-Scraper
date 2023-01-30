@@ -3,6 +3,7 @@ import sys
 import multiprocessing
 import logging
 import contextlib
+import orjson
 import threading
 import sqlalchemy.exc
 
@@ -52,7 +53,11 @@ def get_engine():
 				iso_level = 'SERIALIZABLE'
 			print("INFO: Creating engine for process! Engine name: '%s'" % csid)
 			ENGINES[csid] = create_engine(SQLALCHEMY_DATABASE_URI,
-						isolation_level=iso_level)
+						isolation_level=iso_level,
+
+							json_serializer   = lambda x: orjson.dumps(x).decode('utf-8'),
+							json_deserializer = orjson.loads,
+						)
 						# isolation_level="READ COMMITTED")
 
 	return ENGINES[csid]

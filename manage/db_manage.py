@@ -379,3 +379,58 @@ def reset_missing():
 				print("Item has no files: ", item.artist.site_name, item.state, item.title)
 				item.state = 'new'
 				sess.commit()
+
+
+
+def fix_duplicates():
+	# So I kind of fucked up my DB and wound up with some invalid indexes.
+	# Anyways, I need a tool to clean them before I can reindex them successfully.
+
+	# print("Fixing duplicates tags")
+
+	seen_tags = {}
+	with db.context_sess() as sess:
+		total_items = sess.query(db.ArtTags).count()
+		for rid, item_id, tag in tqdm.tqdm(sess.query(db.ArtTags.id, db.ArtTags.item_id, db.ArtTags.tag).yield_per(1000), total=total_items):
+			seen_tags.setdefault((item_id, tag), []).append(rid)
+
+
+	tag_dupes = {k : v for k, v in seen_tags.items() if len(v) > 1}
+
+	print("Found %s duplicate tag entries" % (len(tag_dupes)))
+
+
+	with db.context_sess() as sess:
+		for key, dbids in tag_dupes.items():
+			print("Deleting dupe for tag: ", (key, dbids))
+			sess.query(db.ArtTags).filter(db.ArtTags.id==max(dbids)).delete()
+			sess.commit()
+
+	print("Fixing duplicates entries")
+
+	seen_entries = {}
+	with db.context_sess() as sess:
+		total_items = sess.query(db.ArtItem).count()
+		for rid, item_id, tag in tqdm.tqdm(sess.query(db.ArtItem.id, db.ArtItem.artist_id, db.ArtItem.release_meta).yield_per(1000), total=total_items):
+			seen_entries.setdefault((item_id, tag), []).append(rid)
+
+
+	entry_dupes = {k : v for k, v in seen_entries.items() if len(v) > 1}
+
+	print("Found %s duplicate entries" % (len(entry_dupes)))
+
+
+	with db.context_sess() as sess:
+		for key, dbids in entry_dupes.items():
+			print("Deleting dupe for entry: ", (key, dbids))
+			sess.query(db.ArtItem).filter(db.ArtItem.id==max(dbids)).delete()
+			sess.commit()
+
+
+
+
+
+
+# REINDEX (VERBOSE) TABLE art_item;
+# REINDEX (VERBOSE) TABLE art_tag;
+

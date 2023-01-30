@@ -13,6 +13,7 @@ import time
 import random
 import pprint
 import requests
+import ChromeController
 from settings import settings
 
 import xascraper.modules.scraper_base
@@ -36,10 +37,13 @@ class GetPatreon(xascraper.modules.scraper_base.ScraperBase):
 
 	numThreads = 1
 
-	custom_ua = [('User-Agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/109.0.0.0 Safari/537.36'),
-				 ('Accept-Language', 'en-US,en;q=0.9'),
-				 ('Accept', 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9'),
-				 ('Accept-Encoding', 'gzip, deflate, br')]
+	custom_ua = [('user-agent',      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/109.0.0.0 Safari/537.36'),
+				 ('accept-language', 'en-US,en;q=0.9'),
+				 ('accept',          'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9'),
+				 ('accept-encoding', 'gzip, deflate, br')]
+
+
+	custom_ua = []
 
 	# Stubbed functions
 	_getGalleries = None
@@ -252,28 +256,9 @@ class GetPatreon(xascraper.modules.scraper_base.ScraperBase):
 			IPython.embed()
 			raise exceptions.CannotAccessException("Could not log in?")
 
-		self.wg.saveCookies()
+		# self.wg.saveCookies()
 
 		return self.checkCookie()
-
-	# ---------------------------------------------------------------------------------------------------------------------------------------------------------
-	# Internal utilities stuff
-	# ---------------------------------------------------------------------------------------------------------------------------------------------------------
-	def __cf_check(self, url, *args, **kwargs):
-		try:
-			content = self.wg.getpage(url, *args, **kwargs)
-		except WebRequest.FetchFailureError as e:
-			if e.err_code == 403 and b"Attention Required! | Cloudflare" in e.err_content:
-				e_soup = WebRequest.as_soup(e.err_content)
-				self.handle_recaptcha(e_soup, url, "https://www.patreon.com/home")
-				print()
-				print(e.err_content)
-				print()
-				print(e.err_reason)
-				print()
-				return self.wg.getpage(url, *args, **kwargs)
-			raise
-		return content
 
 
 	def get_api_json(self, endpoint, postData = None, retries=1):
@@ -281,26 +266,24 @@ class GetPatreon(xascraper.modules.scraper_base.ScraperBase):
 			postData = {"data" : postData}
 			postData = json.dumps(postData, sort_keys=True)
 
-		assert endpoint.startswith("/"), "Endpoint isn't a relative path! Passed: '%s'" % endpoint
+		if endpoint.startswith("http"):
+			endpoint_url = endpoint
+		else:
+			assert endpoint.startswith("/"), "Endpoint isn't a relative path! Passed: '%s'" % endpoint
+			endpoint_url = "https://www.patreon.com/api{endpoint}".format(endpoint=endpoint)
+
 
 		try:
-			# content = self.__cf_check(
 			content = self.cr.xhr_fetch(
-					"https://www.patreon.com/api{endpoint}".format(endpoint=endpoint),
+					endpoint_url,
 					headers ={
-						"Accept"          : "application/json",
-						"Origin"          : "https://www.patreon.com",
-						"Host"            : "www.patreon.com",
-						"Content-Type"    : "application/json",
-						"Accept-Encoding" : "gzip, deflate",
-						"Authority"       : "www.patreon.com",
-						"Scheme"          : "https",
+						"content-type"    : "application/json",
 						# "Referer"         : "https://www.patreon.com/login",
 						# "Pragma"          : "no-cache",
 						# "Cache-Control"   : "no-cache",
 						},
-					post_data      = postData,
-					post_type='application/json'
+					post_data = postData,
+					post_type = 'application/json'
 				)
 
 
@@ -334,47 +317,6 @@ class GetPatreon(xascraper.modules.scraper_base.ScraperBase):
 				json.dump(content, fp)
 			traceback.print_exc()
 			raise exceptions.UnrecoverableFailureException("Wat?")
-
-
-
-		# try:
-
-		# 	headers = {
-		# 				"Accept"          : "*/*",
-		# 				"Origin"          : "https://www.patreon.com",
-		# 				"Host"            : "www.patreon.com",
-		# 				"Content-Type"    : "application/json",
-		# 				"Accept-Encoding" : "gzip, deflate",
-		# 				"Authority"       : "www.patreon.com",
-		# 				"Scheme"          : "https",
-		# 				# "Referer"         : "https://www.patreon.com/login",
-		# 				# "Pragma"          : "no-cache",
-		# 				# "Cache-Control"   : "no-cache",
-		# 		}
-
-		# 	resp = self.req.post(
-		# 			"https://www.patreon.com/api{endpoint}".format(endpoint=endpoint),
-		# 			data    = postData,
-		# 			headers = headers,
-		# 		)
-
-		# except Exception as e:
-		# 	traceback.print_exc()
-		# 	raise exceptions.UnrecoverableFailureException("Wat?")
-
-
-		# if resp is None:
-		# 	self.log.error("Couldn't login! Please check username and password!")
-		# 	raise LoginFailure("Failed to login. Please check your username and password are correct!")
-
-		# ret = resp.json()
-
-		# if 'errors' in ret and ret['errors']:
-		# 	self.log.error("error?")
-		# 	self.log.error(ret)
-		# 	raise RuntimeError
-
-		# return ret
 
 
 	def current_user_info(self):
@@ -645,8 +587,6 @@ class GetPatreon(xascraper.modules.scraper_base.ScraperBase):
 
 		item_type, postid = post_meta
 
-
-
 		if item_type == 'post':
 			item_key = "{}-{}-{}-fetchtime".format("pat", item_type, postid)
 			have = self.db.get_from_db_key_value_store(item_key)
@@ -726,10 +666,13 @@ class GetPatreon(xascraper.modules.scraper_base.ScraperBase):
 			self.log.error("PostID = '%s'", postid)
 			self.log.error(traceback.format_exc())
 
+			import IPython
+			IPython.embed()
+
 		return extends
 
 
-	def _load_art(self, patreon_aid, artist_undecoded, artist_name):
+	def _load_art(self, campaign_id, artist_undecoded, artist_name):
 		local_aid = self._artist_name_to_rid(artist_undecoded)
 
 		oldArt = self._getPreviouslyRetreived(artist_undecoded)
@@ -739,7 +682,7 @@ class GetPatreon(xascraper.modules.scraper_base.ScraperBase):
 		# import pdb
 		# pdb.set_trace()
 
-		artPages = self.get_campaign_posts(local_aid, patreon_aid, artist_undecoded, artist_name, oldArt)
+		artPages = self.get_campaign_posts(local_aid, campaign_id, artist_undecoded, artist_name, oldArt)
 
 		self.log.info("Total gallery items %s", len(artPages))
 
@@ -774,7 +717,7 @@ class GetPatreon(xascraper.modules.scraper_base.ScraperBase):
 			if 'campaign' in artist_meta and artist_meta['campaign']['data']['type'] == 'campaign':
 				campaign_id = artist_meta['campaign']['data']['id']
 
-				newArt = self._load_art(patreon_aid, artist_undecoded, artist_name)
+				newArt = self._load_art(campaign_id, artist_undecoded, artist_name)
 			else:
 				newArt = []
 
@@ -844,47 +787,47 @@ class GetPatreon(xascraper.modules.scraper_base.ScraperBase):
 
 		self.log.info("Getting list of favourite artists.")
 
-		try:
+		# try:
 
-			artist_lut = self.get_artist_lut()
-		except Exception as e:
-			import IPython
-			IPython.embed()
+		# 	artist_lut = self.get_artist_lut()
+		# except Exception as e:
+		# 	import IPython
+		# 	IPython.embed()
 
-		self.log.info("Found %d Names", len(artist_lut))
-		for key, value in artist_lut.items():
-			print((key, value))
+		# self.log.info("Found %d Names", len(artist_lut))
+		# for key, value in artist_lut.items():
+		# 	print((key, value))
 
-		resultList = [json.dumps((key, value), sort_keys=True) for key, value in artist_lut.items()]
+		# resultList = [json.dumps((key, value), sort_keys=True) for key, value in artist_lut.items()]
 
 
-		with self.db.context_sess() as sess:
-			for name in resultList:
-				res = sess.query(self.db.ScrapeTargets.id)             \
-					.filter(self.db.ScrapeTargets.site_name == self.pluginShortName) \
-					.filter(self.db.ScrapeTargets.artist_name == name)              \
-					.scalar()
-				if not res:
-					self.log.info("Need to insert name: %s", name)
-					sess.add(self.db.ScrapeTargets(site_name=self.pluginShortName, artist_name=name))
-					sess.commit()
+		# with self.db.context_sess() as sess:
+		# 	for name in resultList:
+		# 		res = sess.query(self.db.ScrapeTargets.id)             \
+		# 			.filter(self.db.ScrapeTargets.site_name == self.pluginShortName) \
+		# 			.filter(self.db.ScrapeTargets.artist_name == name)              \
+		# 			.scalar()
+		# 		if not res:
+		# 			self.log.info("Need to insert name: %s", name)
+		# 			sess.add(self.db.ScrapeTargets(site_name=self.pluginShortName, artist_name=name))
+		# 			sess.commit()
 
-		with self.db.context_sess() as sess:
-			res = sess.query(self.db.ScrapeTargets)             \
-				.filter(self.db.ScrapeTargets.site_name == self.pluginShortName) \
-				.all()
+		# with self.db.context_sess() as sess:
+		# 	res = sess.query(self.db.ScrapeTargets)             \
+		# 		.filter(self.db.ScrapeTargets.site_name == self.pluginShortName) \
+		# 		.all()
 
-			for row in res:
-				if row.artist_name in resultList:
-					if not row.enabled:
-						self.log.info("Enabling artist: %s", row.artist_name)
-						row.enabled = True
-				else:
-					if row.enabled:
-						self.log.info("Disabling artist: %s", row.artist_name)
-						row.enabled = False
+		# 	for row in res:
+		# 		if row.artist_name in resultList:
+		# 			if not row.enabled:
+		# 				self.log.info("Enabling artist: %s", row.artist_name)
+		# 				row.enabled = True
+		# 		else:
+		# 			if row.enabled:
+		# 				self.log.info("Disabling artist: %s", row.artist_name)
+		# 				row.enabled = False
 
-			sess.commit()
+		# 	sess.commit()
 
 
 
@@ -896,29 +839,26 @@ class GetPatreon(xascraper.modules.scraper_base.ScraperBase):
 	# Gallery Scraping
 	# ---------------------------------------------------------------------------------------------------------------------------------------------------------
 
-	def get_campaign_posts(self, local_aid, patreon_aid, artist_undecoded, artist_name, oldArt):
+	def get_campaign_posts(self, local_aid, campaign_id, artist_undecoded, artist_name, oldArt):
 		now = datetime.datetime.utcnow().replace(tzinfo = pytz.utc).replace(microsecond=0)
 
 		postids = set()
 		types = ['posts', 'poll']
-		while True:
-			current = self.get_api_json("/stream?" +
-				"include=recent_comments.commenter%2Crecent_comments.parent%2Crecent_comments.post%2Crecent_comments.first_reply.commenter%2Crecent_comments.first_reply.parent%2Crecent_comments.first_reply.post" +
-				"&fields[post]=change_visibility_at%2Ccomment_count%2Ccontent%2Ccurrent_user_can_delete%2Ccurrent_user_can_view%2Ccurrent_user_has_liked%2Cearly_access_min_cents%2Cembed%2Cimage%2Cis_paid%2Clike_count%2Cmin_cents_pledged_to_view%2Cpost_file%2Cpublished_at%2Cpatron_count%2Cpatreon_url%2Cpost_type%2Cpledge_url%2Cthumbnail_url%2Ctitle%2Cupgrade_url%2Curl" +
-				"&fields[user]=image_url%2Cfull_name%2Curl" +
-				"&fields[campaign]=earnings_visibility" +
-				"&page[cursor]={now}".format(now=str(now.isoformat())) +
-				"&filter[is_by_creator]=true" +
-				"&filter[is_following]=false" +
-				"&filter[creator_id]={patreon_aid}".format(patreon_aid=patreon_aid) +
-				"&filter[contains_exclusive_posts]=true" +
-				"&json-api-use-default-includes=false" +
-				"&json-api-version=1.0" +
-				"&fields[comment]=body%2Ccreated%2Cdeleted_at%2Cis_by_patron%2Cis_by_creator%2Cvote_sum%2Ccurrent_user_vote%2Creply_count" +
-				"&fields[post]=comment_count" +
-				"&fields[user]=image_url%2Cfull_name%2Curl" +
-				""
-				)
+
+		api_page_url = "/posts?" + \
+				"include=user%2Cattachments%2Ccampaign%2Cpoll.choices%2Cpoll.current_user_responses.user%2Cpoll.current_user_responses.choice%2Cpoll.current_user_responses.poll%2Caccess_rules.tier.null%2Cimages.null%2Caudio.null" + \
+				"&fields[post]=change_visibility_at%2Ccomment_count%2Ccontent%2Ccurrent_user_can_delete%2Ccurrent_user_can_view%2Ccurrent_user_has_liked%2Cembed%2Cimage%2Cis_paid%2Clike_count%2Cmin_cents_pledged_to_view%2Cpost_file%2Cpost_metadata%2Cpublished_at%2Cpatron_count%2Cpatreon_url%2Cpost_type%2Cpledge_url%2Cthumbnail_url%2Cteaser_text%2Ctitle%2Cupgrade_url%2Curl%2Cwas_posted_by_campaign_owner" + \
+				"&fields[user]=image_url%2Cfull_name%2Curl" + \
+				"&fields[campaign]=show_audio_post_download_links%2Cavatar_photo_url%2Cearnings_visibility%2Cis_nsfw%2Cis_monthly%2Cname%2Curl" + \
+				"&fields[access_rule]=access_rule_type%2Camount_cents" + \
+				"&fields[media]=id%2Cimage_urls%2Cdownload_url%2Cmetadata%2Cfile_name" + \
+				"&sort=-published_at" + \
+				"&filter[is_draft]=false&filter[contains_exclusive_posts]=true&json-api-use-default-includes=false&json-api-version=1.0" + \
+				"&filter[campaign_id]={campaign_id}".format(campaign_id=campaign_id)
+
+		while api_page_url:
+			current = self.get_api_json(api_page_url)
+
 
 			had_post = False
 			for release in current['data']:
@@ -948,6 +888,7 @@ class GetPatreon(xascraper.modules.scraper_base.ScraperBase):
 
 					if release['type'] != "post":
 						self.log.warning("Non post release!")
+
 				else:
 					self.log.warning("Unknown type!")
 					for line in pprint.pformat(release).split("\n"):
@@ -955,8 +896,11 @@ class GetPatreon(xascraper.modules.scraper_base.ScraperBase):
 
 
 			self.log.info("iterating over listing of campaign posts. Found %s so far, have new: %s.", len(postids), had_post)
-			if not had_post:
-				break
+
+			if 'links' in current and 'next' in current['links']:
+				api_page_url = current['links']['next']
+			else:
+				api_page_url = None
 
 
 			self.random_sleep(2,4,15)
@@ -972,9 +916,12 @@ class GetPatreon(xascraper.modules.scraper_base.ScraperBase):
 
 	def go(self, *args, **kwargs):
 
-		with self.wg.chromiumContext('https://www.patreon.com/') as cr:
-			self.cr = cr
-			super().go(*args, **kwargs)
+		self.cr = ChromeController.ChromeRemoteDebugInterface(
+				headless           = False,
+				enable_gpu         = True,
+				additional_options = ['--new-window']
+			)
+		super().go(*args, **kwargs)
 
 def signal_handler(dummy_signal, dummy_frame):
 	if flags.namespace.run:

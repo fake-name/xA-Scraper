@@ -44,6 +44,8 @@ def one_arg_go(command):
 		db_manage.dump_item_meta()
 	elif command == 'reset-missing':
 		db_manage.reset_missing()
+	elif command == 'fix-duplicates':
+		db_manage.fix_duplicates()
 	else:
 		cli_utils.print_help()
 
