@@ -25,6 +25,9 @@ class LoginFailure(Exception):
 class FetchError(Exception):
 	pass
 
+PATREON_LOGIN_PAGE = 'https://www.patreon.com/login'
+PATREON_HOME_PAGE  = 'https://www.patreon.com/home'
+
 class GetPatreon(xascraper.modules.scraper_base.ScraperBase):
 
 	pluginShortName = "pat"
@@ -92,7 +95,7 @@ class GetPatreon(xascraper.modules.scraper_base.ScraperBase):
 	def checkCookie(self):
 		print("Checking login!")
 		try:
-			page = self.get_soup("https://www.patreon.com/home")
+			page = self.get_soup(PATREON_HOME_PAGE)
 			page_str = str(page)
 		except Exception:
 			# print("Not logged in!")
@@ -186,8 +189,6 @@ class GetPatreon(xascraper.modules.scraper_base.ScraperBase):
 		self.log.info("Not logged in. Doing login.")
 
 
-		home  = "https://www.patreon.com/home"
-		login = "https://www.patreon.com/login"
 
 		# try:
 		# 	self.cr.blocking_navigate(login)
@@ -213,7 +214,7 @@ class GetPatreon(xascraper.modules.scraper_base.ScraperBase):
 
 
 		try:
-			soup = self.get_soup(login)
+			soup = self.get_soup(PATREON_LOGIN_PAGE)
 		except Exception as e:
 
 			import pdb
@@ -223,10 +224,10 @@ class GetPatreon(xascraper.modules.scraper_base.ScraperBase):
 
 		# These won't work for the particular recaptcha flavor patreon uses. Sigh.
 		if soup.find_all("div", class_="g-recaptcha"):
-			soup = self.handle_recaptcha(soup, home, login)
+			soup = self.handle_recaptcha(soup, PATREON_HOME_PAGE, PATREON_LOGIN_PAGE)
 
 		if soup.find_all("div", id="hcaptcha_widget"):
-			soup = self.handle_hcaptcha(soup, home, login)
+			soup = self.handle_hcaptcha(soup, PATREON_HOME_PAGE, PATREON_LOGIN_PAGE)
 
 		if soup.find_all("div", class_="g-recaptcha"):
 			self.log.error("Failed after attempting to solve recaptcha!")
@@ -260,8 +261,13 @@ class GetPatreon(xascraper.modules.scraper_base.ScraperBase):
 
 		return self.checkCookie()
 
+	def handle_cf(self, content):
+		assert content['code'] == 403
 
-	def get_api_json(self, endpoint, postData = None, retries=1):
+		rendered = self.cr.get_rendered_page_source()
+
+
+	def get_api_json(self, endpoint, postData = None, retry=False):
 		if postData:
 			postData = {"data" : postData}
 			postData = json.dumps(postData, sort_keys=True)
@@ -278,7 +284,7 @@ class GetPatreon(xascraper.modules.scraper_base.ScraperBase):
 					endpoint_url,
 					headers ={
 						"content-type"    : "application/json",
-						# "Referer"         : "https://www.patreon.com/login",
+						# "Referer"         : PATREON_LOGIN_PAGE,
 						# "Pragma"          : "no-cache",
 						# "Cache-Control"   : "no-cache",
 						},
@@ -293,19 +299,34 @@ class GetPatreon(xascraper.modules.scraper_base.ScraperBase):
 
 		try:
 			if content['mimetype'] != 'application/vnd.api+json':
-				self.log.error("Response isn't JSON. What?")
-				with open("bogus_response.json", "w") as fp:
-					json.dump(content, fp)
+				if content['code'] == 403:
+					self.handle_cf(content)
 
-				if content['code'] == 504:
-					raise exceptions.RetryException("Gateway time out. Sleeping for a bit.")
 
-				if content['code'] == 502:
-					raise exceptions.RetryException("Gateway time out. Sleeping for a bit.")
+				if retry:
+					self.log.error("Response isn't JSON. What?")
+					with open("bogus_response.json", "w") as fp:
+						json.dump(content, fp)
 
-				import IPython
-				IPython.embed()
-				raise exceptions.UnrecoverableFailureException("API Response that is not json!")
+					if content['code'] == 504:
+						raise exceptions.RetryException("Gateway time out. Sleeping for a bit.")
+
+					if content['code'] == 502:
+						raise exceptions.RetryException("Gateway time out. Sleeping for a bit.")
+
+
+					import IPython
+					IPython.embed()
+					raise exceptions.UnrecoverableFailureException("API Response that is not json!")
+
+				else:
+
+					# Retry just once
+					self.random_sleep(10,15,60, include_long=False)
+					self.cr.blocking_navigate(PATREON_HOME_PAGE)
+					self.random_sleep(10,15,60)
+					return self.get_api_json(endpoint, postData, retry=True)
+
 			ret = json.loads(content['response'])
 			return ret
 
@@ -360,7 +381,14 @@ class GetPatreon(xascraper.modules.scraper_base.ScraperBase):
 		if os.path.exists(fqpath):
 			self.log.info("Do not need to download: '%s'", fname)
 		else:
-			content = self.wg.getpage(furl, addlHeaders={"Referer" : "https://www.patreon.com/home"})
+			try:
+				content = self.wg.getpage(furl, addlHeaders={"Referer" : PATREON_HOME_PAGE})
+			except WebRequest.FetchFailureError:
+				self.log.error(traceback.format_exc())
+				self.log.error("Could not retreive content: ")
+				self.log.error("%s", furl)
+				return None
+
 			if content:
 				self.local_save_file(aname, fname, content)
 			else:
@@ -384,7 +412,7 @@ class GetPatreon(xascraper.modules.scraper_base.ScraperBase):
 		if os.path.exists(fqpath):
 			self.log.info("Do not need to download: '%s'", fname)
 		else:
-			content = self.wg.getpage(url, addlHeaders={"Referer" : "https://www.patreon.com/home"})
+			content = self.wg.getpage(url, addlHeaders={"Referer" : PATREON_HOME_PAGE})
 			if content:
 				if isinstance(content, str):
 					with open(fqpath, "wb") as fp:
@@ -415,7 +443,13 @@ class GetPatreon(xascraper.modules.scraper_base.ScraperBase):
 		if os.path.exists(fqpath):
 			self.log.info("Do not need to download: '%s'", fname)
 		else:
-			content = self.wg.getpage(url, addlHeaders={"Referer" : "https://www.patreon.com/home"})
+			try:
+				content = self.wg.getpage(url, addlHeaders={"Referer" : PATREON_HOME_PAGE})
+			except WebRequest.FetchFailureError:
+				self.log.error(traceback.format_exc())
+				self.log.error("Could not retreive content: ")
+				self.log.error("%s", url)
+				return None
 			if content:
 				if isinstance(content, str):
 					self.local_save_file(aname, fname, content.encode("utf-8"))
@@ -452,6 +486,12 @@ class GetPatreon(xascraper.modules.scraper_base.ScraperBase):
 
 		raise ValueError("Wat?")
 
+	def __handle_errors(self, post_errors):
+		for error in post_errors:
+			if 'code_name' in error and error['code_name'] == 'ResourceMissing' and 'status' in error and error['status'] == '404':
+				raise exceptions.ContentRemovedException("Item has been deleted or removed.")
+
+
 	def _get_art_post(self, postId, artistName):
 		post = self.get_api_json("/posts/{pid}".format(pid=postId) +
 			"?include=media"
@@ -466,7 +506,11 @@ class GetPatreon(xascraper.modules.scraper_base.ScraperBase):
 
 
 		if not 'data' in post:
+			if "errors" in post:
+				self.__handle_errors(post['errors'])
+
 			self.log.warning("No 'data' member in post!")
+
 			pprint.pprint(post)
 			fail = {
 				'status' : ''
@@ -524,6 +568,7 @@ class GetPatreon(xascraper.modules.scraper_base.ScraperBase):
 			if "post_file" in post_info and post_info['post_file']:
 				furl = urllib.parse.unquote(post_info['post_file']['url'])
 				# print("Post file!", post_info['post_file']['url'], furl)
+
 				fpath = self.save_image(artistName, postId, post_info['post_file']['name'], furl)
 				files.append(fpath)
 
@@ -555,14 +600,21 @@ class GetPatreon(xascraper.modules.scraper_base.ScraperBase):
 		except urllib.error.URLError:
 			self.log.error("Failure retreiving content from post: %s", post)
 
+		# Posts can apparently be empty.
+		if not post_info['content']:
+			post_info['content'] = ""
 
 		ctnt_soup = bs4.BeautifulSoup(post_info['content'], 'lxml')
+
 		for img in ctnt_soup.find_all("img", src=True):
 			furl = img['src']
 			fparsed = urllib.parse.urlparse(furl)
 			fname = fparsed.path.split("/")[-1]
-			fpath = self.save_image(artistName, postId, fname, furl)
-			files.append(fpath)
+
+			# Somehow empty urls ("http://") are getting into here.
+			if len(furl) > len("https://xx"):
+				fpath = self.save_image(artistName, postId, fname, furl)
+				files.append(fpath)
 
 		# Youtube etc are embedded as iframes.
 		for ifr in ctnt_soup.find_all("iframe", src=True):
@@ -602,9 +654,13 @@ class GetPatreon(xascraper.modules.scraper_base.ScraperBase):
 				ret = self._get_art_post(postid, artistName)
 				self.db.set_in_db_key_value_store(item_key, {'last_fetch' : time.time()})
 				return ret
-			finally:
+			except exceptions.ContentRemovedException:
+				# Don't retry removed items more then once a year.
+				self.db.set_in_db_key_value_store(item_key, {'last_fetch' : time.time() + 60*60*24 * 365})
+				raise
 
-				self.random_sleep(5, 15, 60)
+			finally:
+				self.random_sleep(1,3,10, include_long=False)
 
 
 
@@ -675,27 +731,32 @@ class GetPatreon(xascraper.modules.scraper_base.ScraperBase):
 	def _load_art(self, campaign_id, artist_undecoded, artist_name):
 		local_aid = self._artist_name_to_rid(artist_undecoded)
 
-		oldArt = self._getPreviouslyRetreived(artist_undecoded)
-		# oldart is a set of dumped lists:
-		#  '["post", "42951172"]', '["post", "50659317"]', '["post", "25308029"]',
+		item_key = "{}-{}-{}-fetchtime".format("pat", "content_list_fetch", local_aid)
+		have = self.db.get_from_db_key_value_store(item_key)
 
-		# import pdb
-		# pdb.set_trace()
+		# If we've fetched it in the last 2 weeks, don't retry it.
+		if have and 'last_fetch' in have and have['last_fetch'] and have['last_fetch'] > (time.time() - 60*60*24*7*2):
+			pass
 
-		artPages = self.get_campaign_posts(local_aid, campaign_id, artist_undecoded, artist_name, oldArt)
+		else:
 
-		self.log.info("Total gallery items %s", len(artPages))
+			oldArt = self._getPreviouslyRetreived(artist_undecoded)
+			artPages = self.get_campaign_posts(local_aid, campaign_id, artist_undecoded, artist_name, oldArt)
+			self.log.info("Total gallery items %s", len(artPages))
 
-		new = 0
-		with self.db.context_sess() as sess:
-			for item in artPages:
-				item_json = json.dumps(item, sort_keys=True)
-				new += self._upsert_if_new(sess, local_aid, item_json)
+			new = 0
+			with self.db.context_sess() as sess:
+				for item in artPages:
+					item_json = json.dumps(item, sort_keys=True)
+					new += self._upsert_if_new(sess, local_aid, item_json)
 
-		self.log.info("%s new art pages, %s total", new, len(artPages))
+			self.log.info("%s new art pages, %s total", new, len(artPages))
 
-		newArt = artPages - oldArt
-		self.log.info("Old art items = %s, newItems = %s", len(oldArt), len(newArt))
+			newArt = artPages - oldArt
+			self.log.info("Old art items = %s, newItems = %s", len(oldArt), len(newArt))
+
+			self.db.set_in_db_key_value_store(item_key, {'last_fetch' : time.time()})
+
 
 		new_raw = self._getNewToRetreive(aid=local_aid)
 
@@ -705,6 +766,9 @@ class GetPatreon(xascraper.modules.scraper_base.ScraperBase):
 		artist_decoded = json.loads(artist_undecoded)
 		patreon_aid, artist_meta = artist_decoded
 		artist_name, artist_meta = artist_meta
+
+		# Fix artists with leading/trailing spaces
+		artist_name = artist_name.strip()
 
 		if ctrlNamespace.run is False:
 			# self.log.warning("Exiting early from %s due to run flag being unset", artist_undecoded)
@@ -725,16 +789,16 @@ class GetPatreon(xascraper.modules.scraper_base.ScraperBase):
 			embeds = []
 
 
-			# while len(newArt) > 0:
-			# 	postid = newArt.pop()
+			while len(newArt) > 0:
+				postid = newArt.pop()
 
-			# 	ret = self.get_art_item(artist_undecoded, artist_name, postid)
-			# 	embeds.extend(ret)
+				ret = self.get_art_item(artist_undecoded, artist_name, postid)
+				embeds.extend(ret)
 
 
-			# 	self.log.info("Pages for %s remaining = %s", artist_name, len(newArt))
-			# 	if ctrlNamespace.run is False:
-			# 		break
+				self.log.info("Pages for %s remaining = %s", artist_name, len(newArt))
+				if ctrlNamespace.run is False:
+					break
 
 			self.update_last_fetched(artist_undecoded)
 			self.log.info("Successfully retreived content for artist %s", artist_name)
@@ -783,51 +847,49 @@ class GetPatreon(xascraper.modules.scraper_base.ScraperBase):
 		return artist_lut
 
 	def getNameList(self):
-		self.getCookie()
-
 		self.log.info("Getting list of favourite artists.")
 
-		# try:
+		try:
 
-		# 	artist_lut = self.get_artist_lut()
-		# except Exception as e:
-		# 	import IPython
-		# 	IPython.embed()
+			artist_lut = self.get_artist_lut()
+		except Exception as e:
+			import IPython
+			IPython.embed()
 
-		# self.log.info("Found %d Names", len(artist_lut))
-		# for key, value in artist_lut.items():
-		# 	print((key, value))
+		self.log.info("Found %d Names", len(artist_lut))
+		for key, value in artist_lut.items():
+			print((key, value))
 
-		# resultList = [json.dumps((key, value), sort_keys=True) for key, value in artist_lut.items()]
+		resultList = [json.dumps((key, value), sort_keys=True) for key, value in artist_lut.items()]
 
 
-		# with self.db.context_sess() as sess:
-		# 	for name in resultList:
-		# 		res = sess.query(self.db.ScrapeTargets.id)             \
-		# 			.filter(self.db.ScrapeTargets.site_name == self.pluginShortName) \
-		# 			.filter(self.db.ScrapeTargets.artist_name == name)              \
-		# 			.scalar()
-		# 		if not res:
-		# 			self.log.info("Need to insert name: %s", name)
-		# 			sess.add(self.db.ScrapeTargets(site_name=self.pluginShortName, artist_name=name))
-		# 			sess.commit()
+		with self.db.context_sess() as sess:
+			for name in resultList:
+				res = sess.query(self.db.ScrapeTargets.id)             \
+					.filter(self.db.ScrapeTargets.site_name == self.pluginShortName) \
+					.filter(self.db.ScrapeTargets.artist_name == name)              \
+					.scalar()
+				if not res:
+					self.log.info("Need to insert name: %s", name)
+					sess.add(self.db.ScrapeTargets(site_name=self.pluginShortName, artist_name=name))
+					sess.commit()
 
-		# with self.db.context_sess() as sess:
-		# 	res = sess.query(self.db.ScrapeTargets)             \
-		# 		.filter(self.db.ScrapeTargets.site_name == self.pluginShortName) \
-		# 		.all()
+		with self.db.context_sess() as sess:
+			res = sess.query(self.db.ScrapeTargets)             \
+				.filter(self.db.ScrapeTargets.site_name == self.pluginShortName) \
+				.all()
 
-		# 	for row in res:
-		# 		if row.artist_name in resultList:
-		# 			if not row.enabled:
-		# 				self.log.info("Enabling artist: %s", row.artist_name)
-		# 				row.enabled = True
-		# 		else:
-		# 			if row.enabled:
-		# 				self.log.info("Disabling artist: %s", row.artist_name)
-		# 				row.enabled = False
+			for row in res:
+				if row.artist_name in resultList:
+					if not row.enabled:
+						self.log.info("Enabling artist: %s", row.artist_name)
+						row.enabled = True
+				else:
+					if row.enabled:
+						self.log.info("Disabling artist: %s", row.artist_name)
+						row.enabled = False
 
-		# 	sess.commit()
+			sess.commit()
 
 
 
@@ -859,6 +921,10 @@ class GetPatreon(xascraper.modules.scraper_base.ScraperBase):
 		while api_page_url:
 			current = self.get_api_json(api_page_url)
 
+			if not "data" in current:
+				import IPython
+				IPython.embed()
+
 
 			had_post = False
 			for release in current['data']:
@@ -876,15 +942,15 @@ class GetPatreon(xascraper.modules.scraper_base.ScraperBase):
 						had_post = True
 
 
-					post_s = json.dumps(post_tup)
+					# post_s = json.dumps(post_tup)
 
-					if post_s not in oldArt:
-						print("New post:", post_s)
-						self.get_art_item(artist_undecoded, artist_name, post_tup)
+					# if post_s not in oldArt:
+					# 	print("New post:", post_s)
+					# 	self.get_art_item(artist_undecoded, artist_name, post_tup)
 
-						with self.db.context_sess() as sess:
-							item_json = json.dumps(post_tup, sort_keys=True)
-							self._upsert_if_new(sess, local_aid, item_json)
+					# 	with self.db.context_sess() as sess:
+					# 		item_json = json.dumps(post_tup, sort_keys=True)
+					# 		self._upsert_if_new(sess, local_aid, item_json)
 
 					if release['type'] != "post":
 						self.log.warning("Non post release!")
@@ -903,7 +969,7 @@ class GetPatreon(xascraper.modules.scraper_base.ScraperBase):
 				api_page_url = None
 
 
-			self.random_sleep(2,4,15)
+			self.random_sleep(2,4,15, include_long=False)
 
 		return postids
 

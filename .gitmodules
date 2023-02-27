@@ -1,0 +1,3 @@
+[submodule "xascraper/ext"]
+	path = xascraper/ext
+	url = https://github.com/AlexCSDev/PatreonDownloader.git

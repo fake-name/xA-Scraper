@@ -10,6 +10,7 @@ import abc
 import mimetypes
 import pickle
 import random
+import tqdm
 import magic
 import WebRequest
 import sqlalchemy.exc
@@ -96,8 +97,12 @@ def insertCountIfFileExistsAndIsDifferent(fqFName, file_bytes):
 def prep_check_fq_filename(fqfilename):
 	fqfilename = os.path.abspath(fqfilename)
 
+
+
 	filepath, fileN = os.path.split(fqfilename)
 	fileN = makeFilenameSafe(fileN)
+
+	filepath = filepath.replace(":", "")
 
 	# Create the target container directory (if needed)
 	if not os.path.exists(filepath):
@@ -218,8 +223,13 @@ class ScraperBase(module_base.ModuleBase, metaclass=abc.ABCMeta):
 			sleeptime = random.triangular(start*60, mid*60, stop*60)
 
 		self.log.info("Sleeping %0.2f seconds", sleeptime)
-		for _ in range(int(sleeptime)):
-			time.sleep(1)
+		if sleeptime < 10:
+			for _ in range(int(sleeptime)):
+				time.sleep(1)
+		else:
+			for _ in tqdm.trange(int(sleeptime)):
+				time.sleep(1)
+
 
 		# Remaining sleep. Protbably silly.
 		time.sleep(sleeptime % 1.0)
@@ -251,7 +261,7 @@ class ScraperBase(module_base.ModuleBase, metaclass=abc.ABCMeta):
 	def build_page_ret(self, status, fqDlPath, pageDesc=None, pageTitle=None, postTime=None, postTags=None, content_structured=None):
 
 		assert isinstance(fqDlPath, (list, type(None))), "Wat? Item: %s, type: %s" % (fqDlPath, type(fqDlPath))
-		assert status in ['Succeeded', 'Exists', 'Ignore', 'Failed', 'Deleted', 'Prose']
+		assert status in ['Succeeded', 'Exists', 'Ignore', 'Failed', 'Deleted', 'Prose'], "Invalid status field: '%s'" % status
 		assert isinstance(pageDesc,  (str, type(None))), "Wat? Item: %s, type: %s" % (pageDesc,  type(pageDesc))
 		assert isinstance(pageTitle, (str, type(None))), "Wat? Item: %s, type: %s" % (pageTitle, type(pageTitle))
 
@@ -653,11 +663,11 @@ class ScraperBase(module_base.ModuleBase, metaclass=abc.ABCMeta):
 				ret = self._getArtPage(*args, **kwargs)
 				return ret
 			except exceptions.ContentRemovedException as e:
-				return self.build_page_ret(status="Failed: ContentRemovedException", fqDlPath=None, pageTitle="Error: %s" % e)
+				return self.build_page_ret(status="Failed", fqDlPath=None, pageTitle="ContentRemovedException Error: %s" % e)
 			except exceptions.CannotAccessException as e:
-				return self.build_page_ret(status="Failed: CannotAccessException", fqDlPath=None, pageTitle="Error: %s" % e)
+				return self.build_page_ret(status="Failed", fqDlPath=None, pageTitle="CannotAccessException Error: %s" % e)
 			except exceptions.CannotFindContentException as e:
-				return self.build_page_ret(status="Failed: CannotFindContentException", fqDlPath=None, pageTitle="Error: %s" % e)
+				return self.build_page_ret(status="Failed", fqDlPath=None, pageTitle="CannotFindContentException Error: %s" % e)
 
 			except exceptions.RetryException:
 				time.sleep(random.triangular(1,3,10))

@@ -568,6 +568,10 @@ class GetPX(xascraper.modules.scraper_base.ScraperBase):
 				self.log.info("Saving animation")
 				ugoira_meta = self.aapi.ugoira_metadata(item_id)
 
+				if 'error' in ugoira_meta and ugoira_meta['error']['user_message'] == 'Artist has made their work private.':
+					return self.build_page_ret(status="Failed", pageTitle="Artist has made their work private: %s" % ugoira_meta, fqDlPath=None)
+
+
 				images = self._getAnimation(dlPathBase, ugoira_meta)
 
 				return self.build_page_ret(status="Succeeded",
@@ -615,10 +619,23 @@ class GetPX(xascraper.modules.scraper_base.ScraperBase):
 
 		user_details = self.aapi.user_detail(aid)
 
+		# There is a "message" field, and a "user_message" field.
+		# Yeeeaaahhhhh
+		if "error" in user_details and user_details["error"]['message'] == 'Rate Limit':
+			self.random_sleep(10,20,30, include_long=False)
+			user_details = self.aapi.user_detail(aid)
+
 		if "error" in user_details and user_details["error"]['user_message'] == 'The creator has limited who can view this content':
+			self.random_sleep(1,2,5, include_long=False)
 			raise exceptions.AccountDisabledException("Account is locked for viewing!")
 
 		if "error" in user_details and user_details["error"]['user_message'] == 'Your access is currently restricted.':
+			self.random_sleep(1,2,5, include_long=False)
+			raise exceptions.AccountDisabledException("Need to reauthenticate!")
+
+
+		if "error" in user_details and user_details["error"]['user_message'] == 'Error occurred at the OAuth process. Please check your Access Token to fix this. Error Message: invalid_grant':
+			self.random_sleep(1,2,5, include_long=False)
 			raise exceptions.AccountDisabledException("Need to reauthenticate!")
 
 
