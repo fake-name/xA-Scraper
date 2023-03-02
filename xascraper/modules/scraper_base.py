@@ -498,6 +498,11 @@ class ScraperBase(module_base.ModuleBase, metaclass=abc.ABCMeta):
 					import IPython
 					IPython.embed()
 
+				except SystemExit:
+					raise
+
+				except KeyboardInterrupt:
+					raise
 
 	def _checkHaveUrl(self, artist, url):
 		aid = self._artist_name_to_rid(artist)
@@ -678,14 +683,20 @@ class ScraperBase(module_base.ModuleBase, metaclass=abc.ABCMeta):
 				ok, message = self.getCookie()
 				assert ok, "Failed to log in after NotLoggedInException!"
 
+
+			except SystemExit:
+				raise
+			except KeyboardInterrupt:
+				raise
+
 			except Exception as e:
 
 				print("Exception in _fetch_retrier: ", e)
 				import traceback
 				traceback.print_exc()
 
-				import IPython
-				IPython.embed()
+				# import IPython
+				# IPython.embed()
 
 		self.log.error("Failed to fetch content with args: '%s', kwargs: '%s'", args, kwargs)
 		return self.build_page_ret(status="Failed", fqDlPath=None)
@@ -826,6 +837,12 @@ class ScraperBase(module_base.ModuleBase, metaclass=abc.ABCMeta):
 			self.log.error(traceback.format_exc())
 			ctrlNamespace.run = False
 			return True
+
+		except SystemExit:
+			raise
+		except KeyboardInterrupt:
+			raise
+
 		except:
 			self.log.error("Unhandled exception when retreiving artist %s", artist)
 			self.log.error("Aborting fetch.")

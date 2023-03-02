@@ -13,6 +13,7 @@ import xascraper.modules.twit.twitScrape as twits
 import xascraper.modules.tumblr.tumblrScrape as tus
 import xascraper.modules.patreon.patreonScrape as pts
 import xascraper.modules.yiff_party.yiff_scrape as yps
+import xascraper.modules.kemono.kemonoScrape as kms
 
 from settings import settings
 
@@ -32,6 +33,7 @@ PLUGINS =[
 	yps.GetYp,
 	tus.GetTumblr,
 	twits.GetTwit,
+	kms.GetKemono,
 ]
 
 # Plugins that have no config have cls.validate_config() return None

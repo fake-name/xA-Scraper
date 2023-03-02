@@ -84,12 +84,13 @@ class GetKemono(xascraper.modules.scraper_base.ScraperBase):
 			os.makedirs(dirp)
 		return dirp
 
-	def local_save_file(self, aname, filename, filecontent):
+	def local_save_file(self, kemono_service, kemono_name, filename, filecontent):
 		fdir = self.get_save_dir(kemono_service, kemono_name)
 		fqpath = os.path.join(fdir, filename)
 		self.save_file(fqfilename=fqpath, file_content=filecontent)
+		return fqpath
 
-	def save_json(self, aname, itemid, filecontent):
+	def save_json(self, kemono_service, kemono_name, itemid, filecontent):
 		fdir = self.get_save_dir(kemono_service, kemono_name)
 		fqpath = os.path.join(fdir, "pyson-posts")
 		if not os.path.exists(fqpath):
@@ -99,57 +100,38 @@ class GetKemono(xascraper.modules.scraper_base.ScraperBase):
 			fstr = pprint.pformat(filecontent)
 			fp.write(fstr.encode("utf-8"))
 
-	def save_image(self, aname, pid, fname, furl):
-		print("Saving image: '%s'" % furl)
-		fname = "{pid}-{fname}".format(pid=pid, fname=fname)
+	def save_content(self, kemono_service, kemono_name, referrer, source_name, cdn_url):
+
+		cdn_name = urllib.parse.urlsplit(cdn_url).path.split("/")[-1]
+
+		src_fname, _        = os.path.splitext(source_name)
+		cdn_fname, cdn_fext = os.path.splitext(cdn_name)
+
+		print("Saving image: '%s'" % cdn_url)
+		fname = "{src}-{cdn}{ext}".format(src=src_fname,cdn=cdn_fname,ext=cdn_fext)
+
 		fdir = self.get_save_dir(kemono_service, kemono_name)
 		fqpath = os.path.join(fdir, fname)
 		if os.path.exists(fqpath):
 			self.log.info("Do not need to download: '%s'", fname)
 		else:
 			try:
-				content = self.wg.getpage(furl, addlHeaders={"Referer" : PATREON_HOME_PAGE})
+				content = self.wg.getpage(cdn_url, addlHeaders={"Referer" : referrer})
 			except WebRequest.FetchFailureError:
 				self.log.error(traceback.format_exc())
 				self.log.error("Could not retreive content: ")
-				self.log.error("%s", furl)
+				self.log.error("%s", cdn_url)
 				return None
 
 			if content:
-				self.local_save_file(aname, fname, content)
+				fqpath = self.local_save_file(kemono_service, kemono_name, fname, content)
 			else:
 				self.log.error("Could not retreive content: ")
-				self.log.error("%s", furl)
-				return None
-		return fqpath
-
-	def save_attachment(self, aname, pid, dat_struct):
-		print("Saving attachment: '%s'" % dat_struct['attributes']['url'])
-		if dat_struct['attributes']['url'].startswith("https"):
-			url = dat_struct['attributes']['url']
-		else:
-			url = "https:{url}".format(url=dat_struct['attributes']['url'])
-
-		fname = "{pid}-{aid}-{fname}".format(pid=pid, aid=dat_struct['id'], fname=dat_struct['attributes']['name'])
-
-		fdir = self.get_save_dir(kemono_service, kemono_name)
-		fqpath = os.path.join(fdir, fname)
-
-		if os.path.exists(fqpath):
-			self.log.info("Do not need to download: '%s'", fname)
-		else:
-			content = self.wg.getpage(url, addlHeaders={"Referer" : PATREON_HOME_PAGE})
-			if content:
-				if isinstance(content, str):
-					with open(fqpath, "wb") as fp:
-						fp.write(content.encode("utf-8"))
-				else:
-					with open(fqpath, "wb") as fp:
-						fp.write(content)
-			else:
+				self.log.error("%s", cdn_url)
 				return None
 
 		return fqpath
+
 
 
 	def save_media(self, aname, pid, dat_struct):
@@ -218,139 +200,122 @@ class GetKemono(xascraper.modules.scraper_base.ScraperBase):
 				raise exceptions.ContentRemovedException("Item has been deleted or removed.")
 
 
-	def _get_art_post(self, postId, kemono_service, kemono_name):
-		post = self.get_api_json("/posts/{pid}".format(pid=postId) +
-			"?include=media"
-			)
+	def _get_art_post(self, post_url, kemono_service, kemono_name):
 
-		if 'status' in post and post['status'] == '404':
-			self.log.warning("Post is not found!")
-			fail = {
-				'status' : ''
-				}
-			return fail
+		soup = self.wg.getSoup(post_url)
 
 
-		if not 'data' in post:
-			if "errors" in post:
-				self.__handle_errors(post['errors'])
-
-			self.log.warning("No 'data' member in post!")
-
-			pprint.pprint(post)
-			fail = {
-				'status' : ''
-				}
-			return fail
-
-
-		post_content = post['data']
-		post_info = post_content['attributes']
-
-		if 'current_user_can_view' in post_info and post_info['current_user_can_view'] is False:
-			self.log.warning("You apparently cannot view post %s for artist %s. Ignoring.", postId, kemono_service, kemono_name)
-			fail = {
-				'status' : ''
-				}
-			return fail
-
-		if not 'included' in post:
-			self.log.warning("No contents on post %s for artist %s (%s). Please report if this is in error.", postId, kemono_service, kemono_name, post_info['url'])
-			fail = {
-				'status' : ''
-				}
-			return fail
-
-
-		attachments = {item['id'] : item for item in post['included'] if item['type'] == 'attachment'}
-		media       = {item['id'] : item for item in post['included'] if item['type'] == 'media'}
-
-		tags = []
-		if 'user_defined_tags' in post_content['relationships']:
-			for tagmeta in post_content['relationships']['user_defined_tags']['data']:
-				tags.append(tagmeta['id'].split(";")[-1])
-
-		if 'current_user_can_view' in post_content and not post_content['current_user_can_view']:
-			raise exceptions.CannotAccessException("You can't view that content!")
-
-		# if not 'content' in post_info:
-		# pprint.pprint(post_content)
-
-		ret = {
-			'page_desc'   : post_info['content'],
-			'page_title'  : post_info['title'],
-			'post_time'   : dateutil.parser.parse(post_info['published_at']).replace(tzinfo=None),
-			'post_tags'   : tags,
-			'post_embeds' : [],
-		}
-
-		# print("Post:")
-		# pprint.pprint(post)
-		# print("Content:")
-		# pprint.pprint(post_info['content'])
-
-		files = []
 		try:
-			if "post_file" in post_info and post_info['post_file']:
-				furl = urllib.parse.unquote(post_info['post_file']['url'])
-				# print("Post file!", post_info['post_file']['url'], furl)
 
-				fpath = self.save_image(kemono_service, kemono_name, postId, post_info['post_file']['name'], furl)
-				files.append(fpath)
+			post_files    = soup.find("div", class_='post__files')
 
-			if 'post_type' in post_info and post_info['post_type'] == 'video_embed':
-				# print("Post video_embed")
-				fpath = self.fetch_video_embed(post_info)
-				if fpath:
+			files = []
+			external_embeds = []
+			if post_files:
+				for pfile in post_files.find_all("a"):
+					if pfile.get("download"):
+						fpath = self.save_content(kemono_service, kemono_name, post_url, pfile['download'], pfile['href'])
+						files.append(fpath)
+
+					# No download attrigute probably means externally hosted?
+					else:
+						external_embeds.append(pfile['href'])
+
+
+			# From what I can tell, videos are also listed in the attachments section.
+			# At least a quick check shows that the file ties to the video player is also
+			# present as a download.
+			post_attachments   = soup.find("ul", class_='post__attachments')
+
+			if post_attachments:
+				for pfile in post_attachments.find_all("a"):
+					fpath = self.save_content(kemono_service, kemono_name, post_url, pfile['download'], pfile['href'])
 					files.append(fpath)
-				ret['post_embeds'].append(post_info)
 
-			for aid, dat_struct in attachments.items():
-				# print("Post attachments")
-				fpath = self.save_attachment(kemono_service, kemono_name, postId, dat_struct)
-				files.append(fpath)
+			# try:
+			# 	if "post_file" in post_info and post_info['post_file']:
+			# 		furl = urllib.parse.unquote(post_info['post_file']['url'])
+			# 		# print("Post file!", post_info['post_file']['url'], furl)
 
-			for aid, dat_struct in media.items():
-				# print("Post attachments")
-				fpath = self.save_media(kemono_service, kemono_name, postId, dat_struct)
-				files.append(fpath)
+			# 		fpath = self.save_image(kemono_service, kemono_name, post_url, post_info['post_file']['name'], furl)
+			# 		files.append(fpath)
 
-			if 'embed' in post_info and post_info['embed']:
-				for item in self._handle_embed(post_info['embed']):
-					files.append(fpath)
-				ret['post_embeds'].append(post_info['embed'])
+			# 	if 'post_type' in post_info and post_info['post_type'] == 'video_embed':
+			# 		# print("Post video_embed")
+			# 		fpath = self.fetch_video_embed(post_info)
+			# 		if fpath:
+			# 			files.append(fpath)
+			# 		ret['post_embeds'].append(post_info)
+
+			# 	for aid, dat_struct in attachments.items():
+			# 		# print("Post attachments")
+			# 		fpath = self.save_attachment(kemono_service, kemono_name, post_url, dat_struct)
+			# 		files.append(fpath)
+
+			# 	for aid, dat_struct in media.items():
+			# 		# print("Post attachments")
+			# 		fpath = self.save_media(kemono_service, kemono_name, post_url, dat_struct)
+			# 		files.append(fpath)
+
+			# 	if 'embed' in post_info and post_info['embed']:
+			# 		for item in self._handle_embed(post_info['embed']):
+			# 			files.append(fpath)
+			# 		ret['post_embeds'].append(post_info['embed'])
 
 
+			# except urllib.error.URLError:
+			# 	self.log.error("Failure retreiving content from post: %s", post)
 
 
-		except urllib.error.URLError:
-			self.log.error("Failure retreiving content from post: %s", post)
+			for ad in soup.find_all("div", class_='ad-container'):
+				ad.decompose()
 
-		# Posts can apparently be empty.
-		if not post_info['content']:
-			post_info['content'] = ""
+			post_title    = soup.find("h1",  class_='post__title')
+			post_body     = soup.find("div", class_='post__body')
+			post_comments = soup.find("div", class_='post__comments')
+			post_time     = soup.find("div", class_='post__published')
 
-		ctnt_soup = bs4.BeautifulSoup(post_info['content'], 'lxml')
+			tags = []
+			# if 'user_defined_tags' in post_content['relationships']:
+			# 	for tagmeta in post_content['relationships']['user_defined_tags']['data']:
+			# 		tags.append(tagmeta['id'].split(";")[-1])
 
-		for img in ctnt_soup.find_all("img", src=True):
-			furl = img['src']
-			fparsed = urllib.parse.urlparse(furl)
-			fname = fparsed.path.split("/")[-1]
 
-			# Somehow empty urls ("http://") are getting into here.
-			if len(furl) > len("https://xx"):
-				fpath = self.save_image(kemono_service, kemono_name, postId, fname, furl)
-				files.append(fpath)
+			out_soup = bs4.BeautifulSoup()
 
-		# Youtube etc are embedded as iframes.
-		for ifr in ctnt_soup.find_all("iframe", src=True):
-			ret['post_embeds'].append(ifr['src'])
+			out_soup.append(post_body)
+			out_soup.append(post_comments)
 
+			if post_time:
+				parsed_post_time = dateutil.parser.parse(post_time.get_text()).replace(tzinfo=None)
+			else:
+				# Gumroad content does not have a post date.
+				parsed_post_time = datetime.datetime.now().replace(tzinfo=None)
+
+			ret = {
+				'page_desc'   : out_soup.prettify(),
+				'page_title'  : post_title.get_text().strip(),
+				'post_time'   : parsed_post_time,
+				'post_tags'   : [],  # I don't think there are tags on Kemono?
+				'post_embeds' : external_embeds,
+			}
+
+
+			# Youtube etc are embedded as iframes.
+			for ifr in soup.find_all("iframe", src=True):
+				ret['post_embeds'].append(ifr['src'])
+		except KeyboardInterrupt:
+			raise
+		except:
+			import IPython
+			IPython.embed()
+
+		files = list(set(files))
 
 		if len(files):
-			self.log.info("Found %s images/attachments on post.", len(attachments))
+			self.log.info("Found %s images/attachments on post.", len(files))
 		else:
-			self.log.warning("No images/attachments on post %s!", postId)
+			self.log.warning("No images/attachments on post %s!", post_url)
 
 
 		files = [filen for filen in files if filen]
@@ -382,9 +347,17 @@ class GetKemono(xascraper.modules.scraper_base.ScraperBase):
 			# Don't retry removed items more then once a year.
 			self.db.set_in_db_key_value_store(item_key, {'last_fetch' : time.time() + 60*60*24 * 365})
 			raise
+		except SystemExit:
+			raise
+		except KeyboardInterrupt:
+			raise
 
-		finally:
-			self.random_sleep(1,3,10, include_long=False)
+		except:
+			import IPython
+			IPython.embed()
+
+		# finally:
+		# 	self.random_sleep(0.1,1,3, include_long=False)
 
 
 	def get_art_item(self, artist_undecoded, kemono_service, kemono_name, post_url):
@@ -434,13 +407,17 @@ class GetKemono(xascraper.modules.scraper_base.ScraperBase):
 			self.log.error("Page Retrieval failed!")
 			self.log.error("PostID = '%s'", post_url)
 			self.log.error(traceback.format_exc())
+
+		except SystemExit:
+			raise
+		except KeyboardInterrupt:
+			raise
+
 		except:
 			self.log.error("Unknown error in page retrieval!")
 			self.log.error("PostID = '%s'", post_url)
 			self.log.error(traceback.format_exc())
 
-			import IPython
-			IPython.embed()
 
 		return extends
 
@@ -479,6 +456,7 @@ class GetKemono(xascraper.modules.scraper_base.ScraperBase):
 
 	def getArtist(self, artist_undecoded, ctrlNamespace):
 
+		print("getArtist")
 
 
 		artist_decoded = json.loads(artist_undecoded)
@@ -531,6 +509,11 @@ class GetKemono(xascraper.modules.scraper_base.ScraperBase):
 			self.log.error(traceback.format_exc())
 			ctrlNamespace.run = False
 			return False
+
+		except SystemExit:
+			raise
+		except KeyboardInterrupt:
+			raise
 
 		except:
 			self.log.error("Exception when retreiving artist %s:%s", kemono_service, kemono_name)

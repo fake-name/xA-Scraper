@@ -76,17 +76,6 @@ def three_arg_go(command, param_1, param_2):
 		cli_utils.print_help()
 
 
-def mgr_init():
-	print("Setup")
-	signal.signal(signal.SIGINT, signal.SIG_IGN)
-
-	manager = multiprocessing.managers.SyncManager()
-	manager.start()
-	flags.namespace = manager.Namespace()
-	flags.namespace.run = True
-
-	print('initialized manager')
-
 def signal_handler(dummy_signal, dummy_frame):
 	if flags.namespace.run:
 		flags.namespace.run = False
@@ -94,6 +83,21 @@ def signal_handler(dummy_signal, dummy_frame):
 	else:
 		print("Multiple keyboard interrupts. Raising")
 		raise KeyboardInterrupt
+
+def mgr_init():
+	print("Setup")
+
+	manager = multiprocessing.managers.SyncManager()
+	manager.start()
+	flags.namespace = manager.Namespace()
+	flags.namespace.run = True
+
+
+
+	signal.signal(signal.SIGINT, signal_handler)
+
+
+	print('initialized manager')
 
 def go():
 
