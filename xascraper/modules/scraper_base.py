@@ -788,8 +788,12 @@ class ScraperBase(module_base.ModuleBase, metaclass=abc.ABCMeta):
 
 			self.log.warning("Artist name seems to have trailing or leading whitespace!")
 
+		if str(artist) == "0":
+			print("Empty artist (or zero ID)")
+			return False
+
 		if ctrlNamespace.run is False:
-			self.log.warning("Exiting early from %s due to run flag being unset", artist)
+			# self.log.warning("Exiting early from %s due to run flag being unset", artist)
 			return True
 
 		dlPathBase = self.getDownloadPath(self.dlBasePath, artist)
@@ -818,8 +822,9 @@ class ScraperBase(module_base.ModuleBase, metaclass=abc.ABCMeta):
 		except exceptions.RetryException:
 			self.log.error("Cannot consume. Will retry next execution")
 			return False
-		except exceptions.AccountDisabledException:
-			self.log.error("Artist seems to have disabled their account!")
+		except exceptions.AccountDisabledException as err:
+			self.log.error("Artist seems to have disabled their account: %s", err)
+			self.update_last_fetched(artist)
 			return False
 		except WebRequest.FetchFailureError:
 			self.log.error("Failure fetching artist '%s' for site '%s'", artist, self.pluginShortName)
@@ -867,9 +872,6 @@ class ScraperBase(module_base.ModuleBase, metaclass=abc.ABCMeta):
 			startTime = datetime.datetime.now()
 			self.updateLastRunStartTime(self.pluginShortName, startTime)
 
-			if not nameList:
-				nameList = self.getNameList()
-
 			haveCookie, dummy_message = self.checkCookie()
 			if not haveCookie:
 				self.log.info("Do not have login cookie. Retreiving one now.")
@@ -882,6 +884,8 @@ class ScraperBase(module_base.ModuleBase, metaclass=abc.ABCMeta):
 				self.log.critical("Failed to download cookie! Exiting!")
 				return False
 
+			if not nameList:
+				nameList = self.getNameList()
 
 			errored = False
 

@@ -68,7 +68,7 @@ class ModuleBase(xascraper.status_monitor.StatusMixin, metaclass=abc.ABCMeta):
 	# ---------------------------------------------------------------------------------------------------------------------------------------------------------
 
 	def getDownloadPath(self, siteSource, artist):
-		return os.path.join(settings["dldCtntPath"], siteSource, artist)
+		return os.path.join(settings["dldCtntPath"], siteSource.strip(), artist.strip())
 
 	def _checkFileExists(self, filePath):
 		# Return true if file exists

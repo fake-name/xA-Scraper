@@ -2,19 +2,17 @@ import os
 import os.path
 import traceback
 import datetime
+import concurrent.futures
+import urllib.parse
+import json
+import time
+import pprint
 import pytz
 import dateutil.parser
 import bs4
 import WebRequest
-import tqdm
-import urllib.parse
-import json
-import time
-import random
-import pprint
-import requests
 import ChromeController
-from settings import settings
+import tqdm
 
 import xascraper.modules.scraper_base
 from xascraper.modules import exceptions
@@ -30,7 +28,7 @@ class GetKemono(xascraper.modules.scraper_base.ScraperBase):
 
 	ovwMode = "Check Files"
 
-	numThreads = 1
+	numThreads = 2
 
 
 	# Stubbed functions
@@ -124,6 +122,10 @@ class GetKemono(xascraper.modules.scraper_base.ScraperBase):
 				return None
 
 			if content:
+
+				if isinstance(content, str):
+					content = content.encode("utf-8")
+
 				fqpath = self.local_save_file(kemono_service, kemono_name, fname, content)
 			else:
 				self.log.error("Could not retreive content: ")
@@ -287,7 +289,8 @@ class GetKemono(xascraper.modules.scraper_base.ScraperBase):
 			out_soup.append(post_comments)
 
 			if post_time:
-				parsed_post_time = dateutil.parser.parse(post_time.get_text()).replace(tzinfo=None)
+				post_time_str = post_time.get_text().replace("Published:", "").strip()
+				parsed_post_time = dateutil.parser.parse(post_time_str).replace(tzinfo=None)
 			else:
 				# Gumroad content does not have a post date.
 				parsed_post_time = datetime.datetime.now().replace(tzinfo=None)
@@ -306,9 +309,10 @@ class GetKemono(xascraper.modules.scraper_base.ScraperBase):
 				ret['post_embeds'].append(ifr['src'])
 		except KeyboardInterrupt:
 			raise
-		except:
-			import IPython
-			IPython.embed()
+
+		# except:
+		# 	import IPython
+		# 	IPython.embed()
 
 		files = list(set(files))
 
@@ -352,9 +356,9 @@ class GetKemono(xascraper.modules.scraper_base.ScraperBase):
 		except KeyboardInterrupt:
 			raise
 
-		except:
-			import IPython
-			IPython.embed()
+		# except:
+		# 	import IPython
+		# 	IPython.embed()
 
 		# finally:
 		# 	self.random_sleep(0.1,1,3, include_long=False)
@@ -456,11 +460,7 @@ class GetKemono(xascraper.modules.scraper_base.ScraperBase):
 
 	def getArtist(self, artist_undecoded, ctrlNamespace):
 
-		print("getArtist")
-
-
 		artist_decoded = json.loads(artist_undecoded)
-
 
 		kemono_aid     = artist_decoded['id']
 		kemono_name    = artist_decoded['name']
@@ -564,11 +564,25 @@ class GetKemono(xascraper.modules.scraper_base.ScraperBase):
 
 	def getNameList(self):
 
-		try:
-			artist_lut = self.get_artist_listing()
-		except Exception as e:
-			import IPython
-			IPython.embed()
+
+
+		item_key = "kemono-artist-fetchtime"
+		have = self.db.get_from_db_key_value_store(item_key)
+
+		# If we've fetched it in the last 2 days, don't retry it.
+		if have and 'last_fetch' in have and have['last_fetch'] and have['last_fetch'] > (time.time() - 60*60*24*2):
+			return super().getNameList()
+
+
+
+
+		artist_lut = self.get_artist_listing()
+
+		# try:
+		# 	artist_lut = self.get_artist_listing()
+		# except Exception as e:
+		# 	import IPython
+		# 	IPython.embed()
 
 		self.log.info("Found %d Names", len(artist_lut))
 
@@ -589,6 +603,7 @@ class GetKemono(xascraper.modules.scraper_base.ScraperBase):
 			sess.commit()
 
 
+		self.db.set_in_db_key_value_store(item_key, {'last_fetch' : time.time()})
 
 		return super().getNameList()
 
@@ -634,6 +649,68 @@ class GetKemono(xascraper.modules.scraper_base.ScraperBase):
 
 		return post_articles
 
+
+	def get_from_artist_names(self, artist_list, ctrlNamespace, ignore_other=False):
+
+		if ctrlNamespace is None:
+			raise ValueError("You need to specify a namespace!")
+
+		is_another_active = self.getRunningStatus(self.pluginShortName)
+
+		if is_another_active and not ignore_other:
+			self.log.error("Another instance of the %s scraper is running.", self.pluginShortName)
+			self.log.error("Not starting")
+			return
+
+		try:
+			self.updateRunningStatus(self.pluginShortName, True)
+			startTime = datetime.datetime.now()
+			self.updateLastRunStartTime(self.pluginShortName, startTime)
+
+			nameList = self.getNameList()
+
+			nameList = [tmp for tmp in nameList if any([tgt.lower() in str(tmp).lower() for tgt in artist_list])
+			]
+
+			haveCookie, dummy_message = self.checkCookie()
+			if not haveCookie:
+				self.log.info("Do not have login cookie. Retreiving one now.")
+				cookieStatus, msg = self.getCookie()
+				self.log.info("Login attempt status = %s (%s).", cookieStatus, msg)
+				assert cookieStatus, "Login failed! Cannot continue!"
+
+			haveCookie, dummy_message = self.checkCookie()
+			if not haveCookie:
+				self.log.critical("Failed to download cookie! Exiting!")
+				return False
+
+			self.log.info("Queueing %s artists to fetch", len(nameList))
+
+			errored = False
+
+			# Farm out requests to the thread-pool
+			with concurrent.futures.ThreadPoolExecutor(max_workers=self.numThreads) as executor:
+
+				future_to_url = {}
+				for aId, aName in nameList:
+					future_to_url[executor.submit(self.getArtist, aName, ctrlNamespace)] = aName
+
+				for future in concurrent.futures.as_completed(future_to_url):
+					# aName = future_to_url[future]
+					res = future.result()
+					if type(res) is not bool:
+						raise RuntimeError("Future for plugin %s returned non-boolean value (%s). Function %s of class %s" % (self.pluginShortName, res, self.getArtist, self))
+					errored  |= future.result()
+					# self.log.info("Return = %s, aName = %s, errored = %s" % (res, aName, errored))
+
+			if errored:
+				self.log.warn("Had errors!")
+
+			runTime = datetime.datetime.now()-startTime
+			self.updateLastRunDuration(self.pluginShortName, runTime)
+
+		finally:
+			self.updateRunningStatus(self.pluginShortName, False)
 
 
 	def run_old(self):

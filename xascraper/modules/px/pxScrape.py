@@ -283,19 +283,30 @@ class GetPX(xascraper.modules.scraper_base.ScraperBase):
 
 			cr.execute_javascript_function("document.querySelector(\"input[type='text']\").focus()")
 			for char in settings[self.pluginShortName]['username']:
+				cr.Input_dispatchKeyEvent(type='char', code="Backspace")
+				cr.Input_dispatchKeyEvent(type='char', code="Backspace")
+			for char in settings[self.pluginShortName]['username']:
 				cr.Input_dispatchKeyEvent(type='char', text=char)
 
 			cr.execute_javascript_statement("document.querySelector(\"input[type='password']\").focus()")
+			for char in settings[self.pluginShortName]['password']:
+				cr.Input_dispatchKeyEvent(type='char', code="Backspace")
+				cr.Input_dispatchKeyEvent(type='char', code="Backspace")
 			for char in settings[self.pluginShortName]['password']:
 				cr.Input_dispatchKeyEvent(type='char', text=char)
 
 			time.sleep(4)
 			self.log.info("Clicking login.")
 
+
 			cr.execute_javascript_statement("""
-				document.querySelectorAll(\"button[type='submit']\").forEach( (e)=>{
+				document.querySelectorAll('button').forEach( (e)=>{
+				    if (e.textContent.includes('Log In')) {
+				        console.log(e);
+				        console.log(e.textContent);
 				        e.click();
-				});
+				    }
+				})
 				""")
 
 			time.sleep(4)
@@ -313,27 +324,21 @@ class GetPX(xascraper.modules.scraper_base.ScraperBase):
 					break
 
 				resp = cr.execute_javascript_statement("""
-					document.querySelectorAll(\"button[type='submit']\").forEach( (e)=>{
-					        e.click();
-					})
-					""")
-				self.log.info("Click response: '%s'", resp)
-
-				try:
-					cr.handle_page_location_changed()
-				except Exception:
-					# page_location_changed can be broken by redurects to external app handlers
-					pass
-
-				resp = cr.execute_javascript_statement("""
 					document.querySelectorAll('button').forEach( (e)=>{
 					    if (e.textContent.includes('Continue using this account')) {
+					        console.log(e);
+					        console.log(e.textContent);
+					        e.click();
+					    }
+					    if (e.textContent.includes('Log In')) {
+					        console.log(e);
+					        console.log(e.textContent);
 					        e.click();
 					    }
 					})
 					""")
 
-				self.log.info("Button response: '%s'", resp)
+				self.log.info("Click response: '%s'", resp)
 
 				try:
 					cr.handle_page_location_changed()
@@ -605,8 +610,8 @@ class GetPX(xascraper.modules.scraper_base.ScraperBase):
 				IPython.embed()
 
 
-		except pixivpy3.PixivError as e:
-			raise exceptions.RetryException("Error: '%s'" % e)
+		except pixivpy3.PixivError as err:
+			raise exceptions.RetryException("Error: '%s'" % err)
 
 		raise RuntimeError("Unknown item type: '%s' for artist:item_id -> %s -> %s" % (item_type, artistName, item_id))
 
@@ -614,30 +619,66 @@ class GetPX(xascraper.modules.scraper_base.ScraperBase):
 	# Gallery Scraping
 	# ---------------------------------------------------------------------------------------------------------------------------------------------------------
 
+	def _check_limited(self, item_content):
+
+
+		if not item_content:
+
+			print("No item content?")
+
+			import IPython
+			IPython.embed()
+
+		if "error" in item_content and not item_content["error"]:
+
+			print("Empty error section!")
+
+			import IPython
+			IPython.embed()
+
+		# There is a "message" field, and a "user_message" field.
+		# Yeeeaaahhhhh
+		if "error" in item_content and 'message' in item_content["error"] and item_content["error"]['message'] == 'Rate Limit':
+			self.random_sleep(10,20,120, include_long=False)
+			raise exceptions.RetryException("Rate Limited.")
+
+		if "error" in item_content and 'message' in item_content["error"] and item_content["error"]['message'] == 'Error occurred at the OAuth process. Please check your Access Token to fix this. Error Message: invalid_grant':
+			self.random_sleep(1,2,5, include_long=False)
+			raise exceptions.NotLoggedInException("Need to reauthenticate!")
+
+		if "error" in item_content and 'user_message' in item_content["error"] and item_content["error"]['user_message'] == 'The creator has limited who can view this content':
+			self.random_sleep(1,2,5, include_long=False)
+			raise exceptions.AccountDisabledException("Account is locked for viewing!")
+
+		# I think this is caused by accounts that have been deleted.
+		if "error" in item_content and 'user_message' in item_content["error"] and item_content["error"]['user_message'] == 'Your access is currently restricted.':
+			self.random_sleep(1,2,5, include_long=False)
+			raise exceptions.AccountDisabledException("Access is restricted?")
+
+
+		if "error" in item_content and 'user_message' in item_content["error"] and item_content["error"]['user_message'] == 'Error occurred at the OAuth process. Please check your Access Token to fix this. Error Message: invalid_grant':
+			self.random_sleep(1,2,5, include_long=False)
+			raise exceptions.NotLoggedInException("Need to reauthenticate!")
+
+
+		if "error" in item_content and item_content["error"]:
+
+			print("Error without a message?")
+
+			import IPython
+			IPython.embed()
+
+
+
 	def __getTotalArtCount(self, aid):
 
 
 		user_details = self.aapi.user_detail(aid)
 
-		# There is a "message" field, and a "user_message" field.
-		# Yeeeaaahhhhh
-		if "error" in user_details and user_details["error"]['message'] == 'Rate Limit':
-			self.random_sleep(10,20,30, include_long=False)
-			user_details = self.aapi.user_detail(aid)
+		if not user_details:
+			raise exceptions.FetchFailedException("No details for artist: %s" % (user_details, ))
 
-		if "error" in user_details and user_details["error"]['user_message'] == 'The creator has limited who can view this content':
-			self.random_sleep(1,2,5, include_long=False)
-			raise exceptions.AccountDisabledException("Account is locked for viewing!")
-
-		if "error" in user_details and user_details["error"]['user_message'] == 'Your access is currently restricted.':
-			self.random_sleep(1,2,5, include_long=False)
-			raise exceptions.AccountDisabledException("Need to reauthenticate!")
-
-
-		if "error" in user_details and user_details["error"]['user_message'] == 'Error occurred at the OAuth process. Please check your Access Token to fix this. Error Message: invalid_grant':
-			self.random_sleep(1,2,5, include_long=False)
-			raise exceptions.AccountDisabledException("Need to reauthenticate!")
-
+		self._check_limited(user_details)
 
 		if not "profile" in user_details:
 			import IPython
@@ -649,8 +690,8 @@ class GetPX(xascraper.modules.scraper_base.ScraperBase):
 	def _getTotalArtCount(self, aid):
 		try:
 			return self.__getTotalArtCount(aid)
-		except exceptions.NotLoggedInException:
-			self.log.warning("failed to get art count. Checking login status.")
+		except exceptions.NotLoggedInException as err:
+			self.log.warning("failed to get art count (%s). Checking login status.", err)
 			_, status = self.checkLogin()
 			self.log.info("Login status: %s", status)
 			return self.__getTotalArtCount(aid)
@@ -679,6 +720,23 @@ class GetPX(xascraper.modules.scraper_base.ScraperBase):
 
 					self.log.info("Fetching items: %s", qs)
 					json_result = self.aapi.user_illusts(**qs)
+					if not json_result:
+
+						print("No item content?")
+
+						import IPython
+						IPython.embed()
+
+					if "error" in json_result and not json_result["error"]:
+
+						print("Empty error section!")
+
+						import IPython
+						IPython.embed()
+
+
+					self._check_limited(json_result)
+
 					qs = self.aapi.parse_qs(json_result.next_url)
 
 					artlinks.update(

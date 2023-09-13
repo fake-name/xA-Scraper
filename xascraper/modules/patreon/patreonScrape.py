@@ -350,7 +350,6 @@ class GetPatreon(xascraper.modules.scraper_base.ScraperBase):
 	# # ---------------------------------------------------------------------------------------------------------------------------------------------------------
 
 
-
 	def get_save_dir(self, aname):
 
 		dirp = self.getDownloadPath(self.dlBasePath, aname)
@@ -734,8 +733,8 @@ class GetPatreon(xascraper.modules.scraper_base.ScraperBase):
 		item_key = "{}-{}-{}-fetchtime".format("pat", "content_list_fetch", local_aid)
 		have = self.db.get_from_db_key_value_store(item_key)
 
-		# If we've fetched it in the last 2 weeks, don't retry it.
-		if have and 'last_fetch' in have and have['last_fetch'] and have['last_fetch'] > (time.time() - 60*60*24*7*2):
+		# If we've fetched the parts list in the last 2 day, skip it.
+		if have and 'last_fetch' in have and have['last_fetch'] and have['last_fetch'] > (time.time() - 60*60*24*2):
 			pass
 
 		else:
@@ -842,7 +841,7 @@ class GetPatreon(xascraper.modules.scraper_base.ScraperBase):
 	def get_artist_lut(self):
 		general_meta = self.current_user_info()
 		campaign_items = [item for item in general_meta['included'] if item['type'] == "campaign"]
-		artist_lut = {item['id'] : (item['attributes']['full_name'], item['relationships']) for item in general_meta['included'] if item['type'] == 'user'}
+		artist_lut = {item['id'] : (item['attributes']['full_name'].strip(), item['relationships']) for item in general_meta['included'] if item['type'] == 'user'}
 
 		return artist_lut
 
@@ -855,6 +854,7 @@ class GetPatreon(xascraper.modules.scraper_base.ScraperBase):
 		except Exception as e:
 			import IPython
 			IPython.embed()
+
 
 		self.log.info("Found %d Names", len(artist_lut))
 		for key, value in artist_lut.items():
@@ -987,6 +987,7 @@ class GetPatreon(xascraper.modules.scraper_base.ScraperBase):
 				enable_gpu         = True,
 				additional_options = ['--new-window']
 			)
+
 		super().go(*args, **kwargs)
 
 def signal_handler(dummy_signal, dummy_frame):
