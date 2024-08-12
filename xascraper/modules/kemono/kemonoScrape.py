@@ -28,7 +28,7 @@ class GetKemono(xascraper.modules.scraper_base.ScraperBase):
 
 	ovwMode = "Check Files"
 
-	numThreads = 2
+	numThreads = 3
 
 
 	# Stubbed functions
@@ -106,7 +106,7 @@ class GetKemono(xascraper.modules.scraper_base.ScraperBase):
 		cdn_fname, cdn_fext = os.path.splitext(cdn_name)
 
 		print("Saving image: '%s'" % cdn_url)
-		fname = "{src}-{cdn}{ext}".format(src=src_fname,cdn=cdn_fname,ext=cdn_fext)
+		fname = "{src}-{cdn}{ext}".format(src=src_fname, cdn=cdn_fname, ext=cdn_fext)
 
 		fdir = self.get_save_dir(kemono_service, kemono_name)
 		fqpath = os.path.join(fdir, fname)
@@ -114,7 +114,11 @@ class GetKemono(xascraper.modules.scraper_base.ScraperBase):
 			self.log.info("Do not need to download: '%s'", fname)
 		else:
 			try:
-				content = self.wg.getpage(cdn_url, addlHeaders={"Referer" : referrer})
+				if referrer:
+					content = self.wg.getpage(cdn_url, addlHeaders={"Referer" : referrer})
+				else:
+					content = self.wg.getpage(cdn_url)
+
 			except WebRequest.FetchFailureError:
 				self.log.error(traceback.format_exc())
 				self.log.error("Could not retreive content: ")
@@ -136,7 +140,7 @@ class GetKemono(xascraper.modules.scraper_base.ScraperBase):
 
 
 
-	def save_media(self, aname, pid, dat_struct):
+	def save_media(self, kemono_service, kemono_name, post_url, dat_struct):
 		print("Saving media item: '%s'" % dat_struct['attributes']['download_url'])
 		if dat_struct['attributes']['download_url'].startswith("https"):
 			url = dat_struct['attributes']['download_url']
@@ -145,7 +149,7 @@ class GetKemono(xascraper.modules.scraper_base.ScraperBase):
 
 
 		fname = str(dat_struct['attributes']['file_name']).split("/")[-1]
-		fname = "{pid}-{aid}-{fname}".format(pid=pid, aid=dat_struct['id'], fname=fname)
+		fname = "{pid}-{aid}-{fname}".format(pid=post_url, aid=dat_struct['id'], fname=fname)
 
 		fdir = self.get_save_dir(kemono_service, kemono_name)
 		fqpath = os.path.join(fdir, fname)
@@ -202,10 +206,95 @@ class GetKemono(xascraper.modules.scraper_base.ScraperBase):
 				raise exceptions.ContentRemovedException("Item has been deleted or removed.")
 
 
+	def _get_discord_post(self, post_url, kemono_service, kemono_name):
+
+
+		content_structured = self.get_content_structured(post_url)
+		source_url = content_structured['referring_url']
+
+		files = []
+		external_embeds = []
+
+		for attachment in content_structured.get('attachments', []):
+
+			attachment_url = urllib.parse.urljoin(source_url, attachment['path'])
+
+			fpath = self.save_content(
+					kemono_service = kemono_service,
+					kemono_name    = kemono_name,
+					referrer       = None,
+					source_name    = attachment['name'],
+					cdn_url        = attachment_url,
+				)
+
+			files.append(fpath)
+
+			self.random_sleep(2,4,15, include_long=False)
+
+		for embed in content_structured.get('embeds', []):
+			external_embeds.append(embed['url'])
+
+		parsed_post_time = dateutil.parser.parse(content_structured['published']).replace(tzinfo=None)
+
+
+
+		post_title = "{server} -> {channel} -> {datetime} : {user}".format(
+						server   = kemono_name,
+						channel  = content_structured['channel_name'],
+						datetime = content_structured['published'],
+						user     = content_structured['author']['username']
+			)
+
+
+		out_soup = bs4.BeautifulSoup()
+
+		p_tag = out_soup.new_tag("p")
+		p_tag.string = content_structured['content']
+
+		out_soup.append(p_tag)
+
+		for embed in content_structured.get('embeds', []):
+
+			p_tag = out_soup.new_tag("p")
+			a_tag = out_soup.new_tag("a", href=embed['url'])
+
+			a_tag.string = embed.get("description", "No Description")
+			p_tag.append(a_tag)
+
+			out_soup.append(p_tag)
+
+		files = list(set(files))
+
+		if len(files):
+			self.log.info("Found %s images/attachments on post.", len(files))
+		else:
+			self.log.warning("No images/attachments on post %s!", post_url)
+
+
+		files = [filen for filen in files if filen]
+
+		ret = {
+			'page_desc'   : out_soup.prettify(),
+			'page_title'  : post_title,
+			'post_time'   : parsed_post_time,
+			'post_tags'   : [],  # I don't think there are tags on Kemono?
+			'post_embeds' : external_embeds,
+			'dl_path'     : files,
+			'status'      : 'Succeeded',
+		}
+
+		# pprint.pprint(ret)
+		return ret
+
+
 	def _get_art_post(self, post_url, kemono_service, kemono_name):
 
-		soup = self.wg.getSoup(post_url)
+		# Funky special-case for kemono's discord archiving
+		if post_url.startswith("kemono:discord:"):
+			return self._get_discord_post(post_url, kemono_service, kemono_name)
 
+
+		soup = self.wg.getSoup(post_url)
 
 		try:
 
@@ -215,8 +304,9 @@ class GetKemono(xascraper.modules.scraper_base.ScraperBase):
 			external_embeds = []
 			if post_files:
 				for pfile in post_files.find_all("a"):
-					if pfile.get("download"):
-						fpath = self.save_content(kemono_service, kemono_name, post_url, pfile['download'], pfile['href'])
+					dl_filename = pfile.get("download")
+					if dl_filename:
+						fpath = self.save_content(kemono_service, kemono_name, post_url, dl_filename, pfile['href'])
 						files.append(fpath)
 
 					# No download attrigute probably means externally hosted?
@@ -231,8 +321,12 @@ class GetKemono(xascraper.modules.scraper_base.ScraperBase):
 
 			if post_attachments:
 				for pfile in post_attachments.find_all("a"):
-					fpath = self.save_content(kemono_service, kemono_name, post_url, pfile['download'], pfile['href'])
-					files.append(fpath)
+					dl_filename = pfile.get("download")
+					if dl_filename:
+						fpath = self.save_content(kemono_service, kemono_name, post_url, pfile['download'], pfile['href'])
+						files.append(fpath)
+					else:
+						fpath = self.save_content(kemono_service, kemono_name, post_url, "unknown.bin", pfile['href'])
 
 			# try:
 			# 	if "post_file" in post_info and post_info['post_file']:
@@ -341,6 +435,7 @@ class GetKemono(xascraper.modules.scraper_base.ScraperBase):
 			fail = {
 				'status' : ''
 				}
+
 			return fail
 
 		try:
@@ -425,6 +520,93 @@ class GetKemono(xascraper.modules.scraper_base.ScraperBase):
 
 		return extends
 
+	def _load_discord_channel(self, channel_obj, local_aid, artist_undecoded, kemono_service, kemono_aid):
+
+		offset = 0
+		step = 150
+
+		total_items = []
+
+		while 1:
+			channel_url = "https://kemono.su/api/v1/discord/channel/{channel}?o={offset}".format(
+					channel = channel_obj['id'],
+					offset  = offset,
+				)
+
+			page_items = self.wg.getJson(channel_url)
+
+
+			# self.random_sleep(2,4,15, include_long=False)
+
+			if not page_items:
+				break
+
+			for item in page_items:
+				item['referring_url'] = channel_url
+				item['channel_name']  = channel_obj['name']
+				total_items.append((item['id'], item))
+
+
+			offset += step
+
+
+		return total_items
+
+	def _load_discord_pages(self, local_aid, artist_undecoded, kemono_service, kemono_aid):
+
+		root_discord_url = "https://kemono.su/api/v1/discord/channel/lookup/{aid}".format(aid=kemono_aid)
+
+
+		channel_listing = self.wg.getJson(root_discord_url)
+		have = []
+
+		for channel_obj in channel_listing:
+			new_items = self._load_discord_channel(channel_obj, local_aid, artist_undecoded, kemono_service, kemono_aid)
+			have.extend(new_items)
+
+		return have
+
+	def _load_discord(self, artist_undecoded, kemono_service, kemono_aid, artist_decoded):
+		local_aid = self._artist_name_to_rid(artist_undecoded)
+
+		item_key = "{}-{}-{}-fetchtime".format("kemono", "content_list_fetch", local_aid)
+		have = self.db.get_from_db_key_value_store(item_key)
+
+		# If we've fetched it in the last 2 weeks, don't retry it.
+		if have and 'last_fetch' in have and have['last_fetch'] and have['last_fetch'] > (time.time() - 60*60*24*7*2):
+			pass
+
+		else:
+			oldArt = self._getPreviouslyRetreived(artist_undecoded)
+			artPages = self._load_discord_pages(local_aid,artist_undecoded, kemono_service, kemono_aid)
+			self.log.info("Total gallery items %s", len(artPages))
+
+
+			new = 0
+			post_hashes = []
+			with self.db.context_sess() as sess:
+				self.log.info("Upserting files")
+				for discord_post_id, item_struct in tqdm.tqdm(artPages):
+					item = "{}:{}:{}:{}".format(
+							"kemono",
+							"discord",
+							artist_decoded['name'],
+							discord_post_id,
+						)
+					post_hashes.append(item)
+
+					new += self._upsert_if_new(sess, local_aid, item, content_structured=item_struct)
+
+			self.log.info("%s new art pages, %s total", new, len(artPages))
+
+			art_set = set(post_hashes)
+
+			newArt = art_set - oldArt
+			self.log.info("Old art items = %s, newItems = %s", len(oldArt), len(newArt))
+
+			self.db.set_in_db_key_value_store(item_key, {'last_fetch' : time.time()})
+
+		return self._getNewToRetreive(aid=local_aid)
 
 	def _load_art(self, artist_undecoded, kemono_service, kemono_aid):
 		local_aid = self._artist_name_to_rid(artist_undecoded)
@@ -454,8 +636,6 @@ class GetKemono(xascraper.modules.scraper_base.ScraperBase):
 
 			self.db.set_in_db_key_value_store(item_key, {'last_fetch' : time.time()})
 
-
-
 		return self._getNewToRetreive(aid=local_aid)
 
 	def getArtist(self, artist_undecoded, ctrlNamespace):
@@ -475,7 +655,11 @@ class GetKemono(xascraper.modules.scraper_base.ScraperBase):
 			self.log.info("GetArtist - %s:%s -> %s", kemono_service, kemono_name, artist_undecoded)
 			self.setupDir(os.path.join(kemono_service, kemono_name))
 
-			newArt = self._load_art(artist_undecoded, kemono_service, kemono_aid)
+
+			if kemono_service == 'discord':
+				newArt = self._load_discord(artist_undecoded, kemono_service, kemono_aid, artist_decoded)
+			else:
+				newArt = self._load_art(artist_undecoded, kemono_service, kemono_aid)
 
 
 			embeds = []
@@ -537,7 +721,7 @@ class GetKemono(xascraper.modules.scraper_base.ScraperBase):
 	# ---------------------------------------------------------------------------------------------------------------------------------------------------------
 
 	def get_artist_listing(self):
-		creators_api_endpoint = "https://kemono.party/api/creators"
+		creators_api_endpoint = "https://kemono.su/api/v1/creators"
 
 		creators = self.wg.getJson(creators_api_endpoint)
 
@@ -617,7 +801,7 @@ class GetKemono(xascraper.modules.scraper_base.ScraperBase):
 		now = datetime.datetime.utcnow().replace(tzinfo = pytz.utc).replace(microsecond=0)
 
 
-		art_listing_url = "https://kemono.party/{service}/user/{aid}?o={offset}"
+		art_listing_url = "https://kemono.su/{service}/user/{aid}?o={offset}"
 
 
 		post_articles = set()
@@ -631,6 +815,7 @@ class GetKemono(xascraper.modules.scraper_base.ScraperBase):
 				break
 
 
+			this_page = set()
 
 			for article in articles:
 
@@ -640,7 +825,12 @@ class GetKemono(xascraper.modules.scraper_base.ScraperBase):
 
 				post_url = urllib.parse.urljoin(art_listing_url, article.a['href'])
 
-				post_articles.add(post_url)
+				this_page.add(post_url)
+
+			if this_page.issubset(post_articles):
+				break
+
+			post_articles = post_articles | this_page
 
 			self.log.info("iterating over listing of posts. Found %s so far.", len(post_articles))
 

@@ -515,24 +515,32 @@ class ScraperBase(module_base.ModuleBase, metaclass=abc.ABCMeta):
 			print("Res:", res)
 			return res
 
-	def _upsert_if_new(self, sess, aid, url):
+	def _upsert_if_new(self, sess, aid, url, content_structured=None):
 
 		res = sess.query(self.db.ArtItem) \
 			.filter(self.db.ArtItem.artist_id == aid) \
 			.filter(self.db.ArtItem.release_meta == url) \
 			.count()
 		if not res:
-			row = self.db.ArtItem(
-					state        = 'new',
-					artist_id    = aid,
-					release_meta = url,
-				)
+			if content_structured:
+				row = self.db.ArtItem(
+						state              = 'new',
+						artist_id          = aid,
+						release_meta       = url,
+						content_structured = content_structured,
+					)
+			else:
+				row = self.db.ArtItem(
+						state        = 'new',
+						artist_id    = aid,
+						release_meta = url,
+					)
+
 			sess.add(row)
 			sess.commit()
 			return 1
 		else:
 			return 0
-
 
 
 	# Insert bad item into DB
@@ -579,6 +587,19 @@ class ScraperBase(module_base.ModuleBase, metaclass=abc.ABCMeta):
 				sess.commit()
 
 
+
+	def get_content_structured(self, url):
+		# This should be on aid, release_meta, but release_meta is going to be unique enough that we can just query on that.
+		with self.db.context_sess() as sess:
+
+			res = sess.query(self.db.ArtItem) \
+				.filter(self.db.ArtItem.release_meta == url) \
+				.scalar()
+
+			if res:
+				return res.content_structured
+			else:
+				return None
 
 
 	def get_last_fetched(self, artist):

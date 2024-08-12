@@ -650,6 +650,10 @@ class GetPX(xascraper.modules.scraper_base.ScraperBase):
 			self.random_sleep(1,2,5, include_long=False)
 			raise exceptions.AccountDisabledException("Account is locked for viewing!")
 
+		if "error" in item_content and 'user_message' in item_content["error"] and item_content["error"]['user_message'] == 'Page not found':
+			self.random_sleep(1,2,5, include_long=False)
+			raise exceptions.AccountDisabledException("Account has been removed!")
+
 		# I think this is caused by accounts that have been deleted.
 		if "error" in item_content and 'user_message' in item_content["error"] and item_content["error"]['user_message'] == 'Your access is currently restricted.':
 			self.random_sleep(1,2,5, include_long=False)
@@ -664,6 +668,9 @@ class GetPX(xascraper.modules.scraper_base.ScraperBase):
 		if "error" in item_content and item_content["error"]:
 
 			print("Error without a message?")
+
+			print("'item_content' : ")
+			print(item_content)
 
 			import IPython
 			IPython.embed()
