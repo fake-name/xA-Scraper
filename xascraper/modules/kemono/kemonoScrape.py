@@ -28,7 +28,7 @@ class GetKemono(xascraper.modules.scraper_base.ScraperBase):
 
 	ovwMode = "Check Files"
 
-	numThreads = 3
+	numThreads = 2
 
 
 	# Stubbed functions
@@ -131,6 +131,7 @@ class GetKemono(xascraper.modules.scraper_base.ScraperBase):
 					content = content.encode("utf-8")
 
 				fqpath = self.local_save_file(kemono_service, kemono_name, fname, content)
+				self.random_sleep(2,4,15, include_long=False)
 			else:
 				self.log.error("Could not retreive content: ")
 				self.log.error("%s", cdn_url)
@@ -229,7 +230,7 @@ class GetKemono(xascraper.modules.scraper_base.ScraperBase):
 
 			files.append(fpath)
 
-			self.random_sleep(2,4,15, include_long=False)
+
 
 		for embed in content_structured.get('embeds', []):
 			external_embeds.append(embed['url'])
@@ -293,6 +294,8 @@ class GetKemono(xascraper.modules.scraper_base.ScraperBase):
 		if post_url.startswith("kemono:discord:"):
 			return self._get_discord_post(post_url, kemono_service, kemono_name)
 
+		post_url = post_url.replace("https://kemono.party/", "https://kemono.su/")
+
 
 		soup = self.wg.getSoup(post_url)
 
@@ -305,13 +308,15 @@ class GetKemono(xascraper.modules.scraper_base.ScraperBase):
 			if post_files:
 				for pfile in post_files.find_all("a"):
 					dl_filename = pfile.get("download")
+					file_url = urllib.parse.urljoin('https://kemono.su/', pfile['href'])
+
 					if dl_filename:
-						fpath = self.save_content(kemono_service, kemono_name, post_url, dl_filename, pfile['href'])
+						fpath = self.save_content(kemono_service, kemono_name, post_url, dl_filename, file_url)
 						files.append(fpath)
 
 					# No download attrigute probably means externally hosted?
 					else:
-						external_embeds.append(pfile['href'])
+						external_embeds.append(file_url)
 
 
 			# From what I can tell, videos are also listed in the attachments section.
@@ -322,11 +327,14 @@ class GetKemono(xascraper.modules.scraper_base.ScraperBase):
 			if post_attachments:
 				for pfile in post_attachments.find_all("a"):
 					dl_filename = pfile.get("download")
+					attachment_url = urllib.parse.urljoin('https://kemono.su/', pfile['href'])
+
 					if dl_filename:
-						fpath = self.save_content(kemono_service, kemono_name, post_url, pfile['download'], pfile['href'])
+
+						fpath = self.save_content(kemono_service, kemono_name, post_url, pfile['download'], attachment_url)
 						files.append(fpath)
 					else:
-						fpath = self.save_content(kemono_service, kemono_name, post_url, "unknown.bin", pfile['href'])
+						fpath = self.save_content(kemono_service, kemono_name, post_url, "unknown.bin", attachment_url)
 
 			# try:
 			# 	if "post_file" in post_info and post_info['post_file']:
@@ -451,13 +459,6 @@ class GetKemono(xascraper.modules.scraper_base.ScraperBase):
 		except KeyboardInterrupt:
 			raise
 
-		# except:
-		# 	import IPython
-		# 	IPython.embed()
-
-		# finally:
-		# 	self.random_sleep(0.1,1,3, include_long=False)
-
 
 	def get_art_item(self, artist_undecoded, kemono_service, kemono_name, post_url):
 
@@ -536,7 +537,6 @@ class GetKemono(xascraper.modules.scraper_base.ScraperBase):
 			page_items = self.wg.getJson(channel_url)
 
 
-			# self.random_sleep(2,4,15, include_long=False)
 
 			if not page_items:
 				break
