@@ -7,6 +7,8 @@ import urllib.parse
 import json
 import time
 import pprint
+import random
+import logging
 import pytz
 import dateutil.parser
 import bs4
@@ -16,6 +18,63 @@ import tqdm
 
 import xascraper.modules.scraper_base
 from xascraper.modules import exceptions
+
+retry_logger = logging.getLogger("Main.Retrier")
+
+def random_sleep( start, mid, stop, include_long=True):
+
+	sleeptime = random.triangular(start, mid, stop)
+
+	# 1 in 10 chance of longer sleep
+	if random.randrange(0, 10) == 0 and include_long:
+		sleeptime = random.triangular(start*60, mid*60, stop*60)
+
+	retry_logger.info("Sleeping %0.2f seconds", sleeptime)
+	if sleeptime < 10:
+		for _ in range(int(sleeptime)):
+			time.sleep(1)
+	else:
+		for _ in tqdm.trange(int(sleeptime)):
+			time.sleep(1)
+
+
+	# Remaining sleep. Protbably silly.
+	time.sleep(sleeptime % 1.0)
+
+def _retry_func(func, *args, **kwargs):
+	for retry_cnt in range(99999):
+		try:
+			ret = func(*args, **kwargs)
+			return ret
+
+		except exceptions.RetryException:
+			if retry_cnt > 5:
+				raise
+			random_sleep(5,10,15, include_long=False)
+
+
+		except WebRequest.FetchFailureError as err:
+			if retry_cnt > 5:
+				raise
+
+			if err.err_code == 429:
+				retry_logger.info("HTTP 429 Status, sleeping a bit and retrying.")
+				random_sleep(5,10,15, include_long=False)
+			else:
+				raise
+
+		except SystemExit:
+			raise
+		except KeyboardInterrupt:
+			raise
+
+		except Exception as e:
+
+			print("Exception in _fetch_retrier: ", e)
+			import traceback
+			traceback.print_exc()
+
+
 
 
 class GetKemono(xascraper.modules.scraper_base.ScraperBase):
@@ -47,7 +106,6 @@ class GetKemono(xascraper.modules.scraper_base.ScraperBase):
 
 		# This is.... kind of horrible.
 		self.wg.errorOutCount = 1
-
 
 
 	def get_soup(self, url):
@@ -233,7 +291,14 @@ class GetKemono(xascraper.modules.scraper_base.ScraperBase):
 
 
 		for embed in content_structured.get('embeds', []):
-			external_embeds.append(embed['url'])
+			print("Embed:")
+			pprint.pprint(embed)
+			try:
+				external_embeds.append(embed['url'])
+			except KeyError:
+				import pdb
+				pdb.set_trace()
+			print()
 
 		parsed_post_time = dateutil.parser.parse(content_structured['published']).replace(tzinfo=None)
 
@@ -534,7 +599,8 @@ class GetKemono(xascraper.modules.scraper_base.ScraperBase):
 					offset  = offset,
 				)
 
-			page_items = self.wg.getJson(channel_url)
+
+			page_items = _retry_func(self.wg.getJson, channel_url)
 
 
 
@@ -557,7 +623,7 @@ class GetKemono(xascraper.modules.scraper_base.ScraperBase):
 		root_discord_url = "https://kemono.su/api/v1/discord/channel/lookup/{aid}".format(aid=kemono_aid)
 
 
-		channel_listing = self.wg.getJson(root_discord_url)
+		channel_listing = _retry_func(self.wg.getJson, root_discord_url)
 		have = []
 
 		for channel_obj in channel_listing:
@@ -723,7 +789,7 @@ class GetKemono(xascraper.modules.scraper_base.ScraperBase):
 	def get_artist_listing(self):
 		creators_api_endpoint = "https://kemono.su/api/v1/creators"
 
-		creators = self.wg.getJson(creators_api_endpoint)
+		creators = _retry_func(self.wg.getJson, creators_api_endpoint)
 
 
 		artist_lut = [

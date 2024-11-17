@@ -1,13 +1,16 @@
 
 
 import logging
+import multiprocessing
 import colorama as clr
-
+import threading
 import os.path
+import os
 import sys
+import re
 import time
 import traceback
-# Pyling can't figure out what's in the record library for some reason
+# Pylint can't figure out what's in the record library for some reason
 #pylint: disable-msg=E1101
 
 colours = [clr.Fore.BLUE, clr.Fore.RED, clr.Fore.GREEN, clr.Fore.YELLOW, clr.Fore.MAGENTA, clr.Fore.CYAN, clr.Back.YELLOW + clr.Fore.BLACK, clr.Back.YELLOW + clr.Fore.BLUE, clr.Fore.WHITE]
@@ -15,14 +18,79 @@ colours = [clr.Fore.BLUE, clr.Fore.RED, clr.Fore.GREEN, clr.Fore.YELLOW, clr.For
 def getColor(idx):
 	return colours[idx%len(colours)]
 
-class ColourHandler(logging.Handler):
+
+class UnlockedHandler(logging.Handler):
+
+	def acquire(self):
+		"""
+		Acquire the I/O thread lock.
+		"""
+		return
+
+	def release(self):
+		"""
+		Release the I/O thread lock.
+		"""
+		return
+
+
+stdout_lock = multiprocessing.Lock()
+
+
+# THIS IS HORRIBLE
+logging.Handler = UnlockedHandler
+
+
+def getProcessSafeLogger(logPath):
+	if multiprocessing.current_process().name == "MainProcess":
+		return logging.getLogger(logPath)
+	else:
+		return multiprocessing.get_logger(logPath)
+
+
+def resetLoggingLocks():
+	'''
+	This function is a HACK!
+
+	Basically, if we fork() while a logging lock is held, the lock
+	is /copied/ while in the acquired state. However, since we've
+	forked, the thread that acquired the lock no longer exists,
+	so it can never unlock the lock, and we end up blocking
+	forever.
+
+	Therefore, we manually enter the logging module, and forcefully
+	release all the locks it holds.
+
+	THIS IS NOT SAFE (or thread-safe).
+	Basically, it MUST be called right after a process
+	starts, and no where else.
+	'''
+	try:
+		logging._releaseLock()
+	except RuntimeError:
+		pass  # The lock is already released
+
+	# Iterate over the root logger hierarchy, and
+	# force-free all locks.
+	# if logging.Logger.root
+	for handler in logging.Logger.manager.loggerDict.values():
+		if hasattr(handler, "lock") and handler.lock:
+			try:
+				handler.lock.release()
+			except RuntimeError:
+				pass  # The lock is already released
+
+
+
+class ColourHandler(UnlockedHandler):
 
 	def __init__(self, level=logging.DEBUG):
-		logging.Handler.__init__(self, level)
-		self.formatter = logging.Formatter('\r%(name)s%(padding)s - %(style)s%(levelname)s - %(message)s'+clr.Style.RESET_ALL)
+		UnlockedHandler.__init__(self, level)
+		self.formatter = logging.Formatter('\r%(name)s - %(style)s%(levelname)s - %(message)s'+clr.Style.RESET_ALL)
 		clr.init()
 
 		self.logPaths = {}
+
 
 	def emit(self, record):
 
@@ -30,6 +98,8 @@ class ColourHandler(logging.Handler):
 		# print record.name
 
 		segments = record.name.split(".")
+		tname = threading.current_thread().name
+		segments.append(tname)
 		if segments[0] == "Main" and len(segments) > 1:
 			segments.pop(0)
 			segments[0] = "Main."+segments[0]
@@ -49,7 +119,7 @@ class ColourHandler(logging.Handler):
 			nameList.append(name)
 
 
-		record.name = ".".join(nameList)
+		record.name = ".".join(nameList) + " PID: {} ".format(os.getpid())
 
 		if record.levelname == "DEBUG":
 			record.style = clr.Style.DIM
@@ -62,13 +132,76 @@ class ColourHandler(logging.Handler):
 		else:
 			record.style = clr.Style.NORMAL
 
+		# record.padding = ""
+		record.msg = str(record.msg).encode("utf-8", "replace").decode("utf-8")
 		record.padding = ""
-		print((self.format(record)))
+		msg = self.format(record)
+		msg = str(msg).encode("utf-8", "replace").decode("utf-8")
+		locked = False
+		try:
+			locked = stdout_lock.acquire(timeout=1)
+			print(msg)
+
+			# Apparently the answer to "can I break stdout" is yes.
+			# /that happened/
+		except RuntimeError:
+			print("Failure to print!")
+		finally:
+			if locked:
+				stdout_lock.release()
+
+ansi_escape = re.compile(r'\x1b[^m]*m')
 
 class RobustFileHandler(logging.FileHandler):
 	"""
 	A handler class which writes formatted logging records to disk files.
 	"""
+	def __init__(self, *args, **kwargs):
+		super().__init__(*args, **kwargs)
+
+		self.output_streams = {}
+
+	def acquire(self):
+		"""
+		Acquire the I/O thread lock.
+		"""
+		return
+
+	def release(self):
+		"""
+		Release the I/O thread lock.
+		"""
+		return
+
+
+	def stream_emit(self, record, source_name):
+		"""
+		Emit a record.
+
+		If a formatter is specified, it is used to format the record.
+		The record is then written to the stream with a trailing newline.  If
+		exception information is present, it is formatted using
+		traceback.print_exception and appended to the stream.  If the stream
+		has an 'encoding' attribute, it is used to determine how to do the
+		output to the stream.
+		"""
+
+		if not source_name in self.output_streams:
+			out_path = os.path.abspath("./logs")
+			logpath = ansi_escape.sub('', source_name.replace("/", ";").replace(":", ";").replace("?", "-"))
+			filename = "log {path}.txt".format(path=logpath)
+			print("Opening output log file for path: %s" % filename)
+			self.output_streams[source_name] = open(os.path.join(out_path, filename), self.mode, encoding=self.encoding)
+
+		stream = self.output_streams[source_name]
+		try:
+			msg = self.format(record)
+			stream.write(msg)
+			stream.write(self.terminator)
+			stream.flush()
+			self.flush()
+		except Exception:
+			self.handleError(record)
 
 	def emit(self, record):
 		"""
@@ -78,21 +211,9 @@ class RobustFileHandler(logging.FileHandler):
 		constructor, open it before calling the superclass's emit.
 		"""
 		failures = 0
-		while self.stream is None:
-			try:
-				self.stream = self._open()
-			except:
-
-				time.sleep(1)
-				if failures > 3:
-					traceback.print_exc()
-					print("Cannot open log file?")
-					return
-				failures += 1
-		failures = 0
 		while failures < 3:
 			try:
-				logging.StreamHandler.emit(self, record)
+				self.stream_emit(record, record.name)
 				break
 			except:
 				failures += 1
@@ -112,7 +233,7 @@ def exceptHook(exc_type, exc_value, exc_traceback):
 	mainLogger.critical('Uncaught exception!')
 	mainLogger.critical("Uncaught exception", exc_info=(exc_type, exc_value, exc_traceback))
 
-
+# Global hackyness to detect and warn on double-initialization of the logging systems.
 LOGGING_INITIALIZED = False
 
 def initLogging(logLevel=logging.INFO):
@@ -121,8 +242,11 @@ def initLogging(logLevel=logging.INFO):
 	if LOGGING_INITIALIZED:
 
 		print("ERROR - Logging initialized twice!")
-		print(traceback.format_exc())
-		return
+		try:
+			print(traceback.format_exc())
+			return
+		except Exception:
+			pass
 
 	LOGGING_INITIALIZED = True
 
@@ -131,21 +255,16 @@ def initLogging(logLevel=logging.INFO):
 	if not os.path.exists(os.path.join("./logs")):
 		os.mkdir(os.path.join("./logs"))
 
-	mainLogger = logging.getLogger("Main")			# Main logger
-	reqLogger = logging.getLogger()			# requests
-	apschd_log = logging.getLogger("apscheduler")			# Main logger
+	mainLogger = logging.getLogger()			# Main logger
 	mainLogger.setLevel(logLevel)
-	reqLogger .setLevel(logLevel)
-	apschd_log.setLevel(logLevel)
+
 	ch = ColourHandler()
 	mainLogger.addHandler(ch)
-	reqLogger .addHandler(ch)
-	apschd_log.addHandler(ch)
 
-	# logName	= "Error - %s.txt" % (time.strftime("%Y-%m-%d %H;%M;%S", time.gmtime()))
+	logName	= "log - %s.txt" % (time.strftime("%Y-%m-%d %H;%M;%S", time.gmtime()))
 
-	# errLogHandler = RobustFileHandler(os.path.join("./logs", logName))
-	# errLogHandler.setLevel(logging.WARNING)
+	errLogHandler = RobustFileHandler(os.path.join("./logs", logName))
+	errLogHandler.setLevel(logging.INFO)
 	# formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 	# errLogHandler.setFormatter(formatter)
 
@@ -154,7 +273,42 @@ def initLogging(logLevel=logging.INFO):
 	# Install override for excepthook, to catch all errors
 	sys.excepthook = exceptHook
 
-	# Do not propigate up to the root logger
-	mainLogger.propagate = False
+	logtst = logging.getLogger("Main.Test")
+	logtst.info("Logging Active")
 
 	print("done")
+
+
+	# print("Enumerating loggers:")
+	# for k,v in  logging.Logger.manager.loggerDict.items()  :
+	# 	print('+ [%s] {%s} ' % (str.ljust( k, 20)  , str(v.__class__)[8:-2]) )
+	# 	if not isinstance(v, logging.PlaceHolder):
+	# 		for h in v.handlers:
+	# 			print('     +++',str(h.__class__)[8:-2] )
+	# print("Done listing")
+
+
+if __name__ == "__main__":
+	initLogging()
+	log = logging.getLogger("Main.Test")
+	log.debug("Testing logging - level: debug")
+	log.info("Testing logging - level: info")
+	log.warn("Testing logging - level: warn")
+	log.error("Testing logging - level: error")
+	log.critical("Testing logging - level: critical")
+	print()
+	log.info("Exception using exc_info:")
+	try:
+		x = 1 / 0
+	except Exception as e:
+		log.error("Failed to do thing", exc_info=e)
+
+	print()
+	log.info("Exception using manually extracted traceback")
+	try:
+		x = 1 / 0
+	except Exception as e:
+		log.error("Failed to do thing")
+		for line in traceback.format_exc().strip().split("\n"):
+			log.error(line)
+

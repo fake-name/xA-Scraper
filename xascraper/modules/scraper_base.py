@@ -705,6 +705,13 @@ class ScraperBase(module_base.ModuleBase, metaclass=abc.ABCMeta):
 				assert ok, "Failed to log in after NotLoggedInException!"
 
 
+			except WebRequest.FetchFailureError as err:
+				if err.err_code == 429:
+					self.log.info("HTTP 429 Status, sleeping a bit and retrying.")
+					self.random_sleep(5,10,15, include_long=False)
+				else:
+					raise
+
 			except SystemExit:
 				raise
 			except KeyboardInterrupt:
