@@ -122,6 +122,7 @@ class ScraperBase(module_base.ModuleBase, metaclass=abc.ABCMeta):
 
 	def __init__(self):
 		print("ScraperBase Init")
+		assert self.pluginShortName in settings, "Plugin short key ('%s') not in settings file!" % (self.pluginShortName)
 		self.dlBasePath = settings[self.pluginShortName]["dlDirName"]
 		self.config_file_name = "transient_config.pik"
 
@@ -356,7 +357,6 @@ class ScraperBase(module_base.ModuleBase, metaclass=abc.ABCMeta):
 
 			return set([item for sublist in res for item in sublist])
 
-	# Fetch the previously retrieved item URLs from the database.
 	def _getNewToRetreive(self, artist=None, aid=None):
 		if aid is None:
 			aid = self._artist_name_to_rid(artist)
@@ -374,6 +374,29 @@ class ScraperBase(module_base.ModuleBase, metaclass=abc.ABCMeta):
 			tmp.sort()
 
 			return tmp
+
+	def _getSiteToRetreive(self, site):
+
+		with self.db.context_sess() as sess:
+
+			artists = sess.query(self.db.ScrapeTargets.id)             \
+				.filter(self.db.ScrapeTargets.site_name == site)       \
+				.all()
+
+			artist_list = [tmp[0] for tmp in artists]
+
+			res = sess.query(self.db.ArtItem.id, self.db.ArtItem.release_meta) \
+				.filter(self.db.ArtItem.artist_id.in_(artist_list)) \
+				.filter(self.db.ArtItem.state == 'new') \
+				.all()
+
+
+			# Sort the return, so we run in the same order in all cases.
+			tmp = list(res)
+			tmp.sort(key=lambda x: x.addtime)
+
+			return tmp
+
 
 
 	# Insert recently retreived items into the database

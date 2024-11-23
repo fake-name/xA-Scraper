@@ -19,6 +19,8 @@ from settings import settings
 import xascraper.modules.scraper_base
 from xascraper.modules import exceptions
 
+from . import patreonBase
+
 class LoginFailure(Exception):
 	pass
 
@@ -28,321 +30,8 @@ class FetchError(Exception):
 PATREON_LOGIN_PAGE = 'https://www.patreon.com/login'
 PATREON_HOME_PAGE  = 'https://www.patreon.com/home'
 
-class GetPatreon(xascraper.modules.scraper_base.ScraperBase):
+class GetPatreon(patreonBase.GetPatreonBase):
 
-	pluginShortName = "pat"
-
-	pluginName = "PatreonGet"
-
-	urlBase = None
-
-	ovwMode = "Check Files"
-
-	numThreads = 1
-
-	custom_ua = [('user-agent',      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/109.0.0.0 Safari/537.36'),
-				 ('accept-language', 'en-US,en;q=0.9'),
-				 ('accept',          'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9'),
-				 ('accept-encoding', 'gzip, deflate, br')]
-
-
-	custom_ua = []
-
-	# Stubbed functions
-	_getGalleries = None
-	_getTotalArtCount = None
-
-	extra_wg_params = {"chromium_headless" : False}
-
-	# # ---------------------------------------------------------------------------------------------------------------------------------------------------------
-	# # Cookie Management
-	# # ---------------------------------------------------------------------------------------------------------------------------------------------------------
-
-	def __init__(self, *args, **kwargs):
-		super().__init__(*args, **kwargs)
-
-
-		# This is.... kind of horrible.
-		self.wg.errorOutCount = 1
-
-		# proxy = SocksProxy.ProxyLauncher([TwoCaptchaSolver.TWOCAPTCHA_IP])
-		recaptcha_params = {
-				'provider': 'anticaptcha',
-				'api_key': settings["captcha"]["anti-captcha"]['api_key'],
-
-				# 'proxy'       : proxy.get_wan_address(),
-				# 'proxytype'   : "SOCKS5",
-			}
-
-		# self.req = cloudscraper.CloudScraper(
-		# 		recaptcha = recaptcha_params,
-		# 	)
-
-		# self.req.headers.update(self.wg.browserHeaders)
-
-
-
-	def get_soup(self, url):
-		# resp = self.req.get(url)
-		# assert 'text/html' in resp.headers.get("content-type", ""), "response isn't text/html, it's %s" % resp.headers.get("content-type")
-		# return WebRequest.as_soup(resp.text)
-
-		self.cr.blocking_navigate(url)
-		content = self.cr.get_rendered_page_source()
-
-		return WebRequest.as_soup(content)
-
-	def checkCookie(self):
-		print("Checking login!")
-		try:
-			page = self.get_soup(PATREON_HOME_PAGE)
-			page_str = str(page)
-		except Exception:
-			# print("Not logged in!")
-			current = False
-			traceback.print_exc()
-
-
-		if settings[self.pluginShortName]['username'] in page_str:
-			return True, "Autheticated OK"
-
-		# print("Page str:", page_str)
-
-		with open("page.html", "wb") as fp:
-			fp.write(page_str.encode("UTF-8"))
-
-		return False, "Not logged in"
-
-
-	def handle_recaptcha(self, soup, containing_page, referrer_url):
-		raise RuntimeError("Oooold")
-		self.log.warning("Hit recaptcha. Attempting to solve.")
-
-		key = settings['captcha']['anti-captcha']['api_key']
-		solver = WebRequest.AntiCaptchaSolver(api_key=key, wg=self.wg)
-		form = soup.find("form", id="challenge-form")
-
-		args = {}
-		for input_tag in form.find_all('input'):
-			if input_tag.get('name'):
-				args[input_tag['name']] = input_tag['value']
-
-
-		captcha_key = form.script['data-sitekey']
-
-		self.log.info("Captcha key: %s with input values: %s", captcha_key, args)
-
-		recaptcha_response = solver.solve_recaptcha(google_key=captcha_key, page_url=containing_page)
-
-		self.log.info("Captcha solved with response: %s", recaptcha_response)
-		args['g-recaptcha-response'] = recaptcha_response
-
-		solved_soup = self.wg.getpage(
-				urllib.parse.urljoin(containing_page, form['action']),
-				postData    = args,
-				addlHeaders = {'Referer': referrer_url},
-			)
-
-		return WebRequest.as_soup(solved_soup)
-
-
-
-	def handle_hcaptcha(self, soup, containing_page, referrer_url):
-		self.log.warning("Hit hcaptcha. Attempting to solve.")
-
-		key = settings['captcha']['anti-captcha']['api_key']
-		solver = WebRequest.AntiCaptchaSolver(api_key=key, wg=self.wg)
-		form = soup.find("form", id="challenge-form")
-
-		args = {}
-		for input_tag in form.find_all('input'):
-			if input_tag.get('name'):
-				args[input_tag['name']] = input_tag['value']
-
-
-		captcha_key = form.script['data-sitekey']
-
-		self.log.info("Captcha key: %s with input values: %s", captcha_key, args)
-
-		recaptcha_response = solver.solve_hcaptcha(website_key=captcha_key, page_url=containing_page)
-
-		self.log.info("Captcha solved with response: %s", recaptcha_response)
-		args['g-recaptcha-response'] = recaptcha_response
-
-
-		self.cr.execute_javascript_statement("document.querySelector(\"textarea[name='h-captcha-response']\").value = '{}'".format(recaptcha_response))
-		self.cr.execute_javascript_statement("document.querySelector(\"form#challenge-form\").submit()")
-
-		solved_soup = self.cr.get_rendered_page_source()
-		ret = WebRequest.as_soup(solved_soup)
-
-		return ret
-
-
-	def getCookie(self):
-		if self.checkCookie()[0]:
-			return True, "Already logged in"
-
-		self.log.info("Trying to avoid rate limiting!")
-		self.random_sleep(4,5,6)
-
-		self.log.info("Not logged in. Doing login.")
-
-
-
-		# try:
-		# 	self.cr.blocking_navigate(login)
-		# except Exception as e:
-
-		# 	import pdb
-		# 	print(e)
-		# 	pdb.set_trace()
-		# 	print(e)
-
-
-		# try:
-		# 	content = self.cr.get_rendered_page_source()
-		# except Exception as e:
-
-		# 	import pdb
-		# 	print(e)
-		# 	pdb.set_trace()
-		# 	print(e)
-
-		# if not settings[self.pluginShortName]['username'] in content:
-		# 	self.log.info("Not logged in, attempting to do so.")
-
-
-		try:
-			soup = self.get_soup(PATREON_LOGIN_PAGE)
-		except Exception as e:
-
-			import pdb
-			print(e)
-			pdb.set_trace()
-			print(e)
-
-		# These won't work for the particular recaptcha flavor patreon uses. Sigh.
-		if soup.find_all("div", class_="g-recaptcha"):
-			soup = self.handle_recaptcha(soup, PATREON_HOME_PAGE, PATREON_LOGIN_PAGE)
-
-		if soup.find_all("div", id="hcaptcha_widget"):
-			soup = self.handle_hcaptcha(soup, PATREON_HOME_PAGE, PATREON_LOGIN_PAGE)
-
-		if soup.find_all("div", class_="g-recaptcha"):
-			self.log.error("Failed after attempting to solve recaptcha!")
-			raise exceptions.NotLoggedInException("Login failed due to recaptcha!")
-
-		if soup.find_all("div", class_="hcaptcha_widget"):
-			self.log.error("Failed after attempting to solve recaptcha!")
-			raise exceptions.NotLoggedInException("Login failed due to recaptcha!")
-
-
-		# So patreon uses RavenJS, which does a bunch of really horrible change-watching crap on input
-		# fields. I couldn't figure out how to properly fire the on-change events, so let's just
-		# use the debug-protocol interface to type our login info in manually.
-		self.cr.execute_javascript_function("document.querySelector(\"input[type='email']\").focus()")
-		for char in settings[self.pluginShortName]['username']:
-			self.cr.Input_dispatchKeyEvent(type='char', text=char)
-		self.cr.execute_javascript_statement("document.querySelector(\"input[type='password']\").focus()")
-		for char in settings[self.pluginShortName]['password']:
-			self.cr.Input_dispatchKeyEvent(type='char', text=char)
-
-		self.cr.execute_javascript_statement("document.querySelector(\"button[type='submit']\").click()")
-
-		content = self.cr.get_rendered_page_source()
-
-		if not settings[self.pluginShortName]['username'] in content:
-			import IPython
-			IPython.embed()
-			raise exceptions.CannotAccessException("Could not log in?")
-
-		# self.wg.saveCookies()
-
-		return self.checkCookie()
-
-	def handle_cf(self, content):
-		assert content['code'] == 403
-
-		rendered = self.cr.get_rendered_page_source()
-
-
-	def get_api_json(self, endpoint, postData = None, retry=False):
-		if postData:
-			postData = {"data" : postData}
-			postData = json.dumps(postData, sort_keys=True)
-
-		if endpoint.startswith("http"):
-			endpoint_url = endpoint
-		else:
-			assert endpoint.startswith("/"), "Endpoint isn't a relative path! Passed: '%s'" % endpoint
-			endpoint_url = "https://www.patreon.com/api{endpoint}".format(endpoint=endpoint)
-
-
-		try:
-			content = self.cr.xhr_fetch(
-					endpoint_url,
-					headers ={
-						"content-type"    : "application/json",
-						# "Referer"         : PATREON_LOGIN_PAGE,
-						# "Pragma"          : "no-cache",
-						# "Cache-Control"   : "no-cache",
-						},
-					post_data = postData,
-					post_type = 'application/json'
-				)
-
-
-		except Exception as e:
-			traceback.print_exc()
-			raise exceptions.UnrecoverableFailureException("Wat?")
-
-		try:
-			if content['mimetype'] != 'application/vnd.api+json':
-				if content['code'] == 403:
-					self.handle_cf(content)
-
-
-				if retry:
-					self.log.error("Response isn't JSON. What?")
-					with open("bogus_response.json", "w") as fp:
-						json.dump(content, fp)
-
-					if content['code'] == 504:
-						raise exceptions.RetryException("Gateway time out. Sleeping for a bit.")
-
-					if content['code'] == 502:
-						raise exceptions.RetryException("Gateway time out. Sleeping for a bit.")
-
-
-					import IPython
-					IPython.embed()
-					raise exceptions.UnrecoverableFailureException("API Response that is not json!")
-
-				else:
-
-					# Retry just once
-					self.random_sleep(10,15,60, include_long=False)
-					self.cr.blocking_navigate(PATREON_HOME_PAGE)
-					self.random_sleep(10,15,60)
-					return self.get_api_json(endpoint, postData, retry=True)
-
-			ret = json.loads(content['response'])
-			return ret
-
-		except json.JSONDecodeError as e:
-			self.log.error("Failure decoding JSON content:")
-			self.log.error("	'%s'", content)
-
-			with open("undecodable_response.json", "w") as fp:
-				json.dump(content, fp)
-			traceback.print_exc()
-			raise exceptions.UnrecoverableFailureException("Wat?")
-
-
-	def current_user_info(self):
-		current = self.get_api_json("/current_user?include=pledges&include=follows")
-		return current
 
 
 	# # ---------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -761,9 +450,66 @@ class GetPatreon(xascraper.modules.scraper_base.ScraperBase):
 
 		return [json.loads(tmp) for tmp in new_raw]
 
+
+
+	def go(self, nameList=None, ctrlNamespace=None):
+		if ctrlNamespace is None:
+			raise ValueError("You need to specify a namespace!")
+		is_another_active = self.getRunningStatus(self.pluginShortName)
+
+		if is_another_active:
+			self.log.error("Another instance of the %s scraper is running.", self.pluginShortName)
+			self.log.error("Not starting")
+			return
+		try:
+			self.updateRunningStatus(self.pluginShortName, True)
+			startTime = datetime.datetime.now()
+			self.updateLastRunStartTime(self.pluginShortName, startTime)
+
+			haveCookie, dummy_message = self.checkCookie()
+			if not haveCookie:
+				self.log.info("Do not have login cookie. Retreiving one now.")
+				cookieStatus, msg = self.getCookie()
+				self.log.info("Login attempt status = %s (%s).", cookieStatus, msg)
+				assert cookieStatus, "Login failed! Cannot continue!"
+
+			haveCookie, dummy_message = self.checkCookie()
+			if not haveCookie:
+				self.log.critical("Failed to download cookie! Exiting!")
+				return False
+
+			if not nameList:
+				nameList = self.getNameList()
+
+			errored = False
+
+			# Farm out requests to the thread-pool
+			with concurrent.futures.ThreadPoolExecutor(max_workers=self.numThreads) as executor:
+
+				future_to_url = {}
+				for aId, aName in nameList:
+					future_to_url[executor.submit(self.getArtist, aName, ctrlNamespace)] = aName
+
+				for future in concurrent.futures.as_completed(future_to_url):
+					# aName = future_to_url[future]
+					res = future.result()
+					if type(res) is not bool:
+						raise RuntimeError("Future for plugin %s returned non-boolean value (%s). Function %s of class %s" % (self.pluginShortName, res, self.getArtist, self))
+					errored  |= future.result()
+					# self.log.info("Return = %s, aName = %s, errored = %s" % (res, aName, errored))
+
+			if errored:
+				self.log.warn("Had errors!")
+
+			runTime = datetime.datetime.now()-startTime
+			self.updateLastRunDuration(self.pluginShortName, runTime)
+
+		finally:
+			self.updateRunningStatus(self.pluginShortName, False)
+
+
 	def getArtist(self, artist_undecoded, ctrlNamespace):
-		artist_decoded = json.loads(artist_undecoded)
-		patreon_aid, artist_meta = artist_decoded
+		artist_meta = json.loads(artist_undecoded)
 		artist_name, artist_meta = artist_meta
 
 		# Fix artists with leading/trailing spaces
@@ -841,7 +587,7 @@ class GetPatreon(xascraper.modules.scraper_base.ScraperBase):
 	def get_artist_lut(self):
 		general_meta = self.current_user_info()
 		campaign_items = [item for item in general_meta['included'] if item['type'] == "campaign"]
-		artist_lut = {item['id'] : (item['attributes']['full_name'].strip(), item['relationships']) for item in general_meta['included'] if item['type'] == 'user'}
+		artist_lut = [(item['attributes']['full_name'].strip(), item['relationships']) for item in general_meta['included'] if item['type'] == 'user']
 
 		return artist_lut
 
@@ -857,10 +603,10 @@ class GetPatreon(xascraper.modules.scraper_base.ScraperBase):
 
 
 		self.log.info("Found %d Names", len(artist_lut))
-		for key, value in artist_lut.items():
-			print((key, value))
+		for value in artist_lut:
+			print(value)
 
-		resultList = [json.dumps((key, value), sort_keys=True) for key, value in artist_lut.items()]
+		resultList = [json.dumps(value, sort_keys=True) for value in artist_lut]
 
 
 		with self.db.context_sess() as sess:
@@ -983,6 +729,7 @@ class GetPatreon(xascraper.modules.scraper_base.ScraperBase):
 	def go(self, *args, **kwargs):
 
 		self.cr = ChromeController.ChromeRemoteDebugInterface(
+				binary             = "google-chrome",
 				headless           = False,
 				enable_gpu         = True,
 				additional_options = ['--new-window']
@@ -991,6 +738,7 @@ class GetPatreon(xascraper.modules.scraper_base.ScraperBase):
 		super().go(*args, **kwargs)
 
 def signal_handler(dummy_signal, dummy_frame):
+	import flags
 	if flags.namespace.run:
 		flags.namespace.run = False
 		print("Telling threads to stop")
