@@ -385,7 +385,11 @@ class ScraperBase(module_base.ModuleBase, metaclass=abc.ABCMeta):
 
 			artist_list = [tmp[0] for tmp in artists]
 
-			res = sess.query(self.db.ArtItem.id, self.db.ArtItem.release_meta) \
+			res = sess.query(
+						self.db.ArtItem.id,
+						self.db.ArtItem.artist_id,
+						self.db.ArtItem.release_meta
+					) \
 				.filter(self.db.ArtItem.artist_id.in_(artist_list)) \
 				.filter(self.db.ArtItem.state == 'new') \
 				.all()
@@ -393,7 +397,7 @@ class ScraperBase(module_base.ModuleBase, metaclass=abc.ABCMeta):
 
 			# Sort the return, so we run in the same order in all cases.
 			tmp = list(res)
-			tmp.sort(key=lambda x: x.addtime)
+			tmp.sort()
 
 			return tmp
 
