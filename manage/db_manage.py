@@ -427,7 +427,33 @@ def fix_duplicates():
 			sess.commit()
 
 
+def delete_new_art_items():
+	print("delete_new_art_items")
+	with db.context_sess() as sess:
+		patreon_aids = sess.query(db.ScrapeTargets.id) \
+			.filter(db.ScrapeTargets.site_name == 'pat') \
+			.all()
+		patreon_aids = [item[0] for item in patreon_aids]
 
+		print("Found %s patreon AIDs" % (len(patreon_aids), ))
+
+		res = sess.query(db.ArtItem) \
+			.filter(db.ArtItem.artist_id.in_(patreon_aids)) \
+			.filter(db.ArtItem.state == 'new') \
+			.count()
+		print("Found %s new items" % (res, ))
+		rids = sess.query(db.ArtItem.id) \
+			.filter(db.ArtItem.artist_id.in_(patreon_aids)) \
+			.filter(db.ArtItem.state == 'new') \
+			.all()
+		rids = [item[0] for item in rids]
+
+		for rid in tqdm.tqdm(rids):
+			try:
+				sess.delete(sess.query(db.ArtItem).filter(db.ArtItem.id == rid).one())
+				sess.commit()
+			except sqlalchemy.exc.IntegrityError:
+				sess.rollback()
 
 
 

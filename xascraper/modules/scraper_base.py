@@ -347,6 +347,14 @@ class ScraperBase(module_base.ModuleBase, metaclass=abc.ABCMeta):
 				.one()
 			return res[0]
 
+	def _rid_to_artist_name(self, aid):
+		with self.db.context_sess() as sess:
+			res = sess.query(self.db.ScrapeTargets.artist_name)             \
+				.filter(self.db.ScrapeTargets.site_name == self.pluginShortName) \
+				.filter(self.db.ScrapeTargets.id == aid)              \
+				.one()
+			return res[0]
+
 	# Fetch the previously retrieved item URLs from the database.
 	def _getPreviouslyRetreived(self, artist):
 		aid = self._artist_name_to_rid(artist)

@@ -121,6 +121,7 @@ class GetPatreonFeed(patreonBase.GetPatreonBase):
 		cr.set_filter_func(None)
 		cr.remove_all_handlers()
 		cr.clear_content_listener_cache()
+		cr.Log_clear()
 
 		if watch_list_obj not in navs:
 			raise exceptions.UnrecoverableFailureException("Did not receive list of recent notifications. Check if something has changed!")
@@ -251,8 +252,339 @@ class GetPatreonFeed(patreonBase.GetPatreonBase):
 	# Retreival functions for each post
 	# This expects to be able to manipulate the underlying chrome instance.
 	# ---------------------------------------------------------------------------------------------------------------------------------------------------------
+
+
+
+	def get_save_dir(self, aname):
+
+		dirp = self.getDownloadPath(self.dlBasePath, aname)
+		if not os.path.exists(dirp):
+			os.makedirs(dirp)
+		return dirp
+
+	def local_save_file(self, aname, filename, filecontent):
+		fdir = self.get_save_dir(aname)
+		fqpath = os.path.join(fdir, filename)
+		self.save_file(fqfilename=fqpath, file_content=filecontent)
+
+	def save_json(self, aname, itemid, filecontent):
+		fdir = self.get_save_dir(aname)
+		fqpath = os.path.join(fdir, "pyson-posts")
+		if not os.path.exists(fqpath):
+			os.makedirs(fqpath)
+		fqpath = os.path.join(fqpath, 'itemid-{id}.pyson'.format(id=itemid))
+		with open(fqpath, "wb") as fp:
+			fstr = pprint.pformat(filecontent)
+			fp.write(fstr.encode("utf-8"))
+
+	def save_image(self, aname, pid, fname, furl):
+		print("Saving image: '%s'" % furl)
+		fname = "{pid}-{fname}".format(pid=pid, fname=fname)
+		fdir = self.get_save_dir(aname)
+		fqpath = os.path.join(fdir, fname)
+		if os.path.exists(fqpath):
+			self.log.info("Do not need to download: '%s'", fname)
+		else:
+			try:
+				content = self.fetch_with_chrome(url)
+			except WebRequest.FetchFailureError:
+				self.log.error(traceback.format_exc())
+				self.log.error("Could not retreive content: ")
+				self.log.error("%s", furl)
+				return None
+
+			if content:
+				self.local_save_file(aname, fname, content)
+			else:
+				self.log.error("Could not retreive content: ")
+				self.log.error("%s", furl)
+				return None
+		return fqpath
+
+	def save_attachment(self, aname, pid, dat_struct):
+		print("Saving attachment: '%s'" % dat_struct['attributes']['url'])
+		if dat_struct['attributes']['url'].startswith("https"):
+			url = dat_struct['attributes']['url']
+		else:
+			url = "https:{url}".format(url=dat_struct['attributes']['url'])
+
+		fname = "{pid}-{aid}-{fname}".format(pid=pid, aid=dat_struct['id'], fname=dat_struct['attributes']['name'])
+
+		fdir = self.get_save_dir(aname)
+		fqpath = os.path.join(fdir, fname)
+
+		if os.path.exists(fqpath):
+			self.log.info("Do not need to download: '%s'", fname)
+		else:
+			content = self.fetch_with_chrome(url)
+			if content:
+				if isinstance(content, str):
+					with open(fqpath, "wb") as fp:
+						fp.write(content.encode("utf-8"))
+				else:
+					with open(fqpath, "wb") as fp:
+						fp.write(content)
+			else:
+				return None
+
+		return fqpath
+
+
+	def save_media(self, aname, pid, dat_struct):
+		print("Saving media item: '%s'" % dat_struct['attributes']['download_url'])
+		if dat_struct['attributes']['download_url'].startswith("https"):
+			url = dat_struct['attributes']['download_url']
+		else:
+			url = "https:{url}".format(url=dat_struct['attributes']['download_url'])
+
+
+		fname = str(dat_struct['attributes']['file_name']).split("/")[-1]
+		fname = "{pid}-{aid}-{fname}".format(pid=pid, aid=dat_struct['id'], fname=fname)
+
+		fdir = self.get_save_dir(aname)
+		fqpath = os.path.join(fdir, fname)
+
+		if os.path.exists(fqpath):
+			self.log.info("Do not need to download: '%s'", fname)
+		else:
+			try:
+				content = self.fetch_with_chrome(url)
+			except WebRequest.FetchFailureError:
+				self.log.error(traceback.format_exc())
+				self.log.error("Could not retreive content: ")
+				self.log.error("%s", url)
+				return None
+			if content:
+				if isinstance(content, str):
+					self.local_save_file(aname, fname, content.encode("utf-8"))
+				else:
+					self.local_save_file(aname, fname, content)
+			else:
+				return None
+
+		return fqpath
+
+
+
+	# TODO: Implement this
+	def fetch_video_embed(self, post_content):
+		self.log.warning("Embedded video. Plz complain on github about this!")
+		return None
+
+	def _handle_embed(self, embed_info):
+		self.log.warning("Embedded external content. Plz complain on github about this!")
+		self.log.warning("Include the above json-like output so I can see what I need to do.")
+		return []
+
+
+	def _getContentUrlFromPage(self, soup):
+
+		dlBar = soup.find('ul', id='detail-actions')
+
+
+		dummy, dlLink, dummy = dlBar.find_all('li')
+		if 'Download' in dlLink.get_text():
+			itemUrl = urllib.parse.urljoin(self.urlBase, dlLink.a['href'])
+
+			return itemUrl
+
+		raise ValueError("Wat?")
+
+	def __handle_errors(self, post_errors):
+		for error in post_errors:
+			if 'code_name' in error and error['code_name'] == 'ResourceMissing' and 'status' in error and error['status'] == '404':
+				raise exceptions.ContentRemovedException("Item has been deleted or removed.")
+
+
+	def _get_art_post(self, postId, artistName):
+		post = self.get_api_json("/posts/{pid}".format(pid=postId) +
+			"?include=media"
+			)
+
+		if 'status' in post and post['status'] == '404':
+			self.log.warning("Post is not found!")
+			fail = {
+				'status' : ''
+				}
+			return fail
+
+
+
+	# ---------------------------------------------------------------------------------------------------------------------------------------------------------
+
+	def inject_link_and_click(self, cr, link_url):
+
+
+		cr.execute_javascript_statement("""
+		( function do_nav()
+		{
+			var link = document.createElement("a");
+			link.href = "%s";
+			link.click();
+			return link;
+		})()
+		""" % (link_url, ))
+
 	def do_fetch_item(self, item_row):
-		pass
+
+		item_id, artist_id, release_meta = item_row
+		meta_loaded = json.loads(release_meta)
+		tgt_url = "https://www.patreon.com/posts/{post_id}".format(post_id=meta_loaded[-1])
+
+		artistName, _ = self._rid_to_artist_json(artist_id)
+
+		self.inject_link_and_click(self.cr, tgt_url)
+
+		for _ in range(5):
+			self.cr.drain_transport()
+			time.sleep(1)
+
+
+		script_ctnt = self.cr.execute_javascript_statement('document.getElementById("__NEXT_DATA__").innerHTML')
+		assert script_ctnt['type'] == 'string'
+
+		item_ctnt = json.loads(script_ctnt['value'])
+
+		try:
+			post = item_ctnt['props']['pageProps']['bootstrapEnvelope']['pageBootstrap']['post']
+
+		except KeyError:
+			print("Missing bootstrap envelope to parse!")
+			pprint.pprint(item_ctnt)
+			import pdb
+			pdb.set_trace()
+
+
+
+		if not 'data' in post:
+			if "errors" in post:
+				self.__handle_errors(post['errors'])
+
+			self.log.warning("No 'data' member in post!")
+
+			pprint.pprint(post)
+			fail = {
+				'status' : ''
+				}
+			return fail
+
+
+		post_content = post['data']
+		post_info = post_content['attributes']
+
+		if 'current_user_can_view' in post_info and post_info['current_user_can_view'] is False:
+			self.log.warning("You apparently cannot view post %s for artist %s. Ignoring.", item_id, artistName)
+			fail = {
+				'status' : ''
+				}
+			return fail
+
+		if not 'included' in post:
+			self.log.warning("No contents on post %s for artist %s (%s). Please report if this is in error.", item_id, artistName, post_info['url'])
+			fail = {
+				'status' : ''
+				}
+			return fail
+
+
+		attachments = {item['id'] : item for item in post['included'] if item['type'] == 'attachment'}
+		media       = {item['id'] : item for item in post['included'] if item['type'] == 'media'}
+
+		tags = []
+		if 'user_defined_tags' in post_content['relationships']:
+			for tagmeta in post_content['relationships']['user_defined_tags']['data']:
+				tags.append(tagmeta['id'].split(";")[-1])
+
+		if 'current_user_can_view' in post_content and not post_content['current_user_can_view']:
+			raise exceptions.CannotAccessException("You can't view that content!")
+
+		# if not 'content' in post_info:
+		# pprint.pprint(post_content)
+
+		ret = {
+			'page_desc'   : post_info['content'],
+			'page_title'  : post_info['title'],
+			'post_time'   : dateutil.parser.parse(post_info['published_at']).replace(tzinfo=None),
+			'post_tags'   : tags,
+			'post_embeds' : [],
+		}
+
+		# print("Post:")
+		# pprint.pprint(post)
+		# print("Content:")
+		# pprint.pprint(post_info['content'])
+
+		files = []
+		try:
+			if "post_file" in post_info and post_info['post_file']:
+				furl = urllib.parse.unquote(post_info['post_file']['url'])
+				# print("Post file!", post_info['post_file']['url'], furl)
+
+				fpath = self.save_image(artistName, item_id, post_info['post_file']['name'], furl)
+				files.append(fpath)
+
+			if 'post_type' in post_info and post_info['post_type'] == 'video_embed':
+				# print("Post video_embed")
+				fpath = self.fetch_video_embed(post_info)
+				if fpath:
+					files.append(fpath)
+
+				ret['post_embeds'].append(post_info)
+
+			for aid, dat_struct in attachments.items():
+				# print("Post attachments")
+				fpath = self.save_attachment(artistName, item_id, dat_struct)
+				files.append(fpath)
+
+			for aid, dat_struct in media.items():
+				# print("Post attachments")
+				fpath = self.save_media(artistName, item_id, dat_struct)
+				files.append(fpath)
+
+			if 'embed' in post_info and post_info['embed']:
+				for item in self._handle_embed(post_info['embed']):
+					files.append(fpath)
+				ret['post_embeds'].append(post_info['embed'])
+
+
+
+
+		except urllib.error.URLError:
+			self.log.error("Failure retreiving content from post: %s", post)
+
+		# Posts can apparently be empty.
+		if not post_info['content']:
+			post_info['content'] = ""
+
+		ctnt_soup = bs4.BeautifulSoup(post_info['content'], 'lxml')
+
+		for img in ctnt_soup.find_all("img", src=True):
+			furl = img['src']
+			fparsed = urllib.parse.urlparse(furl)
+			fname = fparsed.path.split("/")[-1]
+
+			# Somehow empty urls ("http://") are getting into here.
+			if len(furl) > len("https://xx"):
+				fpath = self.save_image(artistName, item_id, fname, furl)
+				files.append(fpath)
+
+		# Youtube etc are embedded as iframes.
+		for ifr in ctnt_soup.find_all("iframe", src=True):
+			ret['post_embeds'].append(ifr['src'])
+
+
+		if len(files):
+			self.log.info("Found %s images/attachments on post.", len(attachments))
+		else:
+			self.log.warning("No images/attachments on post %s!", item_id)
+
+
+		files = [filen for filen in files if filen]
+		ret['dl_path'] = files
+		ret['status']  = 'Succeeded'
+
+		# pprint.pprint(ret)
+		return ret
 
 
 	# ---------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -281,7 +613,7 @@ class GetPatreonFeed(patreonBase.GetPatreonBase):
 
 			self.updateRunningStatus(self.pluginShortName, True)
 			startTime = datetime.datetime.now()
-			# self.updateLastRunStartTime(self.pluginShortName, startTime)
+			self.updateLastRunStartTime(self.pluginShortName, startTime)
 
 			# haveCookie, dummy_message = self.checkCookie()
 			# if not haveCookie:
@@ -306,7 +638,45 @@ class GetPatreonFeed(patreonBase.GetPatreonBase):
 
 			# This /HAS/ to be single threaded, since it manipulates a single chromium instance.
 			for todo_item in todo:
-				self.do_fetch_item(todo_item)
+				fetch_ret = self.do_fetch_item(todo_item)
+				_, artist_id, release_meta = todo_item
+				artist_undecoded, _ = self._rid_to_artist_json(artist_id)
+
+				assert 'status'     in fetch_ret, "Status not in response!"
+
+				if 'post_embeds' in fetch_ret:
+					extends = fetch_ret['post_embeds']
+
+
+				if fetch_ret['status'] == "Succeeded" or fetch_ret['status'] == "Exists":
+
+					assert 'dl_path'    in fetch_ret
+					assert 'page_desc'  in fetch_ret
+					assert 'page_title' in fetch_ret
+					assert 'post_time'  in fetch_ret
+					assert 'post_tags'  in fetch_ret
+
+					assert isinstance(fetch_ret['dl_path'], list)
+					seq = 0
+					for item in fetch_ret['dl_path']:
+						self._updatePreviouslyRetreived(
+								artist             = artist_undecoded,
+								state              = 'complete',
+								release_meta       = release_meta,
+								fqDlPath           = item,
+								pageDesc           = fetch_ret['page_desc'],
+								pageTitle          = fetch_ret['page_title'],
+								seqNum             = seq,
+								addTime            = fetch_ret['post_time'],
+								postTags           = fetch_ret['post_tags'],
+								content_structured = fetch_ret,
+							)
+						seq += 1
+				elif fetch_ret['status'] == "Ignore":
+					self.log.info("Ignoring root URL, since it has child-pages.")
+				else:
+					self._updateUnableToRetrieve(artist_undecoded, release_meta)
+
 
 			runTime = datetime.datetime.now()-startTime
 			self.updateLastRunDuration(self.pluginShortName, runTime)

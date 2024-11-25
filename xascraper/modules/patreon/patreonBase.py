@@ -6,8 +6,7 @@ import time
 import pytz
 import dateutil.parser
 import bs4
-import WebRequest
-import cloudscraper
+import base64
 import urllib.parse
 import json
 import time
@@ -28,6 +27,13 @@ class FetchError(Exception):
 
 PATREON_LOGIN_PAGE = 'https://www.patreon.com/login'
 PATREON_HOME_PAGE  = 'https://www.patreon.com/home'
+
+
+def maybe_decode(in_obj):
+	if in_obj['base64Encoded']:
+		return base64.b64decode(in_obj['data'])
+	else:
+		return in_obj['data']
 
 class GetPatreonBase(xascraper.modules.scraper_base.ScraperBase):
 
@@ -377,5 +383,48 @@ class GetPatreonBase(xascraper.modules.scraper_base.ScraperBase):
 
 
 		return super().getNameList()
+
+
+
+	# # ---------------------------------------------------------------------------------------------------------------------------------------------------------
+	# # Misc functions
+	# # ---------------------------------------------------------------------------------------------------------------------------------------------------------
+
+
+
+	def _rid_to_artist_json(self, aid):
+		json_str = self._rid_to_artist_name(aid)
+
+		return json.loads(json_str)
+
+	def fetch_with_chrome(self, cr, url):
+		ft = cr.Page_getFrameTree()
+
+		frame_id = ft['result']['frameTree']['frame']['id']
+
+		load_options = {
+
+			"disableCache"       : False,
+			"includeCredentials" : True,
+		}
+
+		result = cr.Network_loadNetworkResource(frameId=frame_id, url=url, options=load_options)
+
+		file_meta = result['result']['resource']
+
+		CHUNKSIZE = 1024 * 1024
+
+		if 'stream' in file_meta:
+			stream_id = file_meta['stream']
+			s_chunk = cr.IO_read(handle=result['result']['resource']['stream'], size=CHUNKSIZE)
+			f_buf = maybe_decode(s_chunk['result'])
+			while s_chunk['result']['eof'] == False:
+				s_chunk = cr.IO_read(handle=result['result']['resource']['stream'], size=CHUNKSIZE)
+				f_buf += maybe_decode(s_chunk['result'])
+			return f_buf
+		else:
+			print("No stream at url:", url)
+			import pdb
+			pdb.set_trace()
 
 

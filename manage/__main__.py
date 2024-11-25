@@ -46,6 +46,9 @@ def one_arg_go(command):
 		db_manage.reset_missing()
 	elif command == 'fix-duplicates':
 		db_manage.fix_duplicates()
+		db_manage.reset_missing()
+	elif command == 'delete-new-items':
+		db_manage.delete_new_art_items()
 	else:
 		cli_utils.print_help()
 
