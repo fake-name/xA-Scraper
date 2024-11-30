@@ -426,6 +426,8 @@ class GetPatreonBase(xascraper.modules.scraper_base.ScraperBase):
 				pbar.update(CHUNKSIZE)
 			pbar.close()
 			return f_buf
+		if 'httpStatusCode' in file_meta:
+			raise exceptions.FetchFailedException("HTTP status code: %s -> error: %s" % (file_meta['httpStatusCode'], file_meta['netErrorName']))
 		else:
 			print("No stream at url:", url)
 			import pdb

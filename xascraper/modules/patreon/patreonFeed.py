@@ -182,7 +182,7 @@ class GetPatreonFeed(patreonBase.GetPatreonBase):
 			prof_img = item['attributes']['profile_image_url']
 
 			if not post_id.startswith("new_post::"):
-				self.log.info("Not a 'new_post::' item: ", post_id)
+				self.log.info("Not a 'new_post::' item: %s", post_id)
 				import pdb
 				pdb.set_trace()
 
@@ -282,7 +282,7 @@ class GetPatreonFeed(patreonBase.GetPatreonBase):
 			fp.write(fstr.encode("utf-8"))
 
 	def save_image(self, aname, pid, fname, furl):
-		self.log.info("Saving image: '%s'", furl)
+		self.log.info("Saving file: '%s'", furl)
 		fname = "{pid}-{fname}".format(pid=pid, fname=fname)
 		fdir = self.get_save_dir(aname)
 		fqpath = os.path.join(fdir, fname)
@@ -292,6 +292,12 @@ class GetPatreonFeed(patreonBase.GetPatreonBase):
 			try:
 				content = self.fetch_with_chrome(self.cr, furl)
 			except WebRequest.FetchFailureError:
+				self.log.error(traceback.format_exc())
+				self.log.error("Could not retreive content: ")
+				self.log.error("%s", furl)
+				return None
+
+			except exceptions.FetchFailedException:
 				self.log.error(traceback.format_exc())
 				self.log.error("Could not retreive content: ")
 				self.log.error("%s", furl)
@@ -500,6 +506,9 @@ class GetPatreonFeed(patreonBase.GetPatreonBase):
 		elif post_info['post_type'] == 'text_only':
 			pass
 		elif post_info['post_type'] == 'audio_file':
+			pass
+		elif post_info['post_type'] == 'podcast':
+			# I believe this is just a audio file in a trenchcoat
 			pass
 		elif post_info['post_type'] == 'poll':
 			# Don't care about polls

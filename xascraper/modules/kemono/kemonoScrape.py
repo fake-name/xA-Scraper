@@ -87,7 +87,7 @@ class GetKemono(xascraper.modules.scraper_base.ScraperBase):
 
 	ovwMode = "Check Files"
 
-	numThreads = 2
+	numThreads = 1
 
 
 	# Stubbed functions
@@ -293,9 +293,11 @@ class GetKemono(xascraper.modules.scraper_base.ScraperBase):
 		for embed in content_structured.get('embeds', []):
 			print("Embed:")
 			pprint.pprint(embed)
-			try:
+			if 'image' in embed:
+				external_embeds.append(embed['image']['url'])
+			elif 'url' in embed:
 				external_embeds.append(embed['url'])
-			except KeyError:
+			else:
 				import pdb
 				pdb.set_trace()
 			print()
@@ -361,124 +363,100 @@ class GetKemono(xascraper.modules.scraper_base.ScraperBase):
 
 		post_url = post_url.replace("https://kemono.party/", "https://kemono.su/")
 
+		# This is gross, but I'm not passing the keo_id around elsewhere.
+		_, _, _, service, _, keo_id, _, post_id = post_url.split("/")
 
-		soup = self.wg.getSoup(post_url)
+		assert (service == kemono_service)
 
-		try:
+		post_api_url = "https://kemono.su/api/v1/{service}/user/{keo_id}/post/{post_id}".format(
+				service = kemono_service,
+				keo_id  = keo_id,
+				post_id = post_id,
+			)
 
-			post_files    = soup.find("div", class_='post__files')
+		post_comments_url = "https://kemono.su/api/v1/{service}/user/{keo_id}/post/{post_id}/comments".format(
+				service = kemono_service,
+				keo_id  = keo_id,
+				post_id = post_id,
+			)
 
-			files = []
-			external_embeds = []
-			if post_files:
-				for pfile in post_files.find_all("a"):
-					dl_filename = pfile.get("download")
-					file_url = urllib.parse.urljoin('https://kemono.su/', pfile['href'])
+		post_info     = _retry_func(self.wg.getJson, post_api_url)
+		post_comments = _retry_func(self.wg.getJson, post_api_url)
 
-					if dl_filename:
-						fpath = self.save_content(kemono_service, kemono_name, post_url, dl_filename, file_url)
-						files.append(fpath)
+		# soup = self.wg.getSoup(post_url)
 
-					# No download attrigute probably means externally hosted?
-					else:
-						external_embeds.append(file_url)
-
-
-			# From what I can tell, videos are also listed in the attachments section.
-			# At least a quick check shows that the file ties to the video player is also
-			# present as a download.
-			post_attachments   = soup.find("ul", class_='post__attachments')
-
-			if post_attachments:
-				for pfile in post_attachments.find_all("a"):
-					dl_filename = pfile.get("download")
-					attachment_url = urllib.parse.urljoin('https://kemono.su/', pfile['href'])
-
-					if dl_filename:
-
-						fpath = self.save_content(kemono_service, kemono_name, post_url, pfile['download'], attachment_url)
-						files.append(fpath)
-					else:
-						fpath = self.save_content(kemono_service, kemono_name, post_url, "unknown.bin", attachment_url)
-
-			# try:
-			# 	if "post_file" in post_info and post_info['post_file']:
-			# 		furl = urllib.parse.unquote(post_info['post_file']['url'])
-			# 		# print("Post file!", post_info['post_file']['url'], furl)
-
-			# 		fpath = self.save_image(kemono_service, kemono_name, post_url, post_info['post_file']['name'], furl)
-			# 		files.append(fpath)
-
-			# 	if 'post_type' in post_info and post_info['post_type'] == 'video_embed':
-			# 		# print("Post video_embed")
-			# 		fpath = self.fetch_video_embed(post_info)
-			# 		if fpath:
-			# 			files.append(fpath)
-			# 		ret['post_embeds'].append(post_info)
-
-			# 	for aid, dat_struct in attachments.items():
-			# 		# print("Post attachments")
-			# 		fpath = self.save_attachment(kemono_service, kemono_name, post_url, dat_struct)
-			# 		files.append(fpath)
-
-			# 	for aid, dat_struct in media.items():
-			# 		# print("Post attachments")
-			# 		fpath = self.save_media(kemono_service, kemono_name, post_url, dat_struct)
-			# 		files.append(fpath)
-
-			# 	if 'embed' in post_info and post_info['embed']:
-			# 		for item in self._handle_embed(post_info['embed']):
-			# 			files.append(fpath)
-			# 		ret['post_embeds'].append(post_info['embed'])
+		# import IPython
+		# IPython.embed()
 
 
-			# except urllib.error.URLError:
-			# 	self.log.error("Failure retreiving content from post: %s", post)
 
 
-			for ad in soup.find_all("div", class_='ad-container'):
-				ad.decompose()
-
-			post_title    = soup.find("h1",  class_='post__title')
-			post_body     = soup.find("div", class_='post__content')
-			post_comments = soup.find("div", class_='post__comments')
-			post_time     = soup.find("div", class_='post__published')
-			post_tags     = soup.find("section", id='post-tags')
-
-			tags = []
-			if post_tags:
-				for tag in post_tags.find_all("a"):
-					tags.append(tag.get_text())
-			# 	for tagmeta in post_content['relationships']['user_defined_tags']['data']:
-			# 		tags.append(tagmeta['id'].split(";")[-1])
+		post         = post_info['post']
+		attachments  = post_info['attachments']
+		post_attach  = post['attachments']
+		post_file    = post['file']
+		videos       = post_info['videos']
 
 
-			out_soup = bs4.BeautifulSoup()
+		files = []
+		external_embeds = []
 
-			out_soup.append(post_body)
-			out_soup.append(post_comments)
+		# the post_file member is the same structure as the post_attach objects,
+		# so just stuff it there so we don't need to support it separately.
+		if post_file:
+			post_attach.append(post_file)
 
-			if post_time:
-				post_time_str = post_time.get_text().replace("Published:", "").strip()
-				parsed_post_time = dateutil.parser.parse(post_time_str).replace(tzinfo=None)
-			else:
-				# Gumroad content does not have a post date.
-				parsed_post_time = datetime.datetime.now().replace(tzinfo=None)
+		for pattachment in post_attach:
+			pattachment_url = urllib.parse.urljoin('https://kemono.su/', pattachment['path'])
+			fpath = self.save_content(
+				kemono_service = kemono_service,
+				kemono_name    = kemono_name,
+				referrer       = post_url,
+				source_name    = pattachment['name'],
+				cdn_url        = pattachment_url)
 
-			ret = {
-				'page_desc'   : out_soup.prettify(),
-				'page_title'  : post_title.get_text().strip(),
-				'post_time'   : parsed_post_time,
-				'post_tags'   : tags,  # I don't think there are tags on Kemono?
-				'post_embeds' : external_embeds,
-			}
+			files.append(fpath)
 
 
-			# Youtube etc are embedded as iframes.
-			for ifr in soup.find_all("iframe", src=True):
-				ret['post_embeds'].append(ifr['src'])
-		except KeyboardInterrupt:
-			raise
+		# Attachents are separate from post attachments, which AFICT are images shown as part of a post (if more then one)
+		if attachments:
+			for attachment in attachments:
+				attachment_url = urllib.parse.urljoin(attachment['server'], attachment['path'])
+				fpath = self.save_content(
+					kemono_service = kemono_service,
+					kemono_name    = kemono_name,
+					referrer       = post_url,
+					source_name    = attachment['name'],
+					cdn_url        = attachment_url)
+
+				files.append(fpath)
+
+
+		post_title    = post['title']
+		post_body     = post['content']
+		# post_comments = soup.find("div", class_='post__comments')
+		post_time     = post['published']
+		post_tags     = post['tags']
+
+
+
+		if post_time:
+			parsed_post_time = dateutil.parser.parse(post_time).replace(tzinfo=None)
+		else:
+			# Gumroad content does not have a post date.
+			parsed_post_time = datetime.datetime.now().replace(tzinfo=None)
+
+		ret = {
+			'page_desc'     : post_body,
+			'page_title'    : post_title,
+			'post_time'     : parsed_post_time,
+			'post_tags'     : post_tags,  # I don't think there are tags on Kemono?
+			'post_embeds'   : external_embeds,
+
+			'source_json'   : post_info,
+			'comments_json' : post_comments,
+
+		}
 
 		# except:
 		# 	import IPython
@@ -495,6 +473,7 @@ class GetKemono(xascraper.modules.scraper_base.ScraperBase):
 		files = [filen for filen in files if filen]
 		ret['dl_path'] = files
 		ret['status']  = 'Succeeded'
+
 
 		# pprint.pprint(ret)
 		return ret
@@ -533,6 +512,7 @@ class GetKemono(xascraper.modules.scraper_base.ScraperBase):
 		extends = []
 
 		try:
+
 			ret = self._fetch_retrier(post_url, kemono_service, kemono_name)
 
 			assert isinstance(ret, dict), "Response is not a dict?"
@@ -562,7 +542,7 @@ class GetKemono(xascraper.modules.scraper_base.ScraperBase):
 							pageTitle          = ret['page_title'],
 							seqNum             = seq,
 							addTime            = ret['post_time'],
-							postTags           = ret['post_tags'],
+							postTags           = ret['post_tags'] if ret['post_tags'] else [],
 							content_structured = ret,
 						)
 					seq += 1
@@ -724,9 +704,16 @@ class GetKemono(xascraper.modules.scraper_base.ScraperBase):
 			self.log.info("GetArtist - %s:%s -> %s", kemono_service, kemono_name, artist_undecoded)
 			self.setupDir(os.path.join(kemono_service, kemono_name))
 
+			# post_listing_url   = "https://kemono.su/api/v1/{service}/user/{creator_id}/post/{post_id}"
+			# post_revisions_url = "https://kemono.su/api/v1/{service}/user/{creator_id}/post/{post_id}/revisions"
+			# # api_listing_url = art_listing_url.format(service=kemono_service, aid=kemono_aid)
+
+			# import IPython
+			# IPython.embed()
 
 			if kemono_service == 'discord':
-				newArt = self._load_discord(artist_undecoded, kemono_service, kemono_aid, artist_decoded)
+				return
+				# newArt = self._load_discord(artist_undecoded, kemono_service, kemono_aid, artist_decoded)
 			else:
 				newArt = self._load_art(artist_undecoded, kemono_service, kemono_aid)
 
@@ -824,6 +811,7 @@ class GetKemono(xascraper.modules.scraper_base.ScraperBase):
 
 		# If we've fetched it in the last 2 days, don't retry it.
 		if have and 'last_fetch' in have and have['last_fetch'] and have['last_fetch'] > (time.time() - 60*60*24*2):
+			print("Skipping namelist update....")
 			return super().getNameList()
 
 
@@ -868,10 +856,15 @@ class GetKemono(xascraper.modules.scraper_base.ScraperBase):
 
 	def load_art_pages(self, local_aid, artist_undecoded, kemono_service, kemono_aid):
 		now = datetime.datetime.utcnow().replace(tzinfo = pytz.utc).replace(microsecond=0)
-
-
 		art_listing_url = "https://kemono.su/{service}/user/{aid}?o={offset}"
 
+		# post_listing_url = "https://kemono.su/api/v1/{service}/user/{aid}"
+		# api_listing_url = art_listing_url.format(service=kemono_service, aid=kemono_aid)
+
+		# import pdb
+		# pdb.set_trace()
+
+		# page_items = _retry_func(self.wg.getJson, post_listing_url)
 
 		post_articles = set()
 
@@ -916,6 +909,8 @@ class GetKemono(xascraper.modules.scraper_base.ScraperBase):
 
 		is_another_active = self.getRunningStatus(self.pluginShortName)
 
+		l_artist_list = [name.lower() for name in artist_list]
+
 		if is_another_active and not ignore_other:
 			self.log.error("Another instance of the %s scraper is running.", self.pluginShortName)
 			self.log.error("Not starting")
@@ -928,7 +923,7 @@ class GetKemono(xascraper.modules.scraper_base.ScraperBase):
 
 			nameList = self.getNameList()
 
-			nameList = [tmp for tmp in nameList if any([tgt.lower() in str(tmp).lower() for tgt in artist_list])
+			nameList = [tmp for tmp in nameList if any([tgt in str(tmp).lower() for tgt in l_artist_list])
 			]
 
 			haveCookie, dummy_message = self.checkCookie()
