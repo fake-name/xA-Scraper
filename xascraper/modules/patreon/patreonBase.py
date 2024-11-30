@@ -10,6 +10,7 @@ import base64
 import urllib.parse
 import json
 import time
+import tqdm
 import random
 import pprint
 import requests
@@ -418,9 +419,12 @@ class GetPatreonBase(xascraper.modules.scraper_base.ScraperBase):
 			stream_id = file_meta['stream']
 			s_chunk = cr.IO_read(handle=result['result']['resource']['stream'], size=CHUNKSIZE)
 			f_buf = maybe_decode(s_chunk['result'])
+			pbar = tqdm.tqdm()
 			while s_chunk['result']['eof'] == False:
 				s_chunk = cr.IO_read(handle=result['result']['resource']['stream'], size=CHUNKSIZE)
 				f_buf += maybe_decode(s_chunk['result'])
+				pbar.update(CHUNKSIZE)
+			pbar.close()
 			return f_buf
 		else:
 			print("No stream at url:", url)

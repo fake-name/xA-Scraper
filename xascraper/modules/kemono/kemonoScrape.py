@@ -440,12 +440,15 @@ class GetKemono(xascraper.modules.scraper_base.ScraperBase):
 				ad.decompose()
 
 			post_title    = soup.find("h1",  class_='post__title')
-			post_body     = soup.find("div", class_='post__body')
+			post_body     = soup.find("div", class_='post__content')
 			post_comments = soup.find("div", class_='post__comments')
 			post_time     = soup.find("div", class_='post__published')
+			post_tags     = soup.find("section", id='post-tags')
 
 			tags = []
-			# if 'user_defined_tags' in post_content['relationships']:
+			if post_tags:
+				for tag in post_tags.find_all("a"):
+					tags.append(tag.get_text())
 			# 	for tagmeta in post_content['relationships']['user_defined_tags']['data']:
 			# 		tags.append(tagmeta['id'].split(";")[-1])
 
@@ -466,7 +469,7 @@ class GetKemono(xascraper.modules.scraper_base.ScraperBase):
 				'page_desc'   : out_soup.prettify(),
 				'page_title'  : post_title.get_text().strip(),
 				'post_time'   : parsed_post_time,
-				'post_tags'   : [],  # I don't think there are tags on Kemono?
+				'post_tags'   : tags,  # I don't think there are tags on Kemono?
 				'post_embeds' : external_embeds,
 			}
 

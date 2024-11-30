@@ -31,6 +31,10 @@ class FetchError(Exception):
 PATREON_LOGIN_PAGE = 'https://www.patreon.com/login'
 PATREON_HOME_PAGE  = 'https://www.patreon.com/home'
 
+def extract_image_fn(url):
+	parsed = urllib.parse.urlparse(url)
+	return parsed.path.split("/")[-1]
+
 class GetPatreonFeed(patreonBase.GetPatreonBase):
 
 	# ---------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -178,7 +182,7 @@ class GetPatreonFeed(patreonBase.GetPatreonBase):
 			prof_img = item['attributes']['profile_image_url']
 
 			if not post_id.startswith("new_post::"):
-				print("Not a 'new_post::' item: ", post_id)
+				self.log.info("Not a 'new_post::' item: ", post_id)
 				import pdb
 				pdb.set_trace()
 
@@ -198,7 +202,7 @@ class GetPatreonFeed(patreonBase.GetPatreonBase):
 				loc_a_id = self._artist_name_to_rid(artist_str)
 
 			except:
-				print("Did not have campaign: '%s'" % (db_name_items[camp_id], ))
+				self.log.info("Did not have campaign: '%s'" % (db_name_items[camp_id], ))
 				traceback.print_exc()
 
 				import pdb
@@ -278,7 +282,7 @@ class GetPatreonFeed(patreonBase.GetPatreonBase):
 			fp.write(fstr.encode("utf-8"))
 
 	def save_image(self, aname, pid, fname, furl):
-		print("Saving image: '%s'" % furl)
+		self.log.info("Saving image: '%s'", furl)
 		fname = "{pid}-{fname}".format(pid=pid, fname=fname)
 		fdir = self.get_save_dir(aname)
 		fqpath = os.path.join(fdir, fname)
@@ -286,7 +290,7 @@ class GetPatreonFeed(patreonBase.GetPatreonBase):
 			self.log.info("Do not need to download: '%s'", fname)
 		else:
 			try:
-				content = self.fetch_with_chrome(url)
+				content = self.fetch_with_chrome(self.cr, furl)
 			except WebRequest.FetchFailureError:
 				self.log.error(traceback.format_exc())
 				self.log.error("Could not retreive content: ")
@@ -301,44 +305,16 @@ class GetPatreonFeed(patreonBase.GetPatreonBase):
 				return None
 		return fqpath
 
-	def save_attachment(self, aname, pid, dat_struct):
-		print("Saving attachment: '%s'" % dat_struct['attributes']['url'])
-		if dat_struct['attributes']['url'].startswith("https"):
-			url = dat_struct['attributes']['url']
-		else:
-			url = "https:{url}".format(url=dat_struct['attributes']['url'])
-
-		fname = "{pid}-{aid}-{fname}".format(pid=pid, aid=dat_struct['id'], fname=dat_struct['attributes']['name'])
-
-		fdir = self.get_save_dir(aname)
-		fqpath = os.path.join(fdir, fname)
-
-		if os.path.exists(fqpath):
-			self.log.info("Do not need to download: '%s'", fname)
-		else:
-			content = self.fetch_with_chrome(url)
-			if content:
-				if isinstance(content, str):
-					with open(fqpath, "wb") as fp:
-						fp.write(content.encode("utf-8"))
-				else:
-					with open(fqpath, "wb") as fp:
-						fp.write(content)
-			else:
-				return None
-
-		return fqpath
-
 
 	def save_media(self, aname, pid, dat_struct):
-		print("Saving media item: '%s'" % dat_struct['attributes']['download_url'])
+		self.log.info("Saving media item: '%s'", dat_struct['attributes']['download_url'])
 		if dat_struct['attributes']['download_url'].startswith("https"):
 			url = dat_struct['attributes']['download_url']
 		else:
 			url = "https:{url}".format(url=dat_struct['attributes']['download_url'])
 
 
-		fname = str(dat_struct['attributes']['file_name']).split("/")[-1]
+		fname = str(dat_struct['attributes']['file_name']).rsplit("/", maxsplit=1)[-1]
 		fname = "{pid}-{aid}-{fname}".format(pid=pid, aid=dat_struct['id'], fname=fname)
 
 		fdir = self.get_save_dir(aname)
@@ -348,7 +324,7 @@ class GetPatreonFeed(patreonBase.GetPatreonBase):
 			self.log.info("Do not need to download: '%s'", fname)
 		else:
 			try:
-				content = self.fetch_with_chrome(url)
+				content = self.fetch_with_chrome(self.cr, url)
 			except WebRequest.FetchFailureError:
 				self.log.error(traceback.format_exc())
 				self.log.error("Could not retreive content: ")
@@ -377,37 +353,11 @@ class GetPatreonFeed(patreonBase.GetPatreonBase):
 		return []
 
 
-	def _getContentUrlFromPage(self, soup):
-
-		dlBar = soup.find('ul', id='detail-actions')
-
-
-		dummy, dlLink, dummy = dlBar.find_all('li')
-		if 'Download' in dlLink.get_text():
-			itemUrl = urllib.parse.urljoin(self.urlBase, dlLink.a['href'])
-
-			return itemUrl
-
-		raise ValueError("Wat?")
 
 	def __handle_errors(self, post_errors):
 		for error in post_errors:
 			if 'code_name' in error and error['code_name'] == 'ResourceMissing' and 'status' in error and error['status'] == '404':
 				raise exceptions.ContentRemovedException("Item has been deleted or removed.")
-
-
-	def _get_art_post(self, postId, artistName):
-		post = self.get_api_json("/posts/{pid}".format(pid=postId) +
-			"?include=media"
-			)
-
-		if 'status' in post and post['status'] == '404':
-			self.log.warning("Post is not found!")
-			fail = {
-				'status' : ''
-				}
-			return fail
-
 
 
 	# ---------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -426,11 +376,14 @@ class GetPatreonFeed(patreonBase.GetPatreonBase):
 		""" % (link_url, ))
 
 	def do_fetch_item(self, item_row):
+		self.log.info("Doing fetch for item: %s", item_row)
 
 		item_id, artist_id, release_meta = item_row
 		meta_loaded = json.loads(release_meta)
-		tgt_url = "https://www.patreon.com/posts/{post_id}".format(post_id=meta_loaded[-1])
+		post_id = meta_loaded[-1]
+		tgt_url = "https://www.patreon.com/posts/{post_id}".format(post_id=post_id)
 
+		self.log.info("Navigating to %s", tgt_url)
 		artistName, _ = self._rid_to_artist_json(artist_id)
 
 		self.inject_link_and_click(self.cr, tgt_url)
@@ -446,11 +399,20 @@ class GetPatreonFeed(patreonBase.GetPatreonBase):
 		item_ctnt = json.loads(script_ctnt['value'])
 
 		try:
-			post = item_ctnt['props']['pageProps']['bootstrapEnvelope']['pageBootstrap']['post']
+			# So pinned ("featured") posts are fiddly here, in that they redirect to the campaign page.
+			# We therefore have to handle the case where theres no 'post' member in the bootstrap blob.
+			# From the way the json is structured, I think there can only ever be one featured post.
+			bootstrap = item_ctnt['props']['pageProps']['bootstrapEnvelope']['pageBootstrap']
+
+			if 'post' in bootstrap:
+				post = bootstrap['post']
+			else:
+				post = bootstrap['featuredPost']
+
 
 		except KeyError:
-			print("Missing bootstrap envelope to parse!")
-			pprint.pprint(item_ctnt)
+			self.log.info("Missing bootstrap envelope to parse!")
+			# pprint.pprint(item_ctnt)
 			import pdb
 			pdb.set_trace()
 
@@ -486,9 +448,17 @@ class GetPatreonFeed(patreonBase.GetPatreonBase):
 				}
 			return fail
 
-
-		attachments = {item['id'] : item for item in post['included'] if item['type'] == 'attachment'}
+		# Thiese are mostly unused. For debugging user only
 		media       = {item['id'] : item for item in post['included'] if item['type'] == 'media'}
+
+		access_rule	= {item['id'] : item for item in post['included'] if item['type'] == 'access-rule'}
+		campaign    = {item['id'] : item for item in post['included'] if item['type'] == 'campaign'}
+		comment     = {item['id'] : item for item in post['included'] if item['type'] == 'comment'}
+		pledge      = {item['id'] : item for item in post['included'] if item['type'] == 'pledge'}
+		post_tag    = {item['id'] : item for item in post['included'] if item['type'] == 'post_tag'}
+		reward      = {item['id'] : item for item in post['included'] if item['type'] == 'reward'}
+		reward_item = {item['id'] : item for item in post['included'] if item['type'] == 'reward-item'}
+		user        = {item['id'] : item for item in post['included'] if item['type'] == 'user'}
 
 		tags = []
 		if 'user_defined_tags' in post_content['relationships']:
@@ -509,19 +479,81 @@ class GetPatreonFeed(patreonBase.GetPatreonBase):
 			'post_embeds' : [],
 		}
 
-		# print("Post:")
-		# pprint.pprint(post)
-		# print("Content:")
-		# pprint.pprint(post_info['content'])
+
+		attachments = {}
+		shown_media = {}
+
+		# Handle posts with the metadata tag present, but the metadata content set to None
+		if 'post_metadata' in post_info and not post_info['post_metadata']:
+			post_info['post_metadata'] = {}
+
+		image_ids = post_info.get('post_metadata', {}).get('image_order', [])
+
+		for itemid, item in media.items():
+			if itemid in image_ids:
+				shown_media[itemid] = item
+			else:
+				attachments[itemid] = item
+
+		if post_info['post_type'] == 'image_file':
+			pass
+		elif post_info['post_type'] == 'text_only':
+			pass
+		elif post_info['post_type'] == 'audio_file':
+			pass
+		elif post_info['post_type'] == 'poll':
+			# Don't care about polls
+			pass
+
+		elif post_info['post_type'] == 'video_embed':
+			# Youtube, if not youtube short
+			pass
+		elif post_info['post_type'] == 'link':
+			# Link posts use the "embed" field
+			# I think this may also effectively subsume the youtube embeds
+			pass
+
+		else:
+			self.log.warning("Unknown post type: %s", post_info['post_type'])
+
+			import pdb
+			pdb.set_trace()
+
 
 		files = []
 		try:
 			if "post_file" in post_info and post_info['post_file']:
+
 				furl = urllib.parse.unquote(post_info['post_file']['url'])
 				# print("Post file!", post_info['post_file']['url'], furl)
 
-				fpath = self.save_image(artistName, item_id, post_info['post_file']['name'], furl)
+				fn = post_info['post_file'].get('name', "{pid}-body_file-{fname}".format(pid=post_id, fname=extract_image_fn(furl)))
+
+				fpath = self.save_image(artistName, item_id, fn , furl)
 				files.append(fpath)
+
+			# There's no real distinction between attachments and shown media.
+			# The separation here is largely historical.
+			for aid, dat_struct in attachments.items():
+				# print("Post attachments")
+				fpath = self.save_media(artistName, item_id, dat_struct)
+				files.append(fpath)
+
+			for aid, dat_struct in shown_media.items():
+				# print("Post attachments")
+				fpath = self.save_media(artistName, item_id, dat_struct)
+				files.append(fpath)
+
+
+
+			if 'embed' in post_info and post_info['embed']:
+
+				for item in self._handle_embed(post_info['embed']):
+					files.append(fpath)
+
+				ret['post_embeds'].append(post_info['embed'])
+
+				self.log.warning("Post embed that is not a video!")
 
 			if 'post_type' in post_info and post_info['post_type'] == 'video_embed':
 				# print("Post video_embed")
@@ -530,27 +562,17 @@ class GetPatreonFeed(patreonBase.GetPatreonBase):
 					files.append(fpath)
 
 				ret['post_embeds'].append(post_info)
-
-			for aid, dat_struct in attachments.items():
-				# print("Post attachments")
-				fpath = self.save_attachment(artistName, item_id, dat_struct)
-				files.append(fpath)
-
-			for aid, dat_struct in media.items():
-				# print("Post attachments")
-				fpath = self.save_media(artistName, item_id, dat_struct)
-				files.append(fpath)
-
-			if 'embed' in post_info and post_info['embed']:
-				for item in self._handle_embed(post_info['embed']):
-					files.append(fpath)
-				ret['post_embeds'].append(post_info['embed'])
-
-
+				self.log.warning("Post video_embed!")
 
 
 		except urllib.error.URLError:
 			self.log.error("Failure retreiving content from post: %s", post)
+
+		# except:
+		# 	print("General error fetching post!")
+		# 	print(traceback.format_exc())
+		# 	import pdb
+		# 	pdb.set_trace()
 
 		# Posts can apparently be empty.
 		if not post_info['content']:
@@ -574,7 +596,10 @@ class GetPatreonFeed(patreonBase.GetPatreonBase):
 
 
 		if len(files):
-			self.log.info("Found %s images/attachments on post.", len(attachments))
+			self.log.info("Found %s images, %s attachments on post (%s total items).", len(shown_media), len(attachments), len(files))
+		elif post_info['post_type'] == 'text_only':
+			self.log.info("Text-only post %s!", item_id)
+
 		else:
 			self.log.warning("No images/attachments on post %s!", item_id)
 
@@ -641,6 +666,7 @@ class GetPatreonFeed(patreonBase.GetPatreonBase):
 				fetch_ret = self.do_fetch_item(todo_item)
 				_, artist_id, release_meta = todo_item
 				artist_undecoded, _ = self._rid_to_artist_json(artist_id)
+				artist_str          = self._rid_to_artist_name(artist_id)
 
 				assert 'status'     in fetch_ret, "Status not in response!"
 
@@ -656,11 +682,26 @@ class GetPatreonFeed(patreonBase.GetPatreonBase):
 					assert 'post_time'  in fetch_ret
 					assert 'post_tags'  in fetch_ret
 
+					fetchtime = datetime.datetime.now()
+
+					# Set the base row (if there's no files, we still set this, to allow text-only posts)
+					self._updatePreviouslyRetreived(
+							artist             = artist_str,
+							state              = 'complete',
+							release_meta       = release_meta,
+							pageDesc           = fetch_ret['page_desc'],
+							pageTitle          = fetch_ret['page_title'],
+							addTime            = fetch_ret['post_time'],
+							postTags           = fetch_ret['post_tags'],
+							content_structured = fetch_ret,
+							fetchTime          = fetchtime,
+						)
+
 					assert isinstance(fetch_ret['dl_path'], list)
 					seq = 0
 					for item in fetch_ret['dl_path']:
 						self._updatePreviouslyRetreived(
-								artist             = artist_undecoded,
+								artist             = artist_str,
 								state              = 'complete',
 								release_meta       = release_meta,
 								fqDlPath           = item,
@@ -670,6 +711,7 @@ class GetPatreonFeed(patreonBase.GetPatreonBase):
 								addTime            = fetch_ret['post_time'],
 								postTags           = fetch_ret['post_tags'],
 								content_structured = fetch_ret,
+								fetchTime          = fetchtime,
 							)
 						seq += 1
 				elif fetch_ret['status'] == "Ignore":
@@ -699,9 +741,9 @@ def signal_handler(dummy_signal, dummy_frame):
 	import flags
 	if flags.namespace.run:
 		flags.namespace.run = False
-		print("Telling threads to stop")
+		self.log.info("Telling threads to stop")
 	else:
-		print("Multiple keyboard interrupts. Raising")
+		self.log.info("Multiple keyboard interrupts. Raising")
 		raise KeyboardInterrupt
 
 
@@ -731,6 +773,7 @@ if __name__ == '__main__':
 	import sys
 	import logSetup
 	import logging
-	logSetup.initLogging(logLevel=logging.DEBUG)
+	logSetup.initLogging()
+	# logSetup.initLogging(logLevel=logging.DEBUG)
 
 	run_local()

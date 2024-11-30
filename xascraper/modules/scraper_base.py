@@ -422,6 +422,7 @@ class ScraperBase(module_base.ModuleBase, metaclass=abc.ABCMeta):
 				seqNum             = None,
 				filename           = None,
 				addTime            = None,
+				fetchTime          = None,
 				postTags           = [],
 				content_structured = None
 			):
@@ -439,7 +440,7 @@ class ScraperBase(module_base.ModuleBase, metaclass=abc.ABCMeta):
 						.filter(self.db.ArtItem.release_meta == release_meta) \
 						.scalar()
 					if row:
-						self.log.info("Updating Item %s -> %s (%s).", aid, release_meta, loop_cnt)
+						self.log.info("Updating Item %s -> %s (%s, %s).", aid, release_meta, loop_cnt, fqDlPath)
 
 					else:
 						self.log.info("Item %s -> %s not present in DB. Adding", aid, release_meta)
@@ -463,6 +464,8 @@ class ScraperBase(module_base.ModuleBase, metaclass=abc.ABCMeta):
 						row.title = pageTitle
 					if addTime and addTime != row.addtime:
 						row.addtime = addTime
+					if fetchTime and fetchTime != row.fetchtime:
+						row.fetchtime = fetchTime
 					if state and state != row.state:
 						row.state = state
 
