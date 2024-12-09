@@ -87,7 +87,7 @@ class GetKemono(xascraper.modules.scraper_base.ScraperBase):
 
 	ovwMode = "Check Files"
 
-	numThreads = 1
+	numThreads = 2
 
 
 	# Stubbed functions
@@ -856,6 +856,7 @@ class GetKemono(xascraper.modules.scraper_base.ScraperBase):
 
 	def load_art_pages(self, local_aid, artist_undecoded, kemono_service, kemono_aid):
 		now = datetime.datetime.utcnow().replace(tzinfo = pytz.utc).replace(microsecond=0)
+
 		art_listing_url = "https://kemono.su/{service}/user/{aid}?o={offset}"
 
 		# post_listing_url = "https://kemono.su/api/v1/{service}/user/{aid}"
@@ -869,7 +870,7 @@ class GetKemono(xascraper.modules.scraper_base.ScraperBase):
 		post_articles = set()
 
 		for offset in range(0, 99999999, 50):
-			soup = self.wg.getSoup(art_listing_url.format(service=kemono_service, aid=kemono_aid, offset=offset))
+			soup = self.wg.getSoup(art_listing_url.format(service=kemono_service, aid=urllib.parse.quote(kemono_aid), offset=offset))
 
 			articles = soup.find_all("article")
 
