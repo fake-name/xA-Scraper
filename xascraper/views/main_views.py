@@ -5,7 +5,7 @@ import traceback
 from flask import render_template
 from flask import request
 from flask import send_file
-from flask_sqlalchemy import get_debug_queries
+# from flask_sqlalchemy import get_debug_queries
 from sqlalchemy import desc
 from sqlalchemy.orm import joinedload
 
@@ -59,17 +59,17 @@ def aggregate_table(page=1, count=app.config['POSTS_PER_PAGE'], site_filter=None
 
 	return releases_paginated
 
-@app.after_request
-def after_request(response):
-	for query in get_debug_queries():
-		if query.duration >= app.config['DATABASE_QUERY_TIMEOUT']:
-			app.logger.warning(
-				"SLOW QUERY: %s\nParameters: %s\nDuration: %fs\nContext: %s\n" %
-				(query.statement, query.parameters, query.duration,
-				 query.context))
+# @app.after_request
+# def after_request(response):
+# 	for query in get_debug_queries():
+# 		if query.duration >= app.config['DATABASE_QUERY_TIMEOUT']:
+# 			app.logger.warning(
+# 				"SLOW QUERY: %s\nParameters: %s\nDuration: %fs\nContext: %s\n" %
+# 				(query.statement, query.parameters, query.duration,
+# 				 query.context))
 
-	db.session.rollback()
-	return response
+# 	db.session.rollback()
+# 	return response
 
 
 @app.teardown_appcontext

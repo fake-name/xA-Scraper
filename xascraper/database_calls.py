@@ -3,10 +3,10 @@ import sys
 import multiprocessing
 import logging
 import contextlib
-import orjson
 import threading
 import sqlalchemy.exc
 
+import orjson
 from settings import settings
 from settings import SQLALCHEMY_DATABASE_URI
 
