@@ -78,7 +78,7 @@ def retry_func(func, *args, **kwargs):
 
 
 		except WebRequest.FetchFailureError as err:
-			if retry_cnt > 5:
+			if retry_cnt > 2:
 				raise
 
 			if err.err_code == 429:
@@ -344,6 +344,7 @@ class GetPatreonFeed(patreonBase.GetPatreonBase):
 
 		navs = {}
 		def closure(container, url, content, meta):
+			print("Closure: %s" % (url, ))
 			navs[url] = {
 				'url' : url,
 				'content' : content,
@@ -351,6 +352,7 @@ class GetPatreonFeed(patreonBase.GetPatreonBase):
 			}
 
 		def filt(url, meta):
+			print("Filter: %s" % (url, ))
 			return "www.patreon.com" in url.lower()
 
 		cr.set_filter_func(filt)
@@ -626,6 +628,13 @@ class GetPatreonFeed(patreonBase.GetPatreonBase):
 
 	def do_fetch_item(self, item_row):
 		self.log.info("Doing fetch for item: %s", item_row)
+
+		if "114865225" in str(item_row):
+			fail = {
+				'status' : ''
+				}
+			return fail
+
 
 		item_id, artist_id, release_meta = item_row
 		meta_loaded = json.loads(release_meta)

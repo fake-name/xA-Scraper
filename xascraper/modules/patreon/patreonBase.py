@@ -413,7 +413,7 @@ class GetPatreonBase(xascraper.modules.scraper_base.ScraperBase):
 
 		file_meta = result['result']['resource']
 
-		CHUNKSIZE = 1024 * 1024
+		CHUNKSIZE = 1024 * 1024 * 64
 
 		if 'stream' in file_meta:
 			stream_id = file_meta['stream']
@@ -423,7 +423,7 @@ class GetPatreonBase(xascraper.modules.scraper_base.ScraperBase):
 			while s_chunk['result']['eof'] == False:
 				s_chunk = cr.IO_read(handle=result['result']['resource']['stream'], size=CHUNKSIZE)
 				f_buf += maybe_decode(s_chunk['result'])
-				pbar.update(CHUNKSIZE)
+				pbar.update(1)
 			pbar.close()
 			return f_buf
 		if 'httpStatusCode' in file_meta:

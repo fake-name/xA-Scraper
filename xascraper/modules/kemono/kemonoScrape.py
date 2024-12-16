@@ -291,16 +291,23 @@ class GetKemono(xascraper.modules.scraper_base.ScraperBase):
 
 
 		for embed in content_structured.get('embeds', []):
-			print("Embed:")
-			pprint.pprint(embed)
-			if 'image' in embed:
-				external_embeds.append(embed['image']['url'])
-			elif 'url' in embed:
-				external_embeds.append(embed['url'])
+			if 'type' in embed and embed['type'] == 'rich':
+				self.log.info("Rich text embed. Nothing to do")
+			elif 'type' in embed and embed['type'] == 'auto_moderation_notification':
+				self.log.info("Auto moderation notification. Nothing to do")
+			elif 'type' in embed and embed['type'] == 'poll_result':
+				self.log.info("Poll result. Nothing to do")
 			else:
-				import pdb
-				pdb.set_trace()
-			print()
+				print("Embed:")
+				pprint.pprint(embed)
+				if 'image' in embed:
+					external_embeds.append(embed['image']['url'])
+				elif 'url' in embed:
+					external_embeds.append(embed['url'])
+				else:
+					import pdb
+					pdb.set_trace()
+				print()
 
 		parsed_post_time = dateutil.parser.parse(content_structured['published']).replace(tzinfo=None)
 
@@ -323,13 +330,28 @@ class GetKemono(xascraper.modules.scraper_base.ScraperBase):
 
 		for embed in content_structured.get('embeds', []):
 
-			p_tag = out_soup.new_tag("p")
-			a_tag = out_soup.new_tag("a", href=embed['url'])
+			if 'type' in embed and embed['type'] == 'rich':
+				self.log.info("Rich text embed. Nothing to do")
+				h_tag = out_soup.new_tag("h3")
+				p_tag = out_soup.new_tag("p")
+				f_tag = out_soup.new_tag("code")
+				h_tag.string = embed.get("title", "No Title")
+				f_tag.string = str(embed.get("footer", "No Footer"))
 
-			a_tag.string = embed.get("description", "No Description")
-			p_tag.append(a_tag)
+				p_tag.string = embed.get("description", "No Description")
+				st = p_tag.string
+				st.insert_before(h_tag)
+				st.insert_after(f_tag)
 
-			out_soup.append(p_tag)
+				out_soup.append(p_tag)
+			else:
+				p_tag = out_soup.new_tag("p")
+				a_tag = out_soup.new_tag("a", href=embed['url'])
+
+				a_tag.string = embed.get("description", "No Description")
+				p_tag.append(a_tag)
+
+				out_soup.append(p_tag)
 
 		files = list(set(files))
 
@@ -712,8 +734,7 @@ class GetKemono(xascraper.modules.scraper_base.ScraperBase):
 			# IPython.embed()
 
 			if kemono_service == 'discord':
-				return
-				# newArt = self._load_discord(artist_undecoded, kemono_service, kemono_aid, artist_decoded)
+				newArt = self._load_discord(artist_undecoded, kemono_service, kemono_aid, artist_decoded)
 			else:
 				newArt = self._load_art(artist_undecoded, kemono_service, kemono_aid)
 
@@ -759,6 +780,8 @@ class GetKemono(xascraper.modules.scraper_base.ScraperBase):
 			self.log.error("Exception when retreiving artist %s:%s", kemono_service, kemono_name)
 			self.log.error("%s", traceback.format_exc())
 			return True
+
+		return False
 
 
 
