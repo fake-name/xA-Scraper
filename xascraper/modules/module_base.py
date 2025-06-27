@@ -2,6 +2,7 @@
 import os
 import os.path
 import logging
+import util
 from settings import settings
 from WebRequest import WebGetRobust
 import threading
@@ -68,6 +69,7 @@ class ModuleBase(xascraper.status_monitor.StatusMixin, metaclass=abc.ABCMeta):
 	# ---------------------------------------------------------------------------------------------------------------------------------------------------------
 
 	def getDownloadPath(self, siteSource, artist):
+		artist = util.makeFilenameSafe(artist)
 		return os.path.join(settings["dldCtntPath"], siteSource.strip(), artist.strip())
 
 	def _checkFileExists(self, filePath):

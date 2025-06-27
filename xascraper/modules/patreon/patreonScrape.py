@@ -39,12 +39,6 @@ class GetPatreon(patreonBase.GetPatreonBase):
 	# # ---------------------------------------------------------------------------------------------------------------------------------------------------------
 
 
-	def get_save_dir(self, aname):
-
-		dirp = self.getDownloadPath(self.dlBasePath, aname)
-		if not os.path.exists(dirp):
-			os.makedirs(dirp)
-		return dirp
 
 	def local_save_file(self, aname, filename, filecontent):
 		fdir = self.get_save_dir(aname)
@@ -764,8 +758,8 @@ def run_local():
 	print(ins)
 	print("Instance: ", ins)
 
-	# ins.go(ctrlNamespace=flags.namespace, update_namelist=True)
-	ins.go(ctrlNamespace=flags.namespace)
+	ins.go(ctrlNamespace=flags.namespace, update_namelist=True)
+	# ins.go(ctrlNamespace=flags.namespace)
 
 
 if __name__ == '__main__':

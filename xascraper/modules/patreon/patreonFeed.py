@@ -1,5 +1,6 @@
 import os
 import os.path
+import trace
 import traceback
 import datetime
 import time
@@ -114,13 +115,29 @@ class GetPatreonFeed(patreonBase.GetPatreonBase):
 		upd = 0
 		skp = 0
 
+
+
 		for item in post_listing:
 			# The desired release-meta string for a item is something like '["post", "1272472"]'. Patreon consistently sends the post IDs as strings, so that should be maintained.
 			# Post IDs seem to be globally unique, and can be turned into a corresponding URL as "https://patreon.com/posts/{post_id}"
 
 			post_id = item['id']
 
-			assert item['attributes']['campaign']['data']['id'] == expected_campaign_id
+			try:
+				assert item['relationships']['campaign']['data']['id'] == expected_campaign_id
+			except AssertionError:
+				print("AssertionError!")
+				print("Expected campaign ID: ", expected_campaign_id)
+				print("Actual campaign ID: ", item['relationships']['campaign']['data']['id'])
+				traceback.print_exc()
+				import pdb
+				pdb.set_trace()
+
+			except KeyError:
+				print("KeyError!")
+				traceback.print_exc()
+				import pdb
+				pdb.set_trace()
 
 			item_meta = '["post", "{num}"]'.format(num=post_id)
 
@@ -160,7 +177,7 @@ class GetPatreonFeed(patreonBase.GetPatreonBase):
 		return new + upd + skp
 
 
-	def fetch_artist_history(self, cr, artist_name, campaign):
+	def fetch_artist_history(self, cr, artist_name, campaign, expected_campaign_id):
 
 		loc_a_id = self._artist_name_to_rid(artist_name)
 
@@ -195,7 +212,7 @@ class GetPatreonFeed(patreonBase.GetPatreonBase):
 			self.log.info("Waiting for DOM idle....")
 
 			# The content of the recent posts feed takes a long-ass time to fetch for some reason.
-			wait_for_idle = random.triangular(15, 20, 30)
+			wait_for_idle = random.triangular(20, 40, 80)
 			cr.wait_for_dom_idle(dom_idle_requirement_secs=wait_for_idle, max_wait_timeout=60*5)
 			self.log.info("DOM Idle!")
 
@@ -205,7 +222,10 @@ class GetPatreonFeed(patreonBase.GetPatreonBase):
 
 			found_posts = 0
 			for key in relevant_keys:
-				found_posts += self.handle_posts_json(loc_a_id, fetched[key], campaign)
+				found_posts += self.handle_posts_json(loc_a_id, fetched[key], expected_campaign_id)
+
+			# import IPython
+			# IPython.embed()
 
 			if found_posts == 0:
 				have_more_posts = False
@@ -214,6 +234,16 @@ class GetPatreonFeed(patreonBase.GetPatreonBase):
 
 			retry_func(cr.clear_content_listener_cache)
 			retry_func(cr.Log_clear)
+
+			# content = self.cr.xhr_fetch(
+			# 		endpoint_url,
+			# 		headers ={
+			# 			"content-type"    : "application/vnd.api+json",
+			# 			},
+			# 		post_data = postData,
+			# 		post_type = 'application/json'
+			# 	)
+
 
 			fetched.clear()
 
@@ -267,12 +297,13 @@ class GetPatreonFeed(patreonBase.GetPatreonBase):
 	def update_all_from_post_history(self, followed_artists, campaign_dict):
 
 
+		items = list(followed_artists.items())
+		random.shuffle(items)
 
-
-		for camp_id, (artist_str, artist_decoded) in followed_artists.items():
+		for camp_id, (artist_str, artist_decoded) in items:
 			try:
 				campaign = campaign_dict[camp_id]
-				self.fetch_artist_history(self.cr, artist_str, campaign)
+				self.fetch_artist_history(self.cr, artist_str, campaign, camp_id)
 			except Exception as e:
 				print("Exception in update_all_from_post_history: ", e)
 				import traceback
@@ -344,7 +375,7 @@ class GetPatreonFeed(patreonBase.GetPatreonBase):
 
 		navs = {}
 		def closure(container, url, content, meta):
-			print("Closure: %s" % (url, ))
+			# print("Closure: %s" % (url, ))
 			navs[url] = {
 				'url' : url,
 				'content' : content,
@@ -352,7 +383,7 @@ class GetPatreonFeed(patreonBase.GetPatreonBase):
 			}
 
 		def filt(url, meta):
-			print("Filter: %s" % (url, ))
+			# print("Filter: %s" % (url, ))
 			return "www.patreon.com" in url.lower()
 
 		cr.set_filter_func(filt)
@@ -366,7 +397,7 @@ class GetPatreonFeed(patreonBase.GetPatreonBase):
 
 
 		watch_list_obj = 'https://www.patreon.com/api/notif-feed?include=notifs&filter[mode]=member&json-api-version=1.0&json-api-use-default-includes=false'
-		member_list_obj = 'https://www.patreon.com/api/current_user?include=active_memberships.campaign&fields[campaign]=avatar_photo_image_urls%2Cname%2Cpublished_at%2Curl%2Cvanity%2Cis_nsfw&fields[member]=is_free_member%2Cis_free_trial&json-api-version=1.0&json-api-use-default-includes=false'
+		member_list_obj = 'https://www.patreon.com/api/current_user?include=active_memberships.campaign&fields[campaign]=avatar_photo_image_urls%2Cname%2Cpublished_at%2Curl%2Cvanity%2Cis_nsfw%2Curl_for_current_user&fields[member]=is_free_member%2Cis_free_trial&json-api-version=1.0&json-api-use-default-includes=false'
 
 		cr.set_filter_func(None)
 		cr.remove_all_handlers()
@@ -385,7 +416,7 @@ class GetPatreonFeed(patreonBase.GetPatreonBase):
 		mbss  = navs[member_list_obj]["content"]
 		mbs   = json.loads(mbss)
 
-		with open("navs.pyson", "w") as fp:
+		with open("navs.pyson", "w", encoding='utf-8') as fp:
 			for key, value in navs.items():
 				fp.write("\n\nObject: '%s'\n" % (key, ))
 
@@ -419,6 +450,19 @@ class GetPatreonFeed(patreonBase.GetPatreonBase):
 			if 'member_like' in item['id']:
 				ign += 1
 				continue
+			if 'creator_like' in item['id']:
+				ign += 1
+				continue
+
+			if 'creator_comment_reply' in item['id']:
+				ign += 1
+				continue
+			if 'member_comment_reply' in item['id']:
+				ign += 1
+				continue
+			if 'new_chat_created_intent' in item['id']:
+				ign += 1
+				continue
 
 			# The desired release-meta string for a item is something like '["post", "1272472"]'. Patreon consistently sends the post IDs as strings, so that should be maintained.
 			# The main challenge here is getting back to the relevant campaign from the post, since it's not freaking mentioned anywhere.
@@ -426,6 +470,11 @@ class GetPatreonFeed(patreonBase.GetPatreonBase):
 
 			post_id = item['id']
 			prof_img = item['attributes']['profile_image_url']
+
+			if post_id == 'new_post::121189629':
+				continue
+			if post_id == 'new_post::120493268':
+				continue
 
 			if not post_id.startswith("new_post::"):
 				self.log.info("Not a 'new_post::' item: %s", post_id)
@@ -441,14 +490,14 @@ class GetPatreonFeed(patreonBase.GetPatreonBase):
 			_, val = prof_img.split("/campaign/")
 			camp_id = val.split("/")[0]
 
-			assert camp_id in db_name_items
 
 			try:
+				assert camp_id in db_name_items
 				artist_str, _ = db_name_items[camp_id]
 				loc_a_id = self._artist_name_to_rid(artist_str)
 
 			except:
-				self.log.info("Did not have campaign: '%s'" % (db_name_items[camp_id], ))
+				self.log.info("Did not have campaign: '%s'" % (camp_id, ))
 				traceback.print_exc()
 
 				import pdb
@@ -471,7 +520,11 @@ class GetPatreonFeed(patreonBase.GetPatreonBase):
 						skp += 1
 
 					# Check we're not bugged out (artist should be fixed)
-					assert res.artist_id == loc_a_id
+					try:
+						assert res.artist_id == loc_a_id, "Mismatched artist IDs: '%s' -> '%s'" % (res.artist_id, loc_a_id)
+					except:
+						import pdb
+						pdb.set_trace()
 
 				else:
 					row = self.db.ArtItem(
@@ -503,29 +556,6 @@ class GetPatreonFeed(patreonBase.GetPatreonBase):
 	# Retreival functions for each post
 	# This expects to be able to manipulate the underlying chrome instance.
 	# ---------------------------------------------------------------------------------------------------------------------------------------------------------
-
-	def get_save_dir(self, aname):
-
-		dirp = self.getDownloadPath(self.dlBasePath, aname)
-		if not os.path.exists(dirp):
-			os.makedirs(dirp)
-		return dirp
-
-	def local_save_file(self, aname, filename, filecontent):
-		fdir = self.get_save_dir(aname)
-		fqpath = os.path.join(fdir, filename)
-		self.save_file(fqfilename=fqpath, file_content=filecontent)
-
-	def save_json(self, aname, itemid, filecontent):
-		fdir = self.get_save_dir(aname)
-		fqpath = os.path.join(fdir, "pyson-posts")
-		if not os.path.exists(fqpath):
-			os.makedirs(fqpath)
-		fqpath = os.path.join(fqpath, 'itemid-{id}.pyson'.format(id=itemid))
-		with open(fqpath, "wb") as fp:
-			fstr = pprint.pformat(filecontent)
-			fp.write(fstr.encode("utf-8"))
-
 	def save_image(self, aname, pid, fname, furl):
 		self.log.info("Saving file: '%s'", furl)
 		fname = "{pid}-{fname}".format(pid=pid, fname=fname)
@@ -773,6 +803,8 @@ class GetPatreonFeed(patreonBase.GetPatreonBase):
 
 		if post_info['post_type'] == 'image_file':
 			pass
+		elif post_info['post_type'] == 'image':
+			pass
 		elif post_info['post_type'] == 'text_only':
 			pass
 		elif post_info['post_type'] == 'audio_file':
@@ -898,9 +930,8 @@ class GetPatreonFeed(patreonBase.GetPatreonBase):
 	# Underlying management
 	# ---------------------------------------------------------------------------------------------------------------------------------------------------------
 
-	def go(self, nameList=None, ctrlNamespace=None):
+	def go(self, nameList=None, ctrlNamespace=None, do_history_update=False):
 
-		do_history_update = True
 
 		if ctrlNamespace is None:
 			raise ValueError("You need to specify a namespace!")
@@ -911,9 +942,11 @@ class GetPatreonFeed(patreonBase.GetPatreonBase):
 			self.log.error("Not starting")
 			return
 		try:
-
+			binary = "google-chrome"
+			if 'win32' in sys.platform:
+				binary = "C:/Program\ Files/Google/Chrome/Application/chrome.exe"
 			self.cr = ChromeController.ChromeRemoteDebugInterface(
-					binary             = "google-chrome",
+					binary             = binary,
 					headless           = False,
 					enable_gpu         = True,
 					additional_options = ['--new-window']
@@ -924,20 +957,20 @@ class GetPatreonFeed(patreonBase.GetPatreonBase):
 			startTime = datetime.datetime.now()
 			self.updateLastRunStartTime(self.pluginShortName, startTime)
 
-			# haveCookie, dummy_message = self.checkCookie()
-			# if not haveCookie:
-			# 	self.log.info("Do not have login cookie. Retreiving one now.")
-			# 	cookieStatus, msg = self.getCookie()
-			# 	self.log.info("Login attempt status = %s (%s).", cookieStatus, msg)
-			# 	assert cookieStatus, "Login failed! Cannot continue!"
+			haveCookie, dummy_message = self.checkCookie()
+			if not haveCookie:
+				self.log.info("Do not have login cookie. Retreiving one now.")
+				cookieStatus, msg = self.getCookie()
+				self.log.info("Login attempt status = %s (%s).", cookieStatus, msg)
+				assert cookieStatus, "Login failed! Cannot continue!"
 
-			# haveCookie, dummy_message = self.checkCookie()
-			# if not haveCookie:
-			# 	self.log.critical("Failed to download cookie! Exiting!")
-			# 	return False
+			haveCookie, dummy_message = self.checkCookie()
+			if not haveCookie:
+				self.log.critical("Failed to download cookie! Exiting!")
+				return False
 
-			# if not nameList:
-			# 	nameList = self.getNameList()
+			if not nameList:
+				nameList = self.getNameList()
 
 			followed_artists, campaign_dict = self.fetch_and_insert_new(self.cr)
 
@@ -1066,6 +1099,7 @@ def run_local():
 
 	# ins.go(ctrlNamespace=flags.namespace, update_namelist=True)
 	ins.go(ctrlNamespace=flags.namespace)
+	ins.go(ctrlNamespace=flags.namespace, do_history_update=True)
 
 
 if __name__ == '__main__':

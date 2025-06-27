@@ -14,8 +14,10 @@ import tqdm
 import random
 import pprint
 import requests
+import WebRequest
 import ChromeController
 from settings import settings
+import util
 
 import xascraper.modules.scraper_base
 from xascraper.modules import exceptions
@@ -228,9 +230,17 @@ class GetPatreonBase(xascraper.modules.scraper_base.ScraperBase):
 		self.cr.execute_javascript_function("document.querySelector(\"input[type='email']\").focus()")
 		for char in settings[self.pluginShortName]['username']:
 			self.cr.Input_dispatchKeyEvent(type='char', text=char)
+
+		self.random_sleep(4,5,6)
+
+		self.cr.execute_javascript_statement("document.querySelector(\"button[type='submit']\").click()")
+		self.random_sleep(4,5,6)
+
 		self.cr.execute_javascript_statement("document.querySelector(\"input[type='password']\").focus()")
 		for char in settings[self.pluginShortName]['password']:
 			self.cr.Input_dispatchKeyEvent(type='char', text=char)
+
+		self.random_sleep(4,5,6)
 
 		self.cr.execute_javascript_statement("document.querySelector(\"button[type='submit']\").click()")
 
@@ -267,7 +277,7 @@ class GetPatreonBase(xascraper.modules.scraper_base.ScraperBase):
 			content = self.cr.xhr_fetch(
 					endpoint_url,
 					headers ={
-						"content-type"    : "application/json",
+						"content-type"    : "application/vnd.api+json",
 						# "Referer"         : PATREON_LOGIN_PAGE,
 						# "Pragma"          : "no-cache",
 						# "Cache-Control"   : "no-cache",
@@ -330,21 +340,29 @@ class GetPatreonBase(xascraper.modules.scraper_base.ScraperBase):
 
 
 	def get_artist_lut(self):
-		general_meta = self.current_user_info()
-		campaign_items = [item for item in general_meta['included'] if item['type'] == "campaign"]
-		artist_lut = [(item['attributes']['full_name'].strip(), item['relationships']) for item in general_meta['included'] if item['type'] == 'user']
+		try:
+			general_meta = self.current_user_info()
+			campaign_items = [item for item in general_meta['included'] if item['type'] == "campaign"]
+			artist_lut = [
+					(item['attributes']['full_name'].strip(), item['relationships'])
+				for
+					item
+				in
+					general_meta['included']
+				if
+					item['type'] == 'user' and 'relationships' in item
+			]
+
+		except Exception as e:
+			import IPython
+			IPython.embed()
 
 		return artist_lut
 
 	def getNameList(self):
 		self.log.info("Getting list of favourite artists.")
 
-		try:
-
-			artist_lut = self.get_artist_lut()
-		except Exception as e:
-			import IPython
-			IPython.embed()
+		artist_lut = self.get_artist_lut()
 
 		self.log.info("Found %d Names", len(artist_lut))
 		for value in artist_lut:
@@ -390,6 +408,58 @@ class GetPatreonBase(xascraper.modules.scraper_base.ScraperBase):
 	# # ---------------------------------------------------------------------------------------------------------------------------------------------------------
 	# # Misc functions
 	# # ---------------------------------------------------------------------------------------------------------------------------------------------------------
+
+	def get_save_dir(self, aname):
+
+		dirp = self.getDownloadPath(self.dlBasePath, aname)
+		if not os.path.exists(dirp):
+			os.makedirs(dirp)
+		return dirp
+
+	def local_save_file(self, aname, filename, filecontent):
+		fdir = self.get_save_dir(aname)
+		fqpath = os.path.join(fdir, filename)
+		self.save_file(fqfilename=fqpath, file_content=filecontent)
+
+	def save_json(self, aname, itemid, filecontent):
+		fdir = self.get_save_dir(aname)
+		fqpath = os.path.join(fdir, "pyson-posts")
+		if not os.path.exists(fqpath):
+			os.makedirs(fqpath)
+		fqpath = os.path.join(fqpath, 'itemid-{id}.pyson'.format(id=itemid))
+		with open(fqpath, "wb") as fp:
+			fstr = pprint.pformat(filecontent)
+			fp.write(fstr.encode("utf-8"))
+
+	def save_image(self, aname, pid, fname, furl):
+		self.log.info("Saving file: '%s'", furl)
+		fname = "{pid}-{fname}".format(pid=pid, fname=fname)
+		fdir = self.get_save_dir(aname)
+		fqpath = os.path.join(fdir, fname)
+		if os.path.exists(fqpath):
+			self.log.info("Do not need to download: '%s'", fname)
+		else:
+			try:
+				content = retry_func(self.fetch_with_chrome, self.cr, furl)
+			except WebRequest.FetchFailureError:
+				self.log.error(traceback.format_exc())
+				self.log.error("Could not retreive content: ")
+				self.log.error("%s", furl)
+				return None
+
+			except exceptions.FetchFailedException:
+				self.log.error(traceback.format_exc())
+				self.log.error("Could not retreive content: ")
+				self.log.error("%s", furl)
+				return None
+
+			if content:
+				self.local_save_file(aname, fname, content)
+			else:
+				self.log.error("Could not retreive content: ")
+				self.log.error("%s", furl)
+				return None
+		return fqpath
 
 
 

@@ -17,12 +17,12 @@ import dateparser
 import bs4
 import pixivpy3
 import pixivpy3.utils
+import ChromeController
 
 import flags
 from settings import settings
 import xascraper.modules.scraper_base
 from xascraper.modules import exceptions
-
 
 
 def convert_pixiv_object(pixiv_object):
@@ -250,7 +250,7 @@ class GetPX(xascraper.modules.scraper_base.ScraperBase):
 
 
 
-		with self.wg.chromiumContext('about:blank') as cr:
+		with ChromeController.chrome_context.ChromeContext(binary='google-chrome', headless=False) as cr:
 
 			# cr.clear_cookies()
 

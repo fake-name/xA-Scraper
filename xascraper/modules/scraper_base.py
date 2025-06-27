@@ -102,7 +102,12 @@ def prep_check_fq_filename(fqfilename):
 	filepath, fileN = os.path.split(fqfilename)
 	fileN = makeFilenameSafe(fileN)
 
-	filepath = filepath.replace(":", "")
+	# Allow colons in the first 3 chars so windows paths work
+	split_pt = 3
+	if ":" in filepath[split_pt:]:
+		prefix, rest = filepath[:split_pt], filepath[split_pt:]
+		rest = rest.replace(":", "")
+		filepath = prefix + rest
 
 	# Create the target container directory (if needed)
 	if not os.path.exists(filepath):
