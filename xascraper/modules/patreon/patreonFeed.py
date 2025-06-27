@@ -1099,6 +1099,12 @@ def run_local():
 
 	# ins.go(ctrlNamespace=flags.namespace, update_namelist=True)
 	ins.go(ctrlNamespace=flags.namespace)
+	print("Done. Doing history fetch...")
+	ins.cr.close()
+	del ins.cr
+	ins.cr = None
+	import gc
+	gc.collect()
 	ins.go(ctrlNamespace=flags.namespace, do_history_update=True)
 
 
