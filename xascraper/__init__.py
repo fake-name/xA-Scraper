@@ -4,6 +4,8 @@ from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
 from flask_debugtoolbar import DebugToolbarExtension
 from flask_httpauth import HTTPBasicAuth
+
+from flask_migrate import Migrate
 import datetime
 import settings
 
@@ -24,6 +26,7 @@ auth = HTTPBasicAuth()
 db = SQLAlchemy(app)
 
 
+migrate = Migrate(app, db, compare_type=True)
 
 @auth.get_password
 def get_pw(username):

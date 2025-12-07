@@ -18,6 +18,9 @@ import time
 import random
 import pprint
 import requests
+import gc
+import sys
+
 import ChromeController
 from settings import settings
 
@@ -34,6 +37,11 @@ class FetchError(Exception):
 
 PATREON_LOGIN_PAGE = 'https://www.patreon.com/login'
 PATREON_HOME_PAGE  = 'https://www.patreon.com/home'
+
+
+CHROME_BINARY_NAME = "google-chrome"
+if 'win32' in sys.platform:
+	CHROME_BINARY_NAME = r"C:/Program\ Files/Google/Chrome/Application/chrome.exe"
 
 def extract_image_fn(url):
 	parsed = urllib.parse.urlparse(url)
@@ -301,6 +309,23 @@ class GetPatreonFeed(patreonBase.GetPatreonBase):
 		random.shuffle(items)
 
 		for camp_id, (artist_str, artist_decoded) in items:
+			print(artist_str)
+
+			if not self.cr:
+				self.cr = ChromeController.ChromeRemoteDebugInterface(
+						binary             = CHROME_BINARY_NAME,
+						headless           = False,
+						enable_gpu         = True,
+						additional_options = ['--new-window']
+					)
+
+				haveCookie, dummy_message = self.checkCookie()
+				if not haveCookie:
+					self.log.critical("Chrome restart caused login to be lost?")
+					return False
+
+
+
 			try:
 				campaign = campaign_dict[camp_id]
 				self.fetch_artist_history(self.cr, artist_str, campaign, camp_id)
@@ -308,6 +333,13 @@ class GetPatreonFeed(patreonBase.GetPatreonBase):
 				print("Exception in update_all_from_post_history: ", e)
 				import traceback
 				traceback.print_exc()
+			finally:
+
+				self.cr.close()
+				del self.cr
+				self.cr = None
+				gc.collect()
+
 
 		self.log.info("Finished fetching history for %s artists", len(followed_artists))
 
@@ -357,14 +389,14 @@ class GetPatreonFeed(patreonBase.GetPatreonBase):
 			for row in res:
 				row.enabled = True
 
-				# if row.artist_name in resultList:
-				# 	if not row.enabled:
-				# 		self.log.info("Enabling artist: %s", row.artist_name)
-				# 		row.enabled = True
-				# else:
-				# 	if row.enabled:
-				# 		self.log.info("Disabling artist: %s", row.artist_name)
-				# 		row.enabled = False
+				if row.artist_name in resultList:
+					if not row.enabled:
+						self.log.info("Setting enable flag on artist: %s", row.artist_name)
+						row.enabled = True
+				else:
+					if row.enabled:
+						self.log.info("Clearing enable flag on artist: %s", row.artist_name)
+						row.enabled = False
 
 			sess.commit()
 
@@ -396,19 +428,42 @@ class GetPatreonFeed(patreonBase.GetPatreonBase):
 			time.sleep(1)
 
 
-		watch_list_obj = 'https://www.patreon.com/api/notif-feed?include=notifs&filter[mode]=member&json-api-version=1.0&json-api-use-default-includes=false'
-		member_list_obj = 'https://www.patreon.com/api/current_user?include=active_memberships.campaign&fields[campaign]=avatar_photo_image_urls%2Cname%2Cpublished_at%2Curl%2Cvanity%2Cis_nsfw%2Curl_for_current_user&fields[member]=is_free_member%2Cis_free_trial&json-api-version=1.0&json-api-use-default-includes=false'
+		# watch_list_obj = 'https://www.patreon.com/api/notif-feed?include=notifs&filter[mode]=member&json-api-version=1.0&json-api-use-default-includes=false'
+		# member_list_obj = 'https://www.patreon.com/api/current_user?include=active_memberships.campaign&fields[campaign]=avatar_photo_image_urls%2Cname%2Cpublished_at%2Curl%2Cvanity%2Cis_nsfw%2Curl_for_current_user&fields[member]=is_free_member%2Cis_free_trial%2Caccess_expires_at&json-api-version=1.0&json-api-use-default-includes=false'
+
+
+		watch_list_obj  = None
+		member_list_obj = None
+
 
 		cr.set_filter_func(None)
 		cr.remove_all_handlers()
 		cr.clear_content_listener_cache()
 		cr.Log_clear()
 
+		for key in navs.keys():
+			if key.startswith("https://www.patreon.com/api/current_user?"):
+				member_list_obj = key
+			elif key.startswith("https://www.patreon.com/api/notif-feed?"):
+				watch_list_obj = key
+
+		if not watch_list_obj or not member_list_obj:
+			print("Did not receive list of recent notifications or memberships. Check if something has changed!")
+			import pdb
+			pdb.set_trace()
+			raise RuntimeError("Did not receive list of recent notifications or memberships. Check if something has changed!")
+
 		if watch_list_obj not in navs:
+			print("Did not receive list of recent notifications. Check if something has changed!")
+			import pdb
+			pdb.set_trace()
 			raise exceptions.UnrecoverableFailureException("Did not receive list of recent notifications. Check if something has changed!")
 
 
 		if member_list_obj not in navs:
+			print("Did not receive list of memberships. Check if something has changed!")
+			import pdb
+			pdb.set_trace()
 			raise exceptions.UnrecoverableFailureException("Did not receive list of memberships. Check if something has changed!")
 
 		ctnts = navs[watch_list_obj]["content"]
@@ -478,12 +533,14 @@ class GetPatreonFeed(patreonBase.GetPatreonBase):
 
 			if not post_id.startswith("new_post::"):
 				self.log.info("Not a 'new_post::' item: %s", post_id)
+				print("Not a 'new_post::' item: %s", post_id)
 				import pdb
 				pdb.set_trace()
 
 			item_meta = '["post", "{num}"]'.format(num=post_id.split(":")[-1])
 
 			if not "/campaign/" in prof_img:
+				print("Missing campaign in profile image URL?")
 				import pdb
 				pdb.set_trace()
 
@@ -496,14 +553,17 @@ class GetPatreonFeed(patreonBase.GetPatreonBase):
 				artist_str, _ = db_name_items[camp_id]
 				loc_a_id = self._artist_name_to_rid(artist_str)
 
-			except:
+			except Exception as exc:
 				self.log.info("Did not have campaign: '%s'" % (camp_id, ))
+				print("Did not have campaign: '%s'" % (camp_id, ))
 				traceback.print_exc()
 
-				import pdb
-				pdb.set_trace()
+				# import pdb
+				# pdb.set_trace()
 
-			with self.db.context_sess() as sess:
+
+
+			with self.db.context_sess() as sess:   # Wattttttt
 				# This is /slightly/ different from the logic of self._upsert_if_new(), since we
 				# don't bother also cross-referencing by aid, and we do date-based invalidation.
 				res = sess.query(self.db.ArtItem) \
@@ -520,11 +580,18 @@ class GetPatreonFeed(patreonBase.GetPatreonBase):
 						skp += 1
 
 					# Check we're not bugged out (artist should be fixed)
-					try:
-						assert res.artist_id == loc_a_id, "Mismatched artist IDs: '%s' -> '%s'" % (res.artist_id, loc_a_id)
-					except:
-						import pdb
-						pdb.set_trace()
+					if (res.artist_id, loc_a_id) == (169355,  189718) :
+						pass
+					else:
+						try:
+							assert res.artist_id == loc_a_id, "Mismatched artist IDs: '%s' -> '%s'" % (res.artist_id, loc_a_id)
+						except Exception as exc:
+							print("Mismatched artist IDs: '%s' -> '%s'" % (res.artist_id, loc_a_id))
+							traceback.print_exc()
+
+							# import pdb
+							# pdb.set_trace()
+
 
 				else:
 					row = self.db.ArtItem(
@@ -557,6 +624,9 @@ class GetPatreonFeed(patreonBase.GetPatreonBase):
 	# This expects to be able to manipulate the underlying chrome instance.
 	# ---------------------------------------------------------------------------------------------------------------------------------------------------------
 	def save_image(self, aname, pid, fname, furl):
+		if furl.lower().startswith("https://www.youtube.com/"):
+			return None
+
 		self.log.info("Saving file: '%s'", furl)
 		fname = "{pid}-{fname}".format(pid=pid, fname=fname)
 		fdir = self.get_save_dir(aname)
@@ -588,6 +658,10 @@ class GetPatreonFeed(patreonBase.GetPatreonBase):
 
 
 	def save_media(self, aname, pid, dat_struct):
+		if not dat_struct['attributes']['download_url']:
+			self.log.error("Cannot save nonexistent media item: '%s'", dat_struct['attributes']['download_url'])
+			return None
+
 		self.log.info("Saving media item: '%s'", dat_struct['attributes']['download_url'])
 		if dat_struct['attributes']['download_url'].startswith("https"):
 			url = dat_struct['attributes']['download_url']
@@ -682,11 +756,41 @@ class GetPatreonFeed(patreonBase.GetPatreonBase):
 			self.cr.drain_transport()
 			time.sleep(1)
 
+		current_url_chk = self.cr.get_current_url()
+		if not "/posts/" in current_url_chk:
+			self.log.warning("Link redirected to non-post URL! ")
+
+			if current_url_chk.startswith("https://www.patreon.com/c/") and current_url_chk.endswith("/posts"):
+				self.log.warning("Post %s seems to have been removed. Ignoring.", item_id)
+				fail = {
+					'status' : 'item has been removed'
+					}
+				return fail
+
+			if "patreon.com/cw/" in current_url_chk:
+				pass
+			if "patreon.com/c/" in current_url_chk and current_url_chk.endswith("/home"):
+				pass
+			else:
+				import pdb
+				pdb.set_trace()
+
+			self.log.warning("Post %s seems to have been removed. Ignoring.", item_id)
+			fail = {
+				'status' : 'item has been removed'
+				}
+			return fail
+
+
+
 
 		script_ctnt = self.cr.execute_javascript_statement('document.getElementById("__NEXT_DATA__").innerHTML')
-		assert script_ctnt['type'] == 'string'
+		assert isinstance(script_ctnt, dict), "Script must be a dict. Received type %s (%s)" % (type(script_ctnt), script_ctnt)
+		assert script_ctnt['type'] == 'string', "Script must be a string. Received type %s (%s)" % (script_ctnt['type'], script_ctnt)
 
 		item_ctnt = json.loads(script_ctnt['value'])
+
+		post = None
 
 		try:
 			# So pinned ("featured") posts are fiddly here, in that they redirect to the campaign page.
@@ -701,6 +805,12 @@ class GetPatreonFeed(patreonBase.GetPatreonBase):
 
 
 		except KeyError:
+			if 'curtainType' in bootstrap and bootstrap['curtainType'] == "campaign_removed":
+				fail = {
+					'status' : 'Campaign has been removed'
+					}
+				return fail
+
 			self.log.info("Missing bootstrap envelope to parse!")
 			# pprint.pprint(item_ctnt)
 			import pdb
@@ -942,11 +1052,9 @@ class GetPatreonFeed(patreonBase.GetPatreonBase):
 			self.log.error("Not starting")
 			return
 		try:
-			binary = "google-chrome"
-			if 'win32' in sys.platform:
-				binary = "C:/Program\ Files/Google/Chrome/Application/chrome.exe"
+
 			self.cr = ChromeController.ChromeRemoteDebugInterface(
-					binary             = binary,
+					binary             = CHROME_BINARY_NAME,
 					headless           = False,
 					enable_gpu         = True,
 					additional_options = ['--new-window']
@@ -964,10 +1072,10 @@ class GetPatreonFeed(patreonBase.GetPatreonBase):
 				self.log.info("Login attempt status = %s (%s).", cookieStatus, msg)
 				assert cookieStatus, "Login failed! Cannot continue!"
 
-			haveCookie, dummy_message = self.checkCookie()
-			if not haveCookie:
-				self.log.critical("Failed to download cookie! Exiting!")
-				return False
+				haveCookie, dummy_message = self.checkCookie()
+				if not haveCookie:
+					self.log.critical("Failed to download cookie! Exiting!")
+					return False
 
 			if not nameList:
 				nameList = self.getNameList()
@@ -1032,13 +1140,26 @@ class GetPatreonFeed(patreonBase.GetPatreonBase):
 								fetchTime          = fetchtime,
 							)
 						seq += 1
-				elif fetch_ret['status'] in ["cannot view", 'item has been removed']:
-						self._updatePreviouslyRetreived(
-								artist             = artist_str,
-								release_meta       = release_meta,
-								state              = 'error',
-								fetchTime          = datetime.datetime.now(),
-							)
+				elif fetch_ret['status'] in ["cannot view", ]:
+					self.log.info("Setting post error flag as removed.")
+					self._updatePreviouslyRetreived(
+							artist             = artist_str,
+							release_meta       = release_meta,
+							state              = 'cannot_view',
+							fetchTime          = datetime.datetime.now(),
+						)
+					seq += 1
+
+				elif fetch_ret['status'] in ['item has been removed', ]:
+					self.log.info("Setting post error flag as removed.")
+					self._updatePreviouslyRetreived(
+							artist             = artist_str,
+							release_meta       = release_meta,
+							state              = 'error',
+							fetchTime          = datetime.datetime.now(),
+						)
+					seq += 1
+
 				elif fetch_ret['status'] == "Ignore":
 					self.log.info("Ignoring root URL, since it has child-pages.")
 				else:
@@ -1099,13 +1220,24 @@ def run_local():
 
 	# ins.go(ctrlNamespace=flags.namespace, update_namelist=True)
 	ins.go(ctrlNamespace=flags.namespace)
-	print("Done. Doing history fetch...")
+
+	# print("Done. Doing history fetch...")
+	# ins.cr.close()
+	# del ins.cr
+
+	ins.cr = None
+	import gc
+	gc.collect()
+	ins.go(ctrlNamespace=flags.namespace, do_history_update=True)
+
+	print("Done. Exiting.")
+
+
 	ins.cr.close()
 	del ins.cr
 	ins.cr = None
 	import gc
 	gc.collect()
-	ins.go(ctrlNamespace=flags.namespace, do_history_update=True)
 
 
 if __name__ == '__main__':

@@ -47,7 +47,7 @@ def bi_c(element, compiler, **kw):
 	return "INTEGER"
 
 
-dlstate_enum   = Enum('new', 'fetching', 'processing', 'complete', 'error', 'removed', 'disabled', 'specialty_deferred', 'specialty_ready', 'not_set', name='dlstate_enum')
+dlstate_enum   = Enum('new', 'fetching', 'processing', 'complete', 'error',  'cannot_view', 'removed', 'disabled', 'specialty_deferred', 'specialty_ready', 'not_set', name='dlstate_enum')
 
 from sqlalchemy.ext.declarative import declarative_base
 Base = declarative_base()

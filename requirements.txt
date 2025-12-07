@@ -49,4 +49,3 @@ pixivpy==3.7.0
 apng
 chromecontroller
 cloudscraper==1.2.48
-
