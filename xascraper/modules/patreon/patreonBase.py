@@ -244,7 +244,15 @@ class GetPatreonBase(xascraper.modules.scraper_base.ScraperBase):
 
 		self.cr.execute_javascript_statement("document.querySelector(\"button[type='submit']\").click()")
 
-		content = self.cr.get_rendered_page_source()
+		for _ in range(3):
+			try:
+				content = self.cr.get_rendered_page_source()
+				break
+			except ChromeController.ChromeError:
+				self.log.warning("Failed to get rendered page source, retrying.")
+				self.random_sleep(4,5,6)
+				self.cr.Page_reload()
+
 
 		if not settings[self.pluginShortName]['username'] in content:
 			import IPython

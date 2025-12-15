@@ -809,6 +809,7 @@ class GetPatreonFeed(patreonBase.GetPatreonBase):
 				fail = {
 					'status' : 'Campaign has been removed'
 					}
+				self.log.warning("Campaign %s has been removed? Ignoring.", campaign_id)
 				return fail
 
 			self.log.info("Missing bootstrap envelope to parse!")
@@ -882,6 +883,7 @@ class GetPatreonFeed(patreonBase.GetPatreonBase):
 				tags.append(tagmeta['id'].split(";")[-1])
 
 		if 'current_user_can_view' in post_content and not post_content['current_user_can_view']:
+			self.log.warning("You can't view that content!")
 			raise exceptions.CannotAccessException("You can't view that content!")
 
 		# if not 'content' in post_info:
@@ -1148,9 +1150,8 @@ class GetPatreonFeed(patreonBase.GetPatreonBase):
 							state              = 'cannot_view',
 							fetchTime          = datetime.datetime.now(),
 						)
-					seq += 1
 
-				elif fetch_ret['status'] in ['item has been removed', ]:
+				elif fetch_ret['status'] in ['item has been removed', 'Campaign has been removed']:
 					self.log.info("Setting post error flag as removed.")
 					self._updatePreviouslyRetreived(
 							artist             = artist_str,
@@ -1158,7 +1159,6 @@ class GetPatreonFeed(patreonBase.GetPatreonBase):
 							state              = 'error',
 							fetchTime          = datetime.datetime.now(),
 						)
-					seq += 1
 
 				elif fetch_ret['status'] == "Ignore":
 					self.log.info("Ignoring root URL, since it has child-pages.")
