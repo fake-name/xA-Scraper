@@ -205,7 +205,8 @@ settings = {
 
 		"dlDirName"       : "Patreon",
 		"runInterval"     : 60*60*18,   # every 24 hours
-
+		"blacklisted_artists" : ["<some user name>", "<some other user>"], #the display name, japaneese names may need to be escaped, better use the ID instead
+		"blacklisted_artists_ids" : ["<some id>"], # ids in case the user changes screen name
 		'user-url'        : "%s-None"
 	},
 	"ng" : # Newgrounds
